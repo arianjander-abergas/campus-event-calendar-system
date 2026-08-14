@@ -12,15 +12,16 @@
  */
 
 // ---- Placeholder credentials --------------------------------------------
-define('SUPABASE_URL', getenv('SUPABASE_URL') ?: 'https://fgwaeugfkrljgbbgvaox.supabase.co');
-define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnd2FldWdma3JsamdiYmd2YW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTExNjIsImV4cCI6MjEwMjI4NzE2Mn0.HvSYkJy2m0rXo5J-Dlx34tTplUT3qRDoZIM67gyY1dc');
+define('SUPABASE_URL', getenv('SUPABASE_URL') ?: 'https://YOUR-PROJECT-REF.supabase.co');
+define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'YOUR-SUPABASE-ANON-KEY');
 
 // Service role key should ONLY ever be used server-side (never sent to the browser).
 define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-SERVICE-ROLE-KEY');
 
-// ---- Suggested table shape (create these in Supabase's SQL editor) ------
-// events(id uuid pk, title text, category text, cover_url text, event_date date,
-//        location text, status text, attendee_count int, organization_id uuid, created_at timestamptz)
+// ---- Real table shape -----------------------------------------------------
+// events(id uuid pk, title text, poster_url text, start_date date, venue text,
+//        status text, category_id uuid fk -> categories.id, organization_id uuid, created_at timestamptz)
+// categories(id uuid pk, name text)
 // organizations(id uuid pk, name text, logo_url text)
 // registrations(id uuid pk, event_id uuid fk, user_id uuid fk, status text)
 // announcements(id uuid pk, title text, body text, type text, created_at timestamptz)
@@ -30,7 +31,7 @@ define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-
  * Minimal PostgREST request helper.
  *
  * @param string $table   Table name, e.g. "events"
- * @param string $query   Raw PostgREST query string, e.g. "select=*&order=event_date.asc"
+ * @param string $query   Raw PostgREST query string, e.g. "select=*,categories(name)&order=start_date.asc"
  * @param string $method  GET | POST | PATCH | DELETE
  * @param array|null $body Payload for POST/PATCH
  * @param bool $useServiceKey Use the service role key instead of anon key (server-only actions)
@@ -44,6 +45,13 @@ function supabase_request(string $table, string $query = '', string $method = 'G
     // the mock branch below (or leave it as an offline fallback).
     if (SUPABASE_URL === 'https://YOUR-PROJECT-REF.supabase.co') {
         return supabase_mock_data($table);
+    }
+
+    // Default to embedding the categories relationship whenever events
+    // is queried without an explicit select, so $ev['categories']['name']
+    // works the way the templates expect.
+    if ($table === 'events' && $query === '' && $method === 'GET') {
+        $query = 'select=*,categories(name)&order=start_date.asc';
     }
 
     $key = $useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
@@ -79,16 +87,17 @@ function supabase_request(string $table, string $query = '', string $method = 'G
 
 /**
  * Sample data so the frontend renders sensibly before Supabase is connected.
- * Mirrors the table shapes documented above.
+ * Mirrors the real table shapes documented above (poster_url, start_date,
+ * venue, nested categories.name) so mock mode and real mode behave the same.
  */
 function supabase_mock_data(string $table): array
 {
     $mocks = [
         'events' => [
-            ['id' => 1, 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'category' => 'Seminar', 'cover_url' => 'assets/event-pace.jpg', 'event_date' => 'TBA', 'location' => 'AVR 1, CITE Building', 'attendee_count' => 0],
-            ['id' => 2, 'title' => 'OSH Training or SIES-ACpEs', 'category' => 'Seminar', 'cover_url' => 'assets/event-osh.jpg', 'event_date' => 'TBA', 'location' => 'AVR 1, CITE Building', 'attendee_count' => 0],
-            ['id' => 3, 'title' => 'GEN Z Night 2026', 'category' => 'Event', 'cover_url' => 'assets/event-genz.jpg', 'event_date' => 'TBA', 'location' => 'AVR 1, CITE Building', 'attendee_count' => 0],
-            ['id' => 4, 'title' => 'JPSSITE Talk: Misinformation', 'category' => 'Seminar', 'cover_url' => 'assets/event-talk.jpg', 'event_date' => 'TBA', 'location' => 'AVR 1, CITE Building', 'attendee_count' => 0],
+            ['id' => 1, 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-pace.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 2, 'title' => 'OSH Training or SIES-ACpEs', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-osh.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 3, 'title' => 'GEN Z Night 2026', 'categories' => ['name' => 'Event'], 'poster_url' => 'assets/event-genz.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 4, 'title' => 'JPSSITE Talk: Misinformation', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-talk.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
         ],
         'announcements' => [
             ['id' => 1, 'title' => 'New scholarship opportunity available!', 'type' => 'info', 'created_at' => 'TBA'],
