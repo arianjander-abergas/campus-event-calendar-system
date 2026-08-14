@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Event Hub | La Consolacion University Philippines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<!-- Supabase JS client (used to load event data + images from Supabase) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#" class="logo">
+      <span class="logo-icon">
+        <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
+          <rect x="4" y="14" width="40" height="26" rx="3" fill="#1b5fa8"/>
+          <rect x="4" y="14" width="40" height="7" rx="3" fill="#ff7a1a"/>
+          <circle cx="24" cy="27.5" r="8" fill="#fff"/>
+          <circle cx="24" cy="27.5" r="6" fill="#1b5fa8"/>
+          <path d="M24 23v4.5l3 2" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="17" y="6" width="4" height="8" rx="1.5" fill="#ff7a1a"/>
+          <rect x="27" y="6" width="4" height="8" rx="1.5" fill="#1b5fa8"/>
+        </svg>
+      </span>
+      <span class="logo-text">
+        <span class="logo-top">CAMPUS<span class="logo-hub"> EVENT HUB</span></span>
+        <span class="logo-bottom">EVENT HUB</span>
+      </span>
+    </a>
+
+    <nav class="main-nav">
+      <a href="#" class="active">Home</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#organizations">Organizations</a>
+      <a href="#about">About Us</a>
+    </nav>
+
+    <div class="header-actions">
+      <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" placeholder="Search for events, organizations, or keywords">
+      </div>
+      <button class="btn-login">LOGIN</button>
+    </div>
+
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+
+  <nav class="mobile-nav" id="mobileNav">
+    <a href="#" class="active">Home</a>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#organizations">Organizations</a>
+    <a href="#about">About Us</a>
+    <div class="mobile-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" placeholder="Search events...">
+    </div>
+    <button class="btn-login btn-login-mobile">LOGIN</button>
+  </nav>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="hero-media">
+    <svg class="hero-illustration" viewBox="0 0 1600 560" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+      <rect width="1600" height="560" fill="#0b3550"/>
+      <rect y="360" width="1600" height="200" fill="#123a55"/>
+      <!-- distant buildings -->
+      <g opacity="0.5" fill="#0e4160">
+        <rect x="40" y="260" width="90" height="140"/>
+        <rect x="150" y="230" width="70" height="170"/>
+        <rect x="1400" y="240" width="90" height="160"/>
+        <rect x="1500" y="270" width="70" height="130"/>
+      </g>
+      <!-- main building -->
+      <g>
+        <rect x="330" y="90" width="620" height="330" fill="#3fa8c9"/>
+        <rect x="330" y="90" width="620" height="330" fill="url(#buildGrad)"/>
+        <!-- floor lines -->
+        <g stroke="#1c6f8c" stroke-width="3">
+          <line x1="330" y1="150" x2="950" y2="150"/>
+          <line x1="330" y1="210" x2="950" y2="210"/>
+          <line x1="330" y1="270" x2="950" y2="270"/>
+          <line x1="330" y1="330" x2="950" y2="330"/>
+        </g>
+        <!-- windows grid -->
+        <g fill="#dff3fa" opacity="0.85">
+          <!-- generate rows programmatically-like via repeated rects -->
+        </g>
+        <g fill="#eaf7fb">
+          <rect x="350" y="100" width="26" height="38"/>
+          <rect x="390" y="100" width="26" height="38"/>
+          <rect x="430" y="100" width="26" height="38"/>
+          <rect x="470" y="100" width="26" height="38"/>
+          <rect x="510" y="100" width="26" height="38"/>
+          <rect x="550" y="100" width="26" height="38"/>
+          <rect x="590" y="100" width="26" height="38"/>
+          <rect x="630" y="100" width="26" height="38"/>
+          <rect x="670" y="100" width="26" height="38"/>
+          <rect x="710" y="100" width="26" height="38"/>
+          <rect x="750" y="100" width="26" height="38"/>
+          <rect x="790" y="100" width="26" height="38"/>
+          <rect x="830" y="100" width="26" height="38"/>
+          <rect x="870" y="100" width="26" height="38"/>
+          <rect x="910" y="100" width="26" height="38"/>
+
+          <rect x="350" y="160" width="26" height="38"/>
+          <rect x="390" y="160" width="26" height="38"/>
+          <rect x="430" y="160" width="26" height="38"/>
+          <rect x="470" y="160" width="26" height="38"/>
+          <rect x="510" y="160" width="26" height="38"/>
+          <rect x="550" y="160" width="26" height="38"/>
+          <rect x="590" y="160" width="26" height="38"/>
+          <rect x="630" y="160" width="26" height="38"/>
+          <rect x="670" y="160" width="26" height="38"/>
+          <rect x="710" y="160" width="26" height="38"/>
+          <rect x="750" y="160" width="26" height="38"/>
+          <rect x="790" y="160" width="26" height="38"/>
+          <rect x="830" y="160" width="26" height="38"/>
+          <rect x="870" y="160" width="26" height="38"/>
+          <rect x="910" y="160" width="26" height="38"/>
+
+          <rect x="350" y="220" width="26" height="38"/>
+          <rect x="390" y="220" width="26" height="38"/>
+          <rect x="430" y="220" width="26" height="38"/>
+          <rect x="470" y="220" width="26" height="38"/>
+          <rect x="510" y="220" width="26" height="38"/>
+          <rect x="550" y="220" width="26" height="38"/>
+          <rect x="590" y="220" width="26" height="38"/>
+          <rect x="630" y="220" width="26" height="38"/>
+          <rect x="670" y="220" width="26" height="38"/>
+          <rect x="710" y="220" width="26" height="38"/>
+          <rect x="750" y="220" width="26" height="38"/>
+          <rect x="790" y="220" width="26" height="38"/>
+          <rect x="830" y="220" width="26" height="38"/>
+          <rect x="870" y="220" width="26" height="38"/>
+          <rect x="910" y="220" width="26" height="38"/>
+
+          <rect x="350" y="280" width="26" height="38"/>
+          <rect x="390" y="280" width="26" height="38"/>
+          <rect x="430" y="280" width="26" height="38"/>
+          <rect x="470" y="280" width="26" height="38"/>
+          <rect x="510" y="280" width="26" height="38"/>
+          <rect x="550" y="280" width="26" height="38"/>
+          <rect x="590" y="280" width="26" height="38"/>
+          <rect x="630" y="280" width="26" height="38"/>
+          <rect x="670" y="280" width="26" height="38"/>
+          <rect x="710" y="280" width="26" height="38"/>
+          <rect x="750" y="280" width="26" height="38"/>
+          <rect x="790" y="280" width="26" height="38"/>
+          <rect x="830" y="280" width="26" height="38"/>
+          <rect x="870" y="280" width="26" height="38"/>
+          <rect x="910" y="280" width="26" height="38"/>
+        </g>
+        <rect x="330" y="90" width="620" height="20" fill="#ff7a1a"/>
+      </g>
+      <!-- torch monument -->
+      <g transform="translate(1010,300)">
+        <rect x="-6" y="60" width="12" height="90" fill="#e8e8e8"/>
+        <ellipse cx="0" cy="60" rx="26" ry="10" fill="#d64545"/>
+        <path d="M-14 10 C-14 40 14 40 14 10 C14 -6 0 -20 0 -20 C0 -20 -14 -6 -14 10Z" fill="#ff7a1a"/>
+        <path d="M-7 6 C-7 22 7 22 7 6 C7 -3 0 -12 0 -12 C0 -12 -7 -3 -7 6Z" fill="#ffd23f"/>
+      </g>
+      <!-- foreground foliage -->
+      <g fill="#0d3a2a">
+        <ellipse cx="120" cy="430" rx="140" ry="46"/>
+        <ellipse cx="260" cy="450" rx="110" ry="40"/>
+        <ellipse cx="1250" cy="440" rx="160" ry="50"/>
+        <ellipse cx="1440" cy="455" rx="120" ry="42"/>
+      </g>
+      <defs>
+        <linearGradient id="buildGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#57b8d4"/>
+          <stop offset="100%" stop-color="#2f89a8"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="hero-scrim"></div>
+  </div>
+
+  <div class="hero-content">
+    <p class="hero-eyebrow">La Consolacion University Philippines</p>
+    <h1 class="hero-title">Create, Innovate,<br>Transform &amp; Empower</h1>
+    <p class="hero-sub">Campus Event Hub is your one-stop platform for discovering<br>campus events, registering, and getting involved.</p>
+    <a href="#events" class="btn-explore">Explore Events</a>
+  </div>
+
+  <div class="hero-updates">
+    <span class="bell-badge">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1b5fa8" stroke-width="2">
+        <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 01-3.46 0"/>
+      </svg>
+    </span>
+    <span class="hero-updates-text">Stay Updated</span>
+  </div>
+</section>
+
+<!-- ===== FEATURE STRIP + STATS ===== -->
+<section class="feature-strip">
+  <div class="feature-strip-inner">
+    <div class="features">
+      <div class="feature">
+        <span class="feature-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b5fa8" stroke-width="1.8">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+          </svg>
+        </span>
+        <span class="feature-text">
+          <strong>All Campus Event</strong>
+          Find academic, innovative and more.
+        </span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b5fa8" stroke-width="1.8">
+            <circle cx="9" cy="8" r="3.2"/>
+            <path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6"/>
+            <circle cx="18" cy="9" r="2.4"/>
+            <path d="M15.5 14.3c2.6.3 4.5 2.3 4.5 5.2"/>
+          </svg>
+        </span>
+        <span class="feature-text">
+          <strong>Easy Participation</strong>
+          Register in just a few clicks.
+        </span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b5fa8" stroke-width="1.8">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        </span>
+        <span class="feature-text">
+          <strong>Stay Updated</strong>
+          Get real-time updates and reminders.
+        </span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1b5fa8" stroke-width="1.8">
+            <circle cx="12" cy="8" r="5.5"/>
+            <path d="M8.2 12.9L7 21l5-2.6L17 21l-1.2-8.1"/>
+          </svg>
+        </span>
+        <span class="feature-text">
+          <strong>Earn Certificates</strong>
+          Get recognized for your participation.
+        </span>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-num" data-target="0">000+</span>
+        <span class="stat-label">Events</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="0">0+</span>
+        <span class="stat-label">Organizations</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="0">0.0k+</span>
+        <span class="stat-label">Active Users</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num" data-target="0">00k+</span>
+        <span class="stat-label">Registrations</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== EVENTS + SIDEBAR ===== -->
+<section class="events-section" id="events">
+  <div class="events-layout">
+
+    <div class="events-grid" id="eventsGrid">
+
+      <article class="event-card">
+        <div class="event-thumb">
+          <img src="https://placehold.co/400x300/6a1b9a/ffffff?text=Event+Cover" alt="JPSSITE PACE LEVEL UP v.6.2 cover image" loading="lazy">
+          <span class="badge badge-seminar">Seminar</span>
+        </div>
+        <div class="event-body">
+          <h3>JPSSITE PACE LEVEL UP v.6.2</h3>
+          <ul class="event-meta">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+              Month 00 0000
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+              AVR 1, CITE Building
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              000 slots
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="event-card">
+        <div class="event-thumb">
+          <img src="https://placehold.co/400x300/b8860b/ffffff?text=Event+Cover" alt="OSH Training or SIES-ACpEs cover image" loading="lazy">
+          <span class="badge badge-seminar">Seminar</span>
+        </div>
+        <div class="event-body">
+          <h3>OSH Training or SIES-ACpEs</h3>
+          <ul class="event-meta">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+              Month 00 0000
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+              AVR 1, CITE Building
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              000 slots
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="event-card">
+        <div class="event-thumb">
+          <img src="https://placehold.co/400x300/1a1a1a/ff3b3b?text=Event+Cover" alt="GEN Z Night 2026 cover image" loading="lazy">
+          <span class="badge badge-event">Event</span>
+        </div>
+        <div class="event-body">
+          <h3>GEN Z Night 2026</h3>
+          <ul class="event-meta">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+              Month 00 0000
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+              AVR 1, CITE Building
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              000 slots
+            </li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="event-card">
+        <div class="event-thumb">
+          <img src="https://placehold.co/400x300/b23a6b/ffffff?text=Event+Cover" alt="JPSSITE TALK MISINFORMATION cover image" loading="lazy">
+          <span class="badge badge-seminar">Seminar</span>
+        </div>
+        <div class="event-body">
+          <h3>JPSSITE TALK MISINFORMATION</h3>
+          <ul class="event-meta">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+              Month 00 0000
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0116 0z"/><circle cx="12" cy="10" r="2.6"/></svg>
+              AVR 1, CITE Building
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              000 slots
+            </li>
+          </ul>
+        </div>
+      </article>
+
+    </div>
+
+    <aside class="sidebar">
+      <h2>Upcoming Today</h2>
+      <ul class="upcoming-list" id="upcomingList">
+        <li>
+          <img class="upcoming-thumb" src="https://placehold.co/120x120/c62828/ffffff?text=%E2%99%AB" alt="JPSSITE LIVE BAND UPSTATE thumbnail" loading="lazy">
+          <div class="upcoming-info">
+            <p class="upcoming-title">JPSSITE LIVE BAND UPSTATE</p>
+            <p class="upcoming-meta">Month 00 0000 &nbsp;|&nbsp; AVR 1, CITE Building</p>
+          </div>
+        </li>
+        <li>
+          <img class="upcoming-thumb" src="https://placehold.co/120x120/8a5a00/ffffff?text=%F0%9F%8E%A4" alt="TAWAG NG JPSSITE thumbnail" loading="lazy">
+          <div class="upcoming-info">
+            <p class="upcoming-title">TAWAG NG JPSSITE</p>
+            <p class="upcoming-meta">Month 00 0000 &nbsp;|&nbsp; AVR 1, CITE Building</p>
+          </div>
+        </li>
+        <li>
+          <img class="upcoming-thumb" src="https://placehold.co/120x120/2a2a2a/ff3b3b?text=GZ" alt="GEN Z Night 2026 thumbnail" loading="lazy">
+          <div class="upcoming-info">
+            <p class="upcoming-title">GEN Z Night 2026</p>
+            <p class="upcoming-meta">Month 00 0000 &nbsp;|&nbsp; AVR 1, CITE Building</p>
+          </div>
+        </li>
+      </ul>
+    </aside>
+
+  </div>
+</section>
+
+<footer class="site-footer">
+  <p>&copy; 2026 Campus Event Hub &mdash; La Consolacion University Philippines</p>
+</footer>
+
+<script src="supabase-config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
