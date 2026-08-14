@@ -76,18 +76,23 @@ function initials(string $name): string {
       <a href="#" class="view-all">View All</a>
     </div>
     <div class="dash-events-row">
-      <?php foreach (array_slice($events, 0, 3) as $ev): ?>
+      <?php foreach (array_slice($events, 0, 3) as $ev):
+        // categories comes from a joined table, so it may be null/missing
+        $categoryName = $ev['categories']['name'] ?? 'Event';
+      ?>
         <article class="event-card">
-          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['cover_url']) ?>');">
-            <span class="event-tag <?= $ev['category'] === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
-              <?= htmlspecialchars($ev['category']) ?>
+          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url']) ?>');">
+            <span class="event-tag <?= $categoryName === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
+              <?= htmlspecialchars($categoryName) ?>
             </span>
           </div>
           <div class="event-body">
             <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-            <div class="event-meta">📅 <?= htmlspecialchars($ev['event_date']) ?></div>
-            <div class="event-meta">📍 <?= htmlspecialchars($ev['location']) ?></div>
-            <div class="event-going">👥 <?= (int)$ev['attendee_count'] ?>0 going</div>
+            <div class="event-meta">📅 <?= htmlspecialchars($ev['start_date']) ?></div>
+            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue']) ?></div>
+            <!-- attendee_count no longer lives on the events row; it needs a
+                 separate count query (e.g. registrations count per event_id).
+                 Until that's wired up we just omit the "going" line. -->
           </div>
         </article>
       <?php endforeach; ?>

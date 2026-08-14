@@ -1,62 +1,45 @@
-/**
- * Supabase client — PLACEHOLDER.
- *
- * 1. Include the Supabase JS library in your page:
- *    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
- * 2. Fill in your real project URL + anon key below.
- * 3. Then everything in campus.js that calls `db.*` will start hitting
- *    your real Supabase tables instead of the local mock data.
- */
-
-const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-SUPABASE-ANON-KEY";
+const SUPABASE_URL = "https://fgwaeugfkrljgbbgvaox.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnd2FldWdma3JsamdiYmd2YW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTExNjIsImV4cCI6MjEwMjI4NzE2Mn0.HvSYkJy2m0rXo5J-Dlx34tTplUT3qRDoZIM67gyY1dc";
 
 let supabaseClient = null;
 
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient;
-
   if (typeof window.supabase === "undefined") {
-    console.warn(
-      "[Supabase] JS library not loaded — add the CDN script tag. Falling back to mock mode."
-    );
+    console.warn("[Supabase] JS library not loaded — add the CDN script tag. Falling back to mock mode.");
     return null;
   }
-
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return supabaseClient;
 }
 
 const isSupabaseConfigured = () => SUPABASE_URL.startsWith("https://YOUR-PROJECT-REF") === false;
 
-/**
- * Tiny data-access layer used by the pages. Every method tries Supabase
- * first (when configured) and falls back to bundled mock/sample data so
- * the UI never breaks while the backend isn't wired up yet.
- */
 const db = {
   async getEvents() {
     if (isSupabaseConfigured()) {
       const client = getSupabaseClient();
       const { data, error } = await client
         .from("events")
-        .select("*")
-        .order("event_date", { ascending: true });
+        .select("*, categories(name)")
+        .eq("is_published", true)
+        .order("start_date", { ascending: true });
       if (!error) return data;
       console.error("[Supabase] getEvents error:", error);
     }
     return window.MOCK_EVENTS || [];
   },
 
-  async getAnnouncements() {
-    if (isSupabaseConfigured()) {
+  async getNotifications(userId) {
+    if (isSupabaseConfigured() && userId) {
       const client = getSupabaseClient();
       const { data, error } = await client
-        .from("announcements")
+        .from("notifications")
         .select("*")
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
       if (!error) return data;
-      console.error("[Supabase] getAnnouncements error:", error);
+      console.error("[Supabase] getNotifications error:", error);
     }
     return window.MOCK_ANNOUNCEMENTS || [];
   },
@@ -65,13 +48,27 @@ const db = {
     if (isSupabaseConfigured()) {
       const client = getSupabaseClient();
       const { data, error } = await client
-        .from("registrations")
+        .from("event_registrations")
         .insert([{ event_id: eventId, user_id: userId, status: "registered" }]);
       if (!error) return data;
       console.error("[Supabase] registerForEvent error:", error);
     }
     console.info("[Mock mode] Would register user", userId, "for event", eventId);
     return { mock: true };
+  },
+
+  async getAttendeeCount(eventId) {
+    if (isSupabaseConfigured()) {
+      const client = getSupabaseClient();
+      const { count, error } = await client
+        .from("event_registrations")
+        .select("*", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .eq("status", "registered");
+      if (!error) return count;
+      console.error("[Supabase] getAttendeeCount error:", error);
+    }
+    return 0;
   },
 
   async signIn(email, password) {
