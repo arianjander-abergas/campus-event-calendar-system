@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/config/supabase.php';
 
-$user = current_user();
+$user = require_login(); // redirects to login.php if not authenticated
 $events = supabase_request('events');
 $announcements = supabase_request('announcements');
 
@@ -59,7 +59,7 @@ function initials(string $name): string {
           <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
           <div class="user-role"><?= htmlspecialchars($user['role']) ?></div>
         </div>
-        <span>⌄</span>
+        <a href="logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
       </div>
     </div>
   </header>

@@ -6,7 +6,6 @@
 
 document.addEventListener("DOMContentLoaded", () => {
   buildCalendar();
-  wireLoginButton();
   wireEventCardClicks();
 });
 
@@ -53,26 +52,14 @@ function buildCalendar() {
   grid.innerHTML = html;
 }
 
-/* ---------------- Login button (placeholder auth flow) ---------------- */
-function wireLoginButton() {
-  const loginBtn = document.querySelector(".btn-login");
-  if (!loginBtn) return;
-
-  loginBtn.addEventListener("click", async () => {
-    // Placeholder: swap this for a real login modal / page, then call
-    // db.signIn(email, password) once Supabase Auth is configured.
-    console.info("[Auth] Login clicked — wire this up to db.signIn(email, password).");
-    window.location.href = "dashboard.php";
-  });
-}
-
 /* ---------------- Event card clicks (placeholder registration) ---------------- */
 function wireEventCardClicks() {
   document.querySelectorAll(".event-card").forEach((card) => {
     card.addEventListener("click", async () => {
       const title = card.querySelector(".event-name")?.textContent ?? "this event";
-      // Placeholder: once real event IDs + a logged-in user are available,
-      // call db.registerForEvent(eventId, userId) here.
+      // Placeholder: once real event IDs are available on the card (e.g. a
+      // data-event-id attribute), call db.registerForEvent(eventId, userId)
+      // here, where userId comes from the logged-in PHP session.
       console.info(`[Events] Clicked "${title}" — hook up db.registerForEvent() here.`);
     });
   });

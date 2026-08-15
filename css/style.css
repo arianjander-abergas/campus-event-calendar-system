@@ -683,3 +683,94 @@ button { font-family: inherit; cursor: pointer; }
   .dash-topbar { grid-column: 1; }
   .dash-events-row, .two-col-lists { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   AUTH PAGES (login / register)
+   ============================================================ */
+
+.btn-login {
+  display: inline-flex;
+  align-items: center;
+}
+
+.auth-shell {
+  min-height: calc(100vh - 73px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: var(--bg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 32px;
+}
+
+.auth-title {
+  margin: 0 0 6px;
+  font-size: 1.4rem;
+  color: var(--navy);
+}
+.auth-sub {
+  margin: 0 0 22px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-form label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 10px;
+}
+.auth-form input {
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+}
+.auth-form input:focus {
+  border-color: var(--blue-accent);
+}
+
+.auth-submit {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.auth-footnote {
+  margin: 20px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.auth-footnote a {
+  color: var(--blue-accent);
+  font-weight: 700;
+}
+
+.auth-alert, .auth-success {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+.auth-alert {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.auth-success {
+  background: #dcfce7;
+  color: #166534;
+}

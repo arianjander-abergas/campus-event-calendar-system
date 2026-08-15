@@ -1,3 +1,13 @@
+<?php
+// This partial is included from pages that have already required
+// config/supabase.php, so current_user()/session_start_once() exist.
+// Guard just in case a page includes header.php on its own.
+if (!function_exists('current_user')) {
+    require_once __DIR__ . '/../config/supabase.php';
+}
+session_start_once();
+$__headerUser = current_user();
+?>
 <header class="site-header">
   <a href="index.php" class="brand">
     <span class="brand-icon">📅</span>
@@ -19,6 +29,13 @@
       <span>🔍</span>
       <input type="text" placeholder="Search for events, organizations, or keywords">
     </div>
-    <button class="btn-login">LOGIN</button>
+    <?php if ($__headerUser): ?>
+      <div class="user-chip">
+        <span class="user-name"><?= htmlspecialchars($__headerUser['full_name']) ?></span>
+        <a href="logout.php" class="btn-login" style="background:#6b7280;">LOG OUT</a>
+      </div>
+    <?php else: ?>
+      <a href="login.php" class="btn-login">LOGIN</a>
+    <?php endif; ?>
   </div>
 </header>
