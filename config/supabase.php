@@ -19,9 +19,6 @@ define('SUPABASE_URL', getenv('SUPABASE_URL') ?: 'https://fgwaeugfkrljgbbgvaox.s
 define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnd2FldWdma3JsamdiYmd2YW94Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3MTExNjIsImV4cCI6MjEwMjI4NzE2Mn0.HvSYkJy2m0rXo5J-Dlx34tTplUT3qRDoZIM67gyY1dc');
 
 // Service role key should ONLY ever be used server-side (never sent to the browser).
-// Not required for the auth flow below (it deliberately uses the user's own
-// access token so Row Level Security still applies), but kept here for future
-// admin-only backend actions (e.g. approving events, deleting users).
 define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-SERVICE-ROLE-KEY');
 
 // ---- Real table shape -----------------------------------------------------
@@ -36,9 +33,9 @@ define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-
 // Required Supabase Auth setup (do this once in the dashboard):
 // 1. Auth -> Providers -> Email: enable "Email" provider (password sign-in).
 // 2. Auth -> Policies (or SQL editor), on `profiles`, add RLS policies:
-//      - insert: with check (auth.uid() = id)
-//      - select: using (true)                -- or auth.uid() = id if profiles should be private
-//      - update: using (auth.uid() = id) with check (auth.uid() = id)
+//    - insert: with check (auth.uid() = id)
+//    - select: using (true)  -- or auth.uid() = id if profiles should be private
+//    - update: using (auth.uid() = id) with check (auth.uid() = id)
 //    Without the insert policy, register.php's profile-creation step will fail.
 // 3. If you want email confirmation OFF for easier testing, turn off
 //    "Confirm email" under Auth -> Providers -> Email (re-enable for production).
@@ -64,6 +61,7 @@ function supabase_http(string $method, string $url, array $headers, ?array $body
     if ($err) {
         return ['ok' => false, 'status' => 0, 'data' => ['error' => $err]];
     }
+
     $decoded = json_decode($response, true);
     return [
         'ok' => $httpCode >= 200 && $httpCode < 300,
@@ -73,25 +71,30 @@ function supabase_http(string $method, string $url, array $headers, ?array $body
 }
 
 /**
- * Minimal PostgREST request helper (unchanged data-access path).
+ * Minimal PostgREST request helper (hardened: never leaks a raw API-error
+ * object back to callers that expect an array of rows).
  *
- * @param string $table   Table name, e.g. "events"
- * @param string $query   Raw PostgREST query string, e.g. "select=*,categories(name)&order=start_date.asc"
- * @param string $method  GET | POST | PATCH | DELETE
- * @param array|null $body Payload for POST/PATCH
- * @param bool $useServiceKey Use the service role key instead of anon key (server-only actions)
+ * @param string $table          Table name, e.g. "events"
+ * @param string $query          Raw PostgREST query string, e.g. "select=*,categories(name)&order=start_date.asc"
+ * @param string $method         GET | POST | PATCH | DELETE
+ * @param array|null $body       Payload for POST/PATCH
+ * @param bool $useServiceKey    Use the service role key instead of anon key (server-only actions)
  * @param string|null $userToken If set, sent as the Authorization bearer instead of the anon/service
- *                               key, so requests run AS that user and RLS policies apply to them.
- * @return array Decoded JSON response (or ['error' => ...] on failure)
+ *                                key, so requests run AS that user and RLS policies apply to them.
+ * @return array Decoded JSON response (array of rows), or [] on any failure.
  */
 function supabase_request(string $table, string $query = '', string $method = 'GET', ?array $body = null, bool $useServiceKey = false, ?string $userToken = null): array
 {
+    // Default to embedding the categories relationship whenever events
+    // is queried without an explicit select, so $ev['categories']['name']
+    // works the way the templates expect.
     if ($table === 'events' && $query === '' && $method === 'GET') {
         $query = 'select=*,categories(name)&order=start_date.asc';
     }
 
     $authKey = $useServiceKey ? SUPABASE_SERVICE_KEY : SUPABASE_ANON_KEY;
     $bearer = $userToken ?: $authKey;
+
     $url = rtrim(SUPABASE_URL, '/') . '/rest/v1/' . $table . ($query ? '?' . $query : '');
 
     $result = supabase_http($method, $url, [
@@ -101,10 +104,36 @@ function supabase_request(string $table, string $query = '', string $method = 'G
         'Prefer: return=representation',
     ], $body);
 
-    if (!$result['ok'] && $result['status'] === 0) {
-        // Network-level failure (no Supabase reachable at all) — fall back to
-        // mock data so the UI still renders something during dev/offline work.
-        return supabase_mock_data($table);
+    // Any failure — network-level (status 0) OR an API-level error response
+    // (missing table, bad query, RLS block, etc.) — must NEVER hand the raw
+    // error object back to callers expecting an array of rows. That's what
+    // caused foreach ($stats as $s) { $s['value'] } to fatal-error: $s ended
+    // up being a plain string from the error object instead of a row.
+    if (!$result['ok']) {
+        error_log(sprintf(
+            '[supabase_request] %s %s failed (HTTP %d): %s',
+            $method,
+            $table,
+            $result['status'],
+            json_encode($result['data'])
+        ));
+
+        // GET requests: fall back to mock/demo data so the page still renders.
+        if ($method === 'GET') {
+            return supabase_mock_data($table);
+        }
+
+        // Writes (POST/PATCH/DELETE): return empty array instead of the raw
+        // error object, so callers using empty()/foreach() stay safe.
+        return [];
+    }
+
+    // Defensive guard: even a 2xx response should be an array of rows.
+    // If PostgREST ever returns something unexpected, don't let a
+    // non-array leak into a foreach() in a template.
+    if (!is_array($result['data'])) {
+        error_log("[supabase_request] $method $table returned non-array data, coercing to []");
+        return [];
     }
 
     return $result['data'];
@@ -214,6 +243,7 @@ function supabase_auth_signin(string $email, string $password): array
     }
 
     $fullName = $user['user_metadata']['full_name'] ?? explode('@', $email)[0];
+
     ensure_profile_exists($user['id'], $fullName, $accessToken);
     start_user_session($user, $fullName, $data['refresh_token'] ?? null, $accessToken);
 

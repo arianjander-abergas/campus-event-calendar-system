@@ -2,7 +2,7 @@
 require_once __DIR__ . '/config/supabase.php';
 session_start_once();
 
-// Already logged in? Skip straight to the dashboard.
+// If logged in, skip straight to the dashboard.
 if (current_user()) {
     header('Location: dashboard.php');
     exit;
