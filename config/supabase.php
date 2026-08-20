@@ -30,6 +30,18 @@ define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-
 // announcements(id uuid pk, title text, body text, type text, created_at timestamptz)
 // profiles(id uuid pk references auth.users(id), full_name text, role text, avatar_url text)
 //
+// NOTE: the ER diagram this project was designed from actually names two of
+// these tables differently — `event_registrations` (not `registrations`) and
+// `notifications` (not `announcements`), and event_registrations has a
+// `registered_at` column rather than relying on a generic timestamp. The
+// helpers added below (register_for_event, is_registered,
+// get_registration_count) use `event_registrations` to match that diagram.
+// dashboard.php's existing "Announcements" panel is left as-is on
+// `announcements`, since it may be an intentionally separate,
+// school-wide-broadcast table rather than the per-user `notifications` one —
+// worth confirming which table actually exists in your Supabase project and
+// aligning whichever side is stale.
+//
 // Required Supabase Auth setup (do this once in the dashboard):
 // 1. Auth -> Providers -> Email: enable "Email" provider (password sign-in).
 // 2. Auth -> Policies (or SQL editor), on `profiles`, add RLS policies:
@@ -162,6 +174,10 @@ function supabase_mock_data(string $table): array
             ['label' => 'Active Users', 'value' => '0.0k+'],
             ['label' => 'Registrations', 'value' => '00k+'],
         ],
+        // No rows by default — event-details.php still renders fine (just
+        // shows 0 registered / an empty state) when Supabase is unreachable.
+        'event_registrations' => [],
+        'notifications' => [],
     ];
 
     return $mocks[$table] ?? [];
@@ -282,6 +298,76 @@ function ensure_profile_exists(string $userId, string $fullName, string $accessT
     if (empty($existing)) {
         create_profile($userId, $fullName, $accessToken);
     }
+}
+
+// =============================================================================
+// EVENT REGISTRATION  (event_registrations table — see schema note at top)
+// =============================================================================
+// These run the insert/select AS the logged-in user (their own access token,
+// same pattern as create_profile()/ensure_profile_exists() above) so RLS can
+// enforce "auth.uid() = user_id" the same way it does on `profiles`. If you
+// haven't added that policy on event_registrations yet:
+//
+//   create policy "Users can register themselves"
+//     on event_registrations for insert
+//     with check (auth.uid() = user_id);
+//
+//   create policy "Users can view their own registrations"
+//     on event_registrations for select
+//     using (auth.uid() = user_id);
+
+/**
+ * Register the current session's user for an event.
+ * @return array{ok:bool, message:string}
+ */
+function register_for_event(string $eventId): array
+{
+    $user = current_user();
+    if (!$user) {
+        return ['ok' => false, 'message' => 'Please log in to register for this event.'];
+    }
+    $token = $_SESSION['access_token'] ?? null;
+
+    $existing = supabase_request(
+        'event_registrations',
+        'select=id&event_id=eq.' . urlencode($eventId) . '&user_id=eq.' . urlencode($user['id']),
+        'GET', null, false, $token
+    );
+    if (!empty($existing)) {
+        return ['ok' => false, 'message' => "You're already registered for this event."];
+    }
+
+    $result = supabase_request('event_registrations', '', 'POST', [
+        'event_id' => $eventId,
+        'user_id' => $user['id'],
+        'status' => 'pending',
+        'registered_at' => date('c'),
+    ], false, $token);
+
+    if (empty($result)) {
+        return ['ok' => false, 'message' => 'Something went wrong registering you. Please try again.'];
+    }
+    return ['ok' => true, 'message' => "You're registered! We'll notify you with any updates."];
+}
+
+/** Whether the current logged-in user is already registered for an event. */
+function is_registered(string $eventId): bool
+{
+    $user = current_user();
+    if (!$user) return false;
+    $rows = supabase_request(
+        'event_registrations',
+        'select=id&event_id=eq.' . urlencode($eventId) . '&user_id=eq.' . urlencode($user['id']),
+        'GET', null, false, $_SESSION['access_token'] ?? null
+    );
+    return !empty($rows);
+}
+
+/** Total registration count for an event (any status), for a "N going" style line. */
+function get_registration_count(string $eventId): int
+{
+    $rows = supabase_request('event_registrations', 'select=id&event_id=eq.' . urlencode($eventId));
+    return count($rows);
 }
 
 function session_start_once(): void

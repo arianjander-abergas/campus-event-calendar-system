@@ -52,15 +52,13 @@ function buildCalendar() {
   grid.innerHTML = html;
 }
 
-/* ---------------- Event card clicks (placeholder registration) ---------------- */
+/* ---------------- Event card clicks -> Event Details page ---------------- */
 function wireEventCardClicks() {
-  document.querySelectorAll(".event-card").forEach((card) => {
-    card.addEventListener("click", async () => {
-      const title = card.querySelector(".event-name")?.textContent ?? "this event";
-      // Placeholder: once real event IDs are available on the card (e.g. a
-      // data-event-id attribute), call db.registerForEvent(eventId, userId)
-      // here, where userId comes from the logged-in PHP session.
-      console.info(`[Events] Clicked "${title}" — hook up db.registerForEvent() here.`);
+  document.querySelectorAll(".event-card[data-event-id]").forEach((card) => {
+    card.style.cursor = "pointer";
+    card.addEventListener("click", () => {
+      const eventId = card.dataset.eventId;
+      window.location.href = `event-details.php?id=${encodeURIComponent(eventId)}`;
     });
   });
 }

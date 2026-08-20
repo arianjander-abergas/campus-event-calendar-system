@@ -80,7 +80,7 @@ function initials(string $name): string {
         // categories comes from a joined table, so it may be null/missing
         $categoryName = $ev['categories']['name'] ?? 'Event';
       ?>
-        <article class="event-card">
+        <article class="event-card" data-event-id="<?= htmlspecialchars((string)$ev['id']) ?>">
           <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url']) ?>');">
             <span class="event-tag <?= $categoryName === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
               <?= htmlspecialchars($categoryName) ?>
