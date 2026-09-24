@@ -1,9 +1,9 @@
 <?php
-require_once __DIR__ . '/config/supabase.php';
+require_once __DIR__ . '/../../config/supabase.php';
 session_start_once();
 
 if (current_user()) {
-    header('Location: dashboard.php');
+    header('Location: ../enduser/dashboard.php');
     exit;
 }
 
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($result['needsEmailConfirmation'])) {
                 $success = $result['message'];
             } else {
-                header('Location: dashboard.php');
+                header('Location: ../enduser/dashboard.php');
                 exit;
             }
         } else {
@@ -43,11 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign Up — Campus Event Hub</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 
-<?php include __DIR__ . '/includes/header.php'; ?>
+<?php include __DIR__ . '/../../includes/header.php'; ?>
 
 <div class="auth-shell">
   <div class="auth-card">

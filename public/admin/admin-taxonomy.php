@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/supabase.php';
+require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_admin(); // redirects non-admins to dashboard.php
 
@@ -121,8 +121,8 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Categories &amp; Organizations — Campus Event Hub</title>
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/admin.css">
 <style>
   /* Small page-local additions — not worth their own stylesheet. */
   .taxonomy-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
@@ -137,12 +137,12 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
 </head>
 <body>
 
-<div class="dashboard-shell">
+<div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-top">
-      <a href="index.php" class="brand">
+      <a href="../index.php" class="brand">
         <span class="brand-icon">📅</span>
         <span class="brand-text">
           <span class="campus">CAMPUS</span>
@@ -153,9 +153,20 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
     </div>
 
     <nav class="side-nav">
-      <a href="index.php"><span class="icon">🏠</span> Home</a>
-      <a href="dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
-      <a href="event-organizer.php"><span class="icon">🎟️</span> Event</a>
+      <a href="../index.php"><span class="icon">🏠</span> Home</a>
+      <a href="../enduser/dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
+      <div class="side-nav-item has-submenu">
+        <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
+          <span class="icon">🎟️</span>
+          <span class="nav-label">Event</span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="event-submenu" id="eventSubmenu" hidden>
+          <a href="../event-details.php" class="calendar-submenu-link">
+            <span class="icon">📅</span> Calendar
+          </a>
+        </div>
+      </div>
     </nav>
 
     <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
@@ -171,7 +182,7 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
   <!-- Top bar -->
   <header class="dash-topbar">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="dashboard.php">Dashboard</a>
+      <a href="../enduser/dashboard.php">Dashboard</a>
       <span class="crumb-sep">›</span>
       <a href="event-organizer.php">Events</a>
       <span class="crumb-sep">›</span>
@@ -184,7 +195,7 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
           <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
           <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
         </div>
-        <a href="logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
+        <a href="../auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
       </div>
     </div>
   </header>
@@ -314,5 +325,6 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
 
 </div>
 
+<script src="../assets/js/sidebar.js"></script>
 </body>
 </html>
