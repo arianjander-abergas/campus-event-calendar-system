@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30" height="18" viewBox="0 0 30 18">
+  <!-- PLACEHOLDER: replace this file with the real image (keep the same file name) -->
+  <rect x="1" y="1" width="28" height="16" rx="4" fill="#e2e2e2" stroke="#9a9a9a" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="8" fill="#777">#6</text>
+</svg>

@@ -52,6 +52,7 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
 <body class="login-page">
 
 <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+  <!-- IMAGE SLOT 1: Logo mark, left of "CAMPUS EVENT HUB" | file: assets/images/login/logo-mark.svg | 72×68 -->
   <img src="../assets/images/login/logo-mark.svg" alt="" class="login-logo-mark" width="72" height="68">
   <span class="login-logo-text">
     <span class="campus">CAMPUS</span>
@@ -61,6 +62,7 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
 
 <main class="login-card">
   <a href="../index.php" class="login-close" aria-label="Close and go back home">
+    <!-- IMAGE SLOT 2: Close (✕) button, top-right of the card | file: assets/images/login/icon-close.svg | 26×26 -->
     <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
   </a>
 
@@ -78,6 +80,7 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
     <label for="email">Email Address</label>
     <div class="login-field">
       <span class="login-field-icon" aria-hidden="true">
+        <!-- IMAGE SLOT 3: Email field icon | file: assets/images/login/icon-email.svg | 28×28 -->
         <img src="../assets/images/login/icon-email.svg" alt="" width="28" height="28">
       </span>
       <input type="email" id="email" name="email" required autocomplete="email"
@@ -88,7 +91,9 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
     <label for="password">Password</label>
     <div class="login-field">
       <button type="button" class="login-field-icon" id="togglePassword" aria-label="Show password">
+        <!-- IMAGE SLOT 4: Password eye, default (password hidden) | file: assets/images/login/icon-eye-off.svg | 28×28 -->
         <img class="icon-hidden" src="../assets/images/login/icon-eye-off.svg" alt="" width="28" height="28">
+        <!-- IMAGE SLOT 5: Password eye, shown after clicking (password visible) | file: assets/images/login/icon-eye.svg | 28×28 -->
         <img class="icon-visible" src="../assets/images/login/icon-eye.svg" alt="" width="28" height="28" hidden>
       </button>
       <input type="password" id="password" name="password" required autocomplete="current-password"
@@ -104,10 +109,12 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
 
   <div class="login-socials">
     <a href="login.php?notice=google" class="login-btn">
+      <!-- IMAGE SLOT 6: Google button icon | file: assets/images/login/icon-google.svg | 34×34 -->
       <img src="../assets/images/login/icon-google.svg" alt="" width="34" height="34">
       Google
     </a>
     <a href="<?= htmlspecialchars($adminLoginUrl) ?>" class="login-btn">
+      <!-- IMAGE SLOT 7: Admin Login button icon | file: assets/images/login/icon-admin.svg | 34×34 -->
       <img src="../assets/images/login/icon-admin.svg" alt="" width="34" height="34">
       Admin Login
     </a>
