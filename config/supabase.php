@@ -17,6 +17,32 @@ define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIs
 // Service role key should ONLY ever be used server-side (never sent to the browser).
 define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-SERVICE-ROLE-KEY');
 
+// ---- Site base URL ----------------------------------------------------------
+// Web path of the public/ folder, e.g. '/campus-event-calendar-system/public'
+// under XAMPP, or '' if public/ is the web root. Shared files (this config,
+// includes/header.php) are loaded from pages in different subfolders, so they
+// build links as BASE_URL . '/auth/login.php' instead of relative paths.
+define('BASE_URL', getenv('APP_BASE_URL') ?: detect_base_url());
+
+function detect_base_url(): string
+{
+    // realpath() on both sides so a junction/symlink (e.g. htdocs linked to
+    // the GitHub folder) doesn't make the two paths look different.
+    $publicDir = str_replace('\\', '/', (string) realpath(dirname(__DIR__) . '/public'));
+    $script = str_replace('\\', '/', (string) realpath($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
+
+    // e.g. script '/.../public/admin/event-organizer.php' -> '/admin/event-organizer.php',
+    // then strip that suffix off the URL path to get the base.
+    if ($script !== '' && stripos($script, $publicDir) === 0) {
+        $rel = substr($script, strlen($publicDir));
+        if ($rel !== '' && substr($scriptName, -strlen($rel)) === $rel) {
+            return substr($scriptName, 0, -strlen($rel));
+        }
+    }
+    return '';
+}
+
 // ---- Real table shape (confirmed directly against the live Supabase project) ----
 // profiles(id uuid pk -> auth.users.id, full_name text, role user_role['admin'|'user'],
 //          avatar_url text, phone text, created_at, updated_at)
@@ -163,10 +189,10 @@ function supabase_mock_data(string $table): array
 {
     $mocks = [
         'events' => [
-            ['id' => 1, 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-pace.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 2, 'title' => 'OSH Training or SIES-ACpEs', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-osh.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 3, 'title' => 'GEN Z Night 2026', 'categories' => ['name' => 'Event'], 'poster_url' => 'assets/event-genz.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 4, 'title' => 'JPSSITE Talk: Misinformation', 'categories' => ['name' => 'Seminar'], 'poster_url' => 'assets/event-talk.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 1, 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-pace.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 2, 'title' => 'OSH Training or SIES-ACpEs', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-osh.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 3, 'title' => 'GEN Z Night 2026', 'categories' => ['name' => 'Event'], 'poster_url' => BASE_URL . '/assets/images/event-genz.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
+            ['id' => 4, 'title' => 'JPSSITE Talk: Misinformation', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-talk.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
         ],
         'notifications' => [
             ['id' => 1, 'title' => 'New scholarship opportunity available!', 'message' => '', 'created_at' => 'TBA'],
@@ -437,8 +463,8 @@ function require_login(): array
 {
     $user = current_user();
     if (!$user) {
-        $dest = urlencode($_SERVER['REQUEST_URI'] ?? 'dashboard.php');
-        header('Location: login.php?redirect=' . $dest);
+        $dest = urlencode($_SERVER['REQUEST_URI'] ?? BASE_URL . '/enduser/dashboard.php');
+        header('Location: ' . BASE_URL . '/auth/login.php?redirect=' . $dest);
         exit;
     }
     return $user;
@@ -455,7 +481,7 @@ function require_admin(): array
 {
     $user = require_login();
     if (($user['role'] ?? 'user') !== 'admin') {
-        header('Location: dashboard.php');
+        header('Location: ' . BASE_URL . '/enduser/dashboard.php');
         exit;
     }
     return $user;

@@ -429,6 +429,14 @@ button { font-family: inherit; cursor: pointer; }
 }
 .dashboard-shell.sidebar-expanded .sidebar { padding: 20px 16px; }
 
+/* Pinned: used on every dashboard-style page (dashboard, admin pages, event details)
+   so the sidebar is always fully open and its labels are never clipped. */
+.dashboard-shell.sidebar-pinned { grid-template-columns: 240px 1fr 300px; }
+.dashboard-shell.sidebar-pinned .sidebar { padding: 20px 16px; }
+.dashboard-shell.sidebar-pinned .sidebar-toggle { display: none; }
+.dashboard-shell.sidebar-pinned .sidebar .nav-label { display: inline; }
+.dashboard-shell.sidebar-pinned .submenu-toggle .chevron { display: inline-block; }
+
 .sidebar .brand { color: #fff; }
 .sidebar .brand-text .campus { color: #fff; }
 .sidebar .brand-text .hub { color: #9fb4de; }
@@ -746,6 +754,7 @@ button { font-family: inherit; cursor: pointer; }
   .events-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard-shell { grid-template-columns: 76px 1fr; }
   .dashboard-shell.sidebar-expanded { grid-template-columns: 200px 1fr; }
+  .dashboard-shell.sidebar-pinned { grid-template-columns: 220px 1fr; }
   .right-rail { display: none; }
   .dash-topbar { grid-column: 2; }
 }
@@ -772,6 +781,18 @@ button { font-family: inherit; cursor: pointer; }
   .submenu-toggle .chevron { display: inline-block; }
   .dashboard-shell.sidebar-expanded .sidebar { transform: translateX(0); }
   .dash-topbar { grid-column: 1; }
+  /* Pinned sidebar has no toggle to open an overlay, so on phones it sits
+     above the page as a normal block instead of hiding off-screen. */
+  .dashboard-shell.sidebar-pinned { grid-template-columns: 1fr; }
+  .dashboard-shell.sidebar-pinned .sidebar {
+    position: static;
+    width: auto;
+    transform: none;
+    box-shadow: none;
+    grid-row: 1;
+  }
+  .dashboard-shell.sidebar-pinned .dash-topbar { grid-row: 2; }
+  .dashboard-shell.sidebar-pinned .dash-main { grid-row: 3; }
   .dash-events-row, .two-col-lists { grid-template-columns: 1fr; }
 }
 

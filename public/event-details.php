@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/supabase.php';
+require_once __DIR__ . '/../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
 
@@ -33,13 +33,13 @@ if (!$event) {
         'venue' => 'AVR, CITE Building',
         'registration_limit' => null,
         'categories' => ['name' => 'Seminar'],
-        'organizations' => ['name' => 'JPSSITE Organization', 'logo_url' => 'assets/org-jpssite.jpg'],
+        'organizations' => ['name' => 'JPSSITE Organization', 'logo_url' => 'assets/images/org-jpssite.jpg'],
     ];
 }
 
 $categoryName = $event['categories']['name'] ?? 'Event';
 $orgName = $event['organizations']['name'] ?? 'Organizer';
-$orgLogo = $event['organizations']['logo_url'] ?? 'assets/org-jpssite.jpg';
+$orgLogo = $event['organizations']['logo_url'] ?? 'assets/images/org-jpssite.jpg';
 $seatsLabel = !empty($event['registration_limit']) ? $event['registration_limit'] . ' slots available' : 'Free / Slots available';
 
 $alreadyRegistered = $eventId ? is_registered($eventId) : false;
@@ -52,15 +52,15 @@ function initials(string $name): string {
     return strtoupper($out) ?: 'U';
 }
 
-$heroImages = ['assets/event-hero-1.jpg', 'assets/event-hero-2.jpg', 'assets/event-hero-3.jpg'];
+$heroImages = ['assets/images/event-hero-1.jpg', 'assets/images/event-hero-2.jpg', 'assets/images/event-hero-3.jpg'];
 
 // Placeholder — event_programs / event_schedule_items aren't in the current
 // schema yet (see README note further down). Swap these for real queries
 // once those tables exist; the markup below is already shaped for it.
 $programs = [
-    ['badge' => 'Seminar', 'image' => 'assets/program-seminar.jpg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Innovating the future through generative AI and low-code solutions', 'time' => '0:00 AM - 0:00 AM'],
-    ['badge' => 'Contest', 'image' => 'assets/program-contest.jpg', 'title' => 'Tawag ng JPSSITE', 'subtitle' => 'The Talent Showdown', 'time' => '0:00 PM - 0:00 PM'],
-    ['badge' => 'Social', 'image' => 'assets/program-social.jpg', 'title' => 'Live Band: Rise Through Rhythm', 'subtitle' => 'Close out the day with music', 'time' => '0:00 PM - 0:00 PM'],
+    ['badge' => 'Seminar', 'image' => 'assets/images/program-seminar.jpg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Innovating the future through generative AI and low-code solutions', 'time' => '0:00 AM - 0:00 AM'],
+    ['badge' => 'Contest', 'image' => 'assets/images/program-contest.jpg', 'title' => 'Tawag ng JPSSITE', 'subtitle' => 'The Talent Showdown', 'time' => '0:00 PM - 0:00 PM'],
+    ['badge' => 'Social', 'image' => 'assets/images/program-social.jpg', 'title' => 'Live Band: Rise Through Rhythm', 'subtitle' => 'Close out the day with music', 'time' => '0:00 PM - 0:00 PM'],
 ];
 
 $morningProgram = ['Registration', 'Augustian Prayer', 'National Anthem', 'Orientation for Emergency Plan', 'Introduction', 'Seminar Speaker', 'Q&A', 'Awarding of Certificate', 'Ice Breaker', 'Reminders', 'Lunch Break'];
@@ -72,11 +72,11 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Event Details — Campus Event Hub</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
-<div class="dashboard-shell">
+<div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar (same as dashboard.php, "Event" highlighted) -->
   <aside class="sidebar">
@@ -93,14 +93,24 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 
     <nav class="side-nav">
       <a href="index.php"><span class="icon">🏠</span> Home</a>
-      <a href="dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
-      <a href="#event" class="active"><span class="icon">🎟️</span> Event <span style="margin-left:auto;">⌄</span></a>
-      <a href="event-details.php<?= $eventId ? '?id=' . urlencode($eventId) : '' ?>" class="side-subitem">Event Details</a>
+      <a href="enduser/dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
+      <div class="side-nav-item has-submenu">
+        <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
+          <span class="icon">🎟️</span>
+          <span class="nav-label">Event</span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="event-submenu" id="eventSubmenu" hidden>
+          <a href="event-details.php" class="calendar-submenu-link">
+            <span class="icon">📅</span> Calendar
+          </a>
+        </div>
+      </div>
     </nav>
 
     <?php if (($user['role'] ?? 'user') === 'admin'): ?>
       <div style="margin-top:auto;">
-        <a href="event-organizer.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#fff; background:rgba(255,255,255,0.08);">
+        <a href="admin/event-organizer.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#fff; background:rgba(255,255,255,0.08);">
           <span class="icon">🛠️</span> Admin View
         </a>
       </div>
@@ -110,9 +120,9 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
   <!-- Top bar -->
   <header class="dash-topbar">
     <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="dashboard.php">Dashboard</a>
+      <a href="enduser/dashboard.php">Dashboard</a>
       <span class="crumb-sep">›</span>
-      <a href="dashboard.php#events">Events</a>
+      <a href="enduser/dashboard.php#events">Events</a>
       <span class="crumb-sep">›</span>
       <span class="crumb-current">Event Details</span>
     </nav>
@@ -132,14 +142,14 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
           <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
           <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
         </div>
-        <a href="logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
+        <a href="auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
       </div>
     </div>
   </header>
 
   <!-- Main content -->
   <main class="dash-main">
-    <a href="dashboard.php" class="back-link">‹ Back to All Events</a>
+    <a href="enduser/dashboard.php" class="back-link">‹ Back to All Events</a>
 
     <?php if (isset($_GET['registered'])): ?>
       <div class="auth-success" style="margin-bottom:16px;">You're registered! We'll notify you with any updates.</div>
@@ -231,7 +241,8 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 
 <script>window.CURRENT_USER_ID = <?= json_encode($user['id']) ?>;</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/event-details.js"></script>
+<script src="assets/js/supabase-client.js"></script>
+<script src="assets/js/event-details.js"></script>
+<script src="assets/js/sidebar.js"></script>
 </body>
 </html>

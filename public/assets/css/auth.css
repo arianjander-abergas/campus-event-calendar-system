@@ -1,0 +1,201 @@
+/* ============================================================
+   Campus Event Hub — LOGIN page (auth/login.php)
+   Loaded after style.css; everything is scoped to .login-page.
+   ============================================================ */
+
+.login-page {
+  --login-bg: #d9d9d9;
+  --login-field: #ebebeb;
+  --login-btn: #6a7fa2;
+  --login-btn-hover: #5a6e90;
+  --login-link: #1a73e8;
+  --login-label: #4a4a4a;
+
+  min-height: 100vh;
+  margin: 0;
+  background: var(--login-bg);
+  font-family: "Lexend", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #111;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 46px 16px 40px;
+}
+
+/* ---- Logo ---- */
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 26px;
+  text-decoration: none;
+}
+.login-logo-mark { width: 72px; height: 68px; flex-shrink: 0; object-fit: contain; }
+.login-logo-text { display: flex; flex-direction: column; line-height: 0.9; }
+.login-logo-text .campus {
+  font-size: 2.9rem;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  color: #ff7a21;
+}
+.login-logo-text .hub {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #0e2a5e;
+}
+
+/* ---- Card ---- */
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 542px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px 40px 28px;
+}
+.login-card h1 {
+  margin: 0 0 34px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #000;
+}
+.login-close {
+  position: absolute;
+  top: 24px;
+  right: 30px;
+  color: #444;
+  line-height: 0;
+}
+.login-close img { width: 26px; height: 26px; display: block; }
+.login-close:hover { color: #000; }
+
+/* ---- Alerts ---- */
+.login-alert,
+.login-notice {
+  margin: -18px 0 16px 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.login-alert { background: #fdecec; color: #b42318; }
+.login-notice { background: #eaf2fd; color: #1a4f9c; }
+
+/* ---- Form ---- */
+.login-form { padding-left: 12px; }
+.login-form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+  font-weight: 400;
+  color: var(--login-label);
+}
+.login-field {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  margin-bottom: 20px;
+  background: var(--login-field);
+  border-radius: 6px;
+}
+.login-field-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 28px;
+  border-right: 1.5px solid #9a9a9a;
+  color: #444;
+  flex-shrink: 0;
+  background: none;
+  border-top: 0; border-bottom: 0; border-left: 0;
+  padding: 0;
+}
+button.login-field-icon { cursor: pointer; }
+.login-field-icon img { width: 28px; height: 28px; object-fit: contain; }
+.login-field-icon img[hidden] { display: none; }
+.login-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: #222;
+  outline: none;
+}
+.login-field input::placeholder { color: #8a8a8a; }
+.login-field:focus-within { box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.45); }
+
+.login-forgot {
+  display: block;
+  width: fit-content;
+  margin: 6px 16px 22px auto;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--login-link);
+  text-decoration: none;
+}
+.login-forgot:hover { text-decoration: underline; }
+
+.login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 180px;
+  height: 50px;
+  border: none;
+  border-radius: 4px;
+  background: var(--login-btn);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.login-btn:hover { background: var(--login-btn-hover); }
+.login-submit { margin: 0 auto; }
+
+/* ---- "Or Sign in with" divider ---- */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 38px 0 14px 4px;
+  font-size: 0.7rem;
+  color: #888;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #b5b5b5;
+}
+
+.login-socials {
+  display: flex;
+  justify-content: center;
+  gap: 52px;
+}
+.login-socials .login-btn img { width: 34px; height: 34px; flex-shrink: 0; object-fit: contain; }
+
+.login-signup {
+  margin-top: 18px;
+  font-size: 0.85rem;
+  color: #555;
+}
+.login-signup a { color: var(--login-link); font-weight: 600; }
+
+@media (max-width: 520px) {
+  .login-card { padding: 24px 20px 32px; }
+  .login-form { padding-left: 0; }
+  .login-socials { gap: 14px; }
+  .login-btn { width: 100%; }
+  .login-socials .login-btn { flex: 1; }
+  .login-logo-text .campus { font-size: 2.1rem; }
+}

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/supabase.php';
+require_once __DIR__ . '/../config/supabase.php';
 
 $events = supabase_request('events');
 $stats = supabase_request('stats');
@@ -10,14 +10,14 @@ $stats = supabase_request('stats');
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campus Event Hub — La Consolacion University Philippines</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
 
-<?php include __DIR__ . '/includes/header.php'; ?>
+<?php include __DIR__ . '/../includes/header.php'; ?>
 
 <section class="hero">
-  <div class="hero-bg" style="background-image:url('assets/campus-hero.jpg');"></div>
+  <div class="hero-bg" style="background-image:url('assets/images/campus-hero.jpg');"></div>
   <div class="hero-overlay"></div>
   <div class="hero-content">
     <p class="hero-eyebrow">LA CONSOLACION UNIVERSITY PHILIPPINES</p>
@@ -99,21 +99,21 @@ $stats = supabase_request('stats');
     <aside class="upcoming-panel">
       <h3>Upcoming Today</h3>
       <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/event-liveband.jpg');"></div>
+        <div class="upcoming-thumb" style="background-image:url('assets/images/event-liveband.jpg');"></div>
         <div class="upcoming-info">
           <div class="u-title">JPSSITE Live Band Upsite</div>
           <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
         </div>
       </div>
       <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/event-tawag.jpg');"></div>
+        <div class="upcoming-thumb" style="background-image:url('assets/images/event-tawag.jpg');"></div>
         <div class="upcoming-info">
           <div class="u-title">Tawag ng JPSSite</div>
           <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
         </div>
       </div>
       <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/event-genz.jpg');"></div>
+        <div class="upcoming-thumb" style="background-image:url('assets/images/event-genz.jpg');"></div>
         <div class="upcoming-info">
           <div class="u-title">GEN Z Night 2026</div>
           <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
@@ -134,7 +134,7 @@ $stats = supabase_request('stats');
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/main.js"></script>
+<script src="assets/js/supabase-client.js"></script>
+<script src="assets/js/main.js"></script>
 </body>
 </html>

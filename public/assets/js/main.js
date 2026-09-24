@@ -4,11 +4,14 @@
  * would eventually talk to Supabase.
  */
 
+// This file lives in public/assets/js/, so "../../" is the public/ folder.
+// Used to build page links that work from both index.php and enduser/dashboard.php.
+const SITE_ROOT = new URL("../../", document.currentScript.src).href;
+
 document.addEventListener("DOMContentLoaded", () => {
   buildCalendar();
   wireEventCardClicks();
   wireSidebarToggle();
-  wireEventDropdown();
 });
 
 /* ---------------- Sidebar: collapsed by default, expands on press ---------------- */
@@ -52,51 +55,8 @@ function wireSidebarToggle() {
     if (isExpanded) closeEventSubmenu();
   });
 
-  // Exposed so wireEventDropdown() can force-expand the sidebar when needed.
+  // Exposed so the Event dropdown (sidebar.js) can force-expand the sidebar when needed.
   window.__expandSidebar = () => setExpanded(true);
-}
-
-/* ---------------- Event dropdown (sidebar submenu) ---------------- */
-function closeEventSubmenu() {
-  const btn = document.getElementById("eventDropdownBtn");
-  const submenu = document.getElementById("eventSubmenu");
-  if (!btn || !submenu) return;
-  submenu.hidden = true;
-  btn.setAttribute("aria-expanded", "false");
-}
-
-function wireEventDropdown() {
-  const btn = document.getElementById("eventDropdownBtn");
-  const submenu = document.getElementById("eventSubmenu");
-  if (!btn || !submenu) {
-    console.warn(
-      "[event-dropdown] #eventDropdownBtn or #eventSubmenu not found; Event dropdown is inactive on this page."
-    );
-    return;
-  }
-
-  btn.addEventListener("click", () => {
-    const isOpen = btn.getAttribute("aria-expanded") === "true";
-
-    // If the sidebar is collapsed (icon rail), pressing the dropdown
-    // expands it first so the submenu labels are actually visible.
-    if (!isOpen && typeof window.__expandSidebar === "function") {
-      window.__expandSidebar();
-    }
-
-    submenu.hidden = isOpen;
-    btn.setAttribute("aria-expanded", String(!isOpen));
-  });
-
-  document.addEventListener("click", (e) => {
-    if (
-      !submenu.hidden &&
-      !submenu.contains(e.target) &&
-      !btn.contains(e.target)
-    ) {
-      closeEventSubmenu();
-    }
-  });
 }
 
 /* ---------------- Calendar (right rail on the dashboard) ---------------- */
@@ -148,7 +108,7 @@ function wireEventCardClicks() {
     card.style.cursor = "pointer";
     card.addEventListener("click", () => {
       const eventId = card.dataset.eventId;
-      window.location.href = `event-details.php?id=${encodeURIComponent(eventId)}`;
+      window.location.href = `${SITE_ROOT}event-details.php?id=${encodeURIComponent(eventId)}`;
     });
   });
 }

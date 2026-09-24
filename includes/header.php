@@ -9,7 +9,7 @@ session_start_once();
 $__headerUser = current_user();
 ?>
 <header class="site-header">
-  <a href="index.php" class="brand">
+  <a href="<?= BASE_URL ?>/index.php" class="brand">
     <span class="brand-icon">📅</span>
     <span class="brand-text">
       <span class="campus">CAMPUS</span>
@@ -18,8 +18,8 @@ $__headerUser = current_user();
   </a>
 
   <nav class="main-nav">
-    <a href="index.php">Home</a>
-    <a href="dashboard.php">Dashboard</a>
+    <a href="<?= BASE_URL ?>/index.php">Home</a>
+    <a href="<?= BASE_URL ?>/enduser/dashboard.php">Dashboard</a>
     <a href="#organizations">Organizations</a>
     <a href="#about">About Us</a>
   </nav>
@@ -32,10 +32,10 @@ $__headerUser = current_user();
     <?php if ($__headerUser): ?>
       <div class="user-chip">
         <span class="user-name"><?= htmlspecialchars($__headerUser['full_name']) ?></span>
-        <a href="logout.php" class="btn-login" style="background:#6b7280;">LOG OUT</a>
+        <a href="<?= BASE_URL ?>/auth/logout.php" class="btn-login" style="background:#6b7280;">LOG OUT</a>
       </div>
     <?php else: ?>
-      <a href="login.php" class="btn-login">LOGIN</a>
+      <a href="<?= BASE_URL ?>/auth/login.php" class="btn-login">LOGIN</a>
     <?php endif; ?>
   </div>
 </header>

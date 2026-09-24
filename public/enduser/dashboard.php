@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/config/supabase.php';
+require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
 $events = supabase_request('events');
@@ -22,16 +22,16 @@ function initials(string $name): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Campus Event Hub</title>
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 
-<div class="dashboard-shell">
+<div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-top">
-      <a href="index.php" class="brand">
+      <a href="../index.php" class="brand">
         <span class="brand-icon">📅</span>
         <span class="brand-text nav-label">
           <span class="campus">CAMPUS</span>
@@ -42,7 +42,7 @@ function initials(string $name): string {
     </div>
 
     <nav class="side-nav">
-      <a href="index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
+      <a href="../index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
       <a href="dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
 
       <div class="side-nav-item has-submenu">
@@ -52,7 +52,7 @@ function initials(string $name): string {
           <span class="chevron" aria-hidden="true">⌄</span>
         </button>
         <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="event-details.php" class="calendar-submenu-link">
+          <a href="../event-details.php" class="calendar-submenu-link">
             <span class="icon">📅</span> Calendar
           </a>
         </div>
@@ -61,7 +61,7 @@ function initials(string $name): string {
 
     <?php if (($user['role'] ?? 'user') === 'admin'): ?>
       <div style="margin-top:auto;">
-        <a href="event-organizer.php" class="admin-view-link">
+        <a href="../admin/event-organizer.php" class="admin-view-link">
           <span class="icon">🛠️</span> <span class="nav-label">Admin View</span>
         </a>
       </div>
@@ -82,7 +82,7 @@ function initials(string $name): string {
           <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
           <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
         </div>
-        <a href="logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
+        <a href="../auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
       </div>
     </div>
   </header>
@@ -132,7 +132,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-pace.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-pace.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">JPSSITE PACE LEVEL UP v.6.2</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
@@ -141,7 +141,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-osh.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-osh.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">OSH Training or SIES-ACpEs</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
@@ -150,7 +150,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-genz.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">GEN Z Night 2026</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
@@ -166,7 +166,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-liveband.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-liveband.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">JPSSITE Live Band Upsite</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
@@ -175,7 +175,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-tawag.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-tawag.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">Tawag ng JPSSite</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
@@ -184,7 +184,7 @@ function initials(string $name): string {
         </div>
 
         <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('assets/event-genz.jpg');"></div>
+          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
           <div class="mini-info">
             <div class="mini-title">GEN Z Night 2026</div>
             <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
@@ -239,7 +239,8 @@ function initials(string $name): string {
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/main.js"></script>
+<script src="../assets/js/supabase-client.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/main.js"></script>
 </body>
 </html>
