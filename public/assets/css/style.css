@@ -360,6 +360,7 @@ button { font-family: inherit; cursor: pointer; }
   border-bottom: 1px solid var(--border);
 }
 .upcoming-item:last-child { border-bottom: none; }
+a.upcoming-item { color: inherit; }
 .upcoming-thumb {
   width: 52px;
   height: 52px;
@@ -393,6 +394,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .trusted-title { font-weight: 800; color: var(--orange); letter-spacing: 0.4px; flex: 1; }
 .trusted-copy { color: var(--text-muted); font-size: 0.82rem; max-width: 320px; text-align: right; }
+
+.events-empty { grid-column: 1 / -1; margin: 0; padding: 24px; color: var(--text-muted); }
 
 .site-footer-space { height: 24px; }
 
@@ -635,6 +638,8 @@ button { font-family: inherit; cursor: pointer; }
   border-bottom: 1px solid var(--border);
 }
 .mini-row:last-child { border-bottom: none; }
+a.mini-row { color: inherit; }
+a.mini-row:hover .mini-title { color: var(--blue-accent); }
 .mini-thumb {
   width: 46px; height: 46px;
   border-radius: 8px;
@@ -703,6 +708,7 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-main);
 }
 .cal-grid .day.muted { color: #c7cbd4; }
+.cal-grid .day.today { background: var(--navy); color: #fff; border-radius: 6px; }
 .cal-grid .day .marker {
   position: absolute;
   bottom: 2px;

@@ -17,6 +17,9 @@ define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIs
 // Service role key should ONLY ever be used server-side (never sent to the browser).
 define('SUPABASE_SERVICE_KEY', getenv('SUPABASE_SERVICE_KEY') ?: 'YOUR-SUPABASE-SERVICE-ROLE-KEY');
 
+// "Today" (events happening today, upcoming lists) is the Philippines' date.
+date_default_timezone_set('Asia/Manila');
+
 // ---- Site base URL ----------------------------------------------------------
 // Web path of the public/ folder, e.g. '/campus-event-calendar-system/public'
 // under XAMPP, or '' if public/ is the web root. Shared files (this config,
@@ -43,11 +46,17 @@ function detect_base_url(): string
     return '';
 }
 
-// ---- Real table shape (confirmed directly against the live Supabase project) ----
+// ---- Real table shape (Thesis Supabase project) ----
 // profiles(id uuid pk -> auth.users.id, full_name text, role user_role['admin'|'user'],
-//          avatar_url text, phone text, created_at, updated_at)
+//          year_level int2 (1-5, null for faculty/admin), course text (e.g. 'BSIT'),
+//          organization_id -> organizations.id, avatar_url text, phone text, created_at, updated_at)
 // organizations(id uuid pk, name text unique, description text, logo_url text,
 //               created_by uuid -> profiles.id, created_at, updated_at)
+// organization_officers(id uuid pk, organization_id -> organizations.id, profile_id -> profiles.id (optional),
+//                       full_name text, position text, photo_url text (officer-photos bucket),
+//                       academic_year text (e.g. '2026-2027'), year_level int2, course text,
+//                       sort_order int (President=1 ... PRO=7, Year Representatives=8+),
+//                       is_active bool, created_at, updated_at)
 // categories(id uuid pk, name text unique, description text,
 //            created_by uuid -> profiles.id, created_at, updated_at)
 // events(id uuid pk, title text, category_id -> categories.id, organization_id -> organizations.id,
@@ -58,13 +67,17 @@ function detect_base_url(): string
 //        enable_registration bool, is_published bool, send_notification bool,
 //        status event_status['draft'|'published'|'cancelled'|'completed'],
 //        created_by -> profiles.id, created_at, updated_at)
+// event_programs(id uuid pk, event_id -> events.id, title text, description text, speaker text,
+//                sort_order int, created_at, updated_at)   -- segments of an event (Schedule)
 // event_registrations(id uuid pk, event_id -> events.id, user_id -> profiles.id,
-//                      status registration_status['registered'|'waitlisted'|'cancelled'|'attended'],
-//                      registered_at)
+//                      status registration_status['registered'|'waitlisted'|'cancelled'|'attended'|'no_show'],
+//                      registered_at)  -- unique (event_id, user_id)
 // notifications(id uuid pk, event_id -> events.id (nullable), user_id -> profiles.id (nullable),
-//               title text, message text, status notification_status['pending'|'sent'|'failed'],
+//               title text, message text, status notification_status['pending'|'sent'|'failed'|'read'],
 //               created_at, sent_at)
 // stats(id uuid pk, label text, value text, sort_order int, created_at, updated_at)
+// rpc event_registration_counts() -> (event_id, going): registration totals per published
+//     event, without exposing who registered.
 //
 // IMPORTANT: role / status / event_type / registration_status / notification_status
 // are real Postgres ENUM columns. Any INSERT/UPDATE using a value outside the
@@ -150,6 +163,24 @@ function supabase_request(string $table, string $query = '', string $method = 'G
         'Prefer: return=representation',
     ], $body);
 
+    // The Supabase access token expires after 1 hour, but the PHP login
+    // session lasts longer. If the logged-in user's token has expired
+    // (HTTP 401), swap the refresh token for a new one and retry once.
+    static $retrying = false;
+    if (!$result['ok'] && $result['status'] === 401 && !$retrying
+        && $userToken !== null && $userToken === ($_SESSION['access_token'] ?? null)
+        && supabase_refresh_session()) {
+        $retrying = true;
+        try {
+            return supabase_request($table, $query, $method, $body, $useServiceKey, $_SESSION['access_token']);
+        } finally {
+            $retrying = false;
+        }
+    }
+    if (!$result['ok'] && $result['status'] === 401 && $userToken !== null) {
+        $GLOBALS['supabase_session_expired'] = true; // see supabase_session_expired()
+    }
+
     // Any failure — network-level (status 0) OR an API-level error response
     // (missing table, bad query, RLS block, invalid enum value, etc.) — must
     // NEVER hand the raw error object back to callers expecting an array of
@@ -163,13 +194,9 @@ function supabase_request(string $table, string $query = '', string $method = 'G
             json_encode($result['data'])
         ));
 
-        // GET requests: fall back to mock/demo data so the page still renders.
-        if ($method === 'GET') {
-            return supabase_mock_data($table);
-        }
-
-        // Writes (POST/PATCH/DELETE): return empty array instead of the raw
-        // error object, so callers using empty()/foreach() stay safe.
+        // No local sample data: reads AND writes return an empty array instead
+        // of the raw error object, so callers using empty()/foreach() stay
+        // safe and pages show an empty state (e.g. "No events yet").
         return [];
     }
 
@@ -182,37 +209,104 @@ function supabase_request(string $table, string $query = '', string $method = 'G
     return $result['data'];
 }
 
-/**
- * Sample data so the frontend renders sensibly if Supabase is unreachable.
- */
-function supabase_mock_data(string $table): array
-{
-    $mocks = [
-        'events' => [
-            ['id' => 1, 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-pace.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 2, 'title' => 'OSH Training or SIES-ACpEs', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-osh.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 3, 'title' => 'GEN Z Night 2026', 'categories' => ['name' => 'Event'], 'poster_url' => BASE_URL . '/assets/images/event-genz.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-            ['id' => 4, 'title' => 'JPSSITE Talk: Misinformation', 'categories' => ['name' => 'Seminar'], 'poster_url' => BASE_URL . '/assets/images/event-talk.jpg', 'start_date' => 'TBA', 'venue' => 'AVR 1, CITE Building'],
-        ],
-        'notifications' => [
-            ['id' => 1, 'title' => 'New scholarship opportunity available!', 'message' => '', 'created_at' => 'TBA'],
-            ['id' => 2, 'title' => 'Class suspended on Month 00 0000 (Day)', 'message' => '', 'created_at' => 'TBA'],
-            ['id' => 3, 'title' => 'Submission of your requirements!', 'message' => '', 'created_at' => 'TBA'],
-        ],
-        'stats' => [
-            ['label' => 'Events', 'value' => '000+'],
-            ['label' => 'Organizations', 'value' => '0+'],
-            ['label' => 'Active Users', 'value' => '0.0k+'],
-            ['label' => 'Registrations', 'value' => '00k+'],
-        ],
-        // No rows by default — pages still render fine (just show an empty
-        // state) when Supabase is unreachable.
-        'event_registrations' => [],
-        'categories' => [],
-        'organizations' => [],
-    ];
+// =============================================================================
+// EVENT DATA HELPERS — everything comes from the Thesis Supabase project.
+// There is no local sample data: if Supabase is unreachable or a table is
+// empty, these return [] and the pages show an empty state instead.
+// =============================================================================
 
-    return $mocks[$table] ?? [];
+/** Columns used for event cards/lists: category + organization joined in. */
+const EVENT_CARD_SELECT = 'select=*,categories(name),organizations(name,logo_url)';
+
+/** Published events happening today (start_date <= today <= end_date), earliest start time first. */
+function get_events_today(int $limit = 5): array
+{
+    $today = date('Y-m-d');
+    return supabase_request('events', EVENT_CARD_SELECT
+        . '&status=eq.published&start_date=lte.' . $today . '&end_date=gte.' . $today
+        . '&order=start_time.asc.nullslast&limit=' . $limit);
+}
+
+/**
+ * Published events that haven't ended yet, soonest first — so anything
+ * happening today always comes before later dates. $excludeId skips one
+ * event (e.g. the one currently being viewed).
+ */
+function get_upcoming_events(int $limit = 3, ?string $excludeId = null): array
+{
+    $query = EVENT_CARD_SELECT . '&status=eq.published&end_date=gte.' . date('Y-m-d')
+        . '&order=start_date.asc,start_time.asc.nullslast&limit=' . $limit;
+    if ($excludeId) {
+        $query .= '&id=neq.' . urlencode($excludeId);
+    }
+    return supabase_request('events', $query);
+}
+
+/** Programs (segments) of one event, in running order — the event details Schedule. */
+function get_event_programs(string $eventId): array
+{
+    return supabase_request('event_programs', 'select=*&event_id=eq.' . urlencode($eventId) . '&order=sort_order.asc');
+}
+
+/**
+ * Registration totals per event: ['<event uuid>' => 12, ...]. Uses the
+ * event_registration_counts() database function, which returns counts only
+ * (users can't read other people's registrations directly because of RLS).
+ */
+function get_registration_counts(): array
+{
+    static $counts = null; // one request per page load
+    if ($counts === null) {
+        $counts = [];
+        foreach (supabase_request('rpc/event_registration_counts') as $row) {
+            $counts[$row['event_id']] = (int) $row['going'];
+        }
+    }
+    return $counts;
+}
+
+/** Upcoming published events with the most registrations ("Trending"); ties keep date order. */
+function get_trending_events(int $limit = 3): array
+{
+    $events = supabase_request('events', EVENT_CARD_SELECT
+        . '&status=eq.published&end_date=gte.' . date('Y-m-d') . '&order=start_date.asc');
+    $counts = get_registration_counts();
+    foreach ($events as &$ev) {
+        $ev['going'] = $counts[$ev['id']] ?? 0;
+    }
+    unset($ev);
+    usort($events, fn($a, $b) => $b['going'] <=> $a['going']);
+    return array_slice($events, 0, $limit);
+}
+
+/** The logged-in user's registrations (not cancelled), newest first, with the event joined in. */
+function get_my_registrations(int $limit = 5): array
+{
+    $user = current_user();
+    if (!$user) return [];
+    $rows = supabase_request(
+        'event_registrations',
+        'select=status,registered_at,events(id,title,start_date,end_date,start_time,venue,poster_url,status)'
+            . '&user_id=eq.' . urlencode($user['id']) . '&status=neq.cancelled&order=registered_at.desc&limit=' . $limit,
+        'GET', null, false, $_SESSION['access_token'] ?? null
+    );
+    return array_values(array_filter($rows, fn($r) => !empty($r['events'])));
+}
+
+/** '2026-09-20' -> 'Sep 20, 2026'; empty -> 'TBA'. */
+function format_event_date(?string $date): string
+{
+    if (!$date) return 'TBA';
+    $ts = strtotime($date);
+    return $ts ? date('M j, Y', $ts) : $date;
+}
+
+/** '13:30:00' -> '1:30 PM'; empty -> ''. */
+function format_event_time(?string $time): string
+{
+    if (!$time) return '';
+    $ts = strtotime($time);
+    return $ts ? date('g:i A', $ts) : $time;
 }
 
 // =============================================================================
@@ -296,6 +390,43 @@ function supabase_auth_signin(string $email, string $password): array
     start_user_session($user, $fullName, $data['refresh_token'] ?? null, $accessToken);
 
     return ['ok' => true, 'message' => 'Logged in.'];
+}
+
+/**
+ * Get a new access token using the refresh token saved at login, and store
+ * both in the session. Called automatically by supabase_request() when the
+ * access token has expired.
+ *
+ * @return bool false if there's no refresh token or Supabase rejected it
+ *              (e.g. the user was signed out elsewhere) — log in again then.
+ */
+function supabase_refresh_session(): bool
+{
+    session_start_once();
+    $refreshToken = $_SESSION['refresh_token'] ?? null;
+    if (!$refreshToken) {
+        return false;
+    }
+
+    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/token?grant_type=refresh_token', [
+        'apikey: ' . SUPABASE_ANON_KEY,
+        'Content-Type: application/json',
+    ], ['refresh_token' => $refreshToken]);
+
+    if (!$result['ok'] || empty($result['data']['access_token'])) {
+        error_log('[supabase_refresh_session] refresh failed (HTTP ' . $result['status'] . ')');
+        return false;
+    }
+
+    $_SESSION['access_token'] = $result['data']['access_token'];
+    $_SESSION['refresh_token'] = $result['data']['refresh_token'] ?? $refreshToken;
+    return true;
+}
+
+/** True if a request this page load failed because the login couldn't be renewed. */
+function supabase_session_expired(): bool
+{
+    return !empty($GLOBALS['supabase_session_expired']);
 }
 
 /** Invalidate the Supabase-side refresh token and clear the local session. */
@@ -415,8 +546,7 @@ function is_registered(string $eventId): bool
 /** Total registration count for an event (any status), for a "N going" style line. */
 function get_registration_count(string $eventId): int
 {
-    $rows = supabase_request('event_registrations', 'select=id&event_id=eq.' . urlencode($eventId));
-    return count($rows);
+    return get_registration_counts()[$eventId] ?? 0;
 }
 
 function session_start_once(): void
@@ -532,7 +662,9 @@ function create_event_admin(array $fields): array
 
     $result = supabase_request('events', '', 'POST', $fields, false, $token);
     if (empty($result)) {
-        return ['ok' => false, 'message' => 'Could not create the event. Please check the required fields and try again.'];
+        return ['ok' => false, 'message' => supabase_session_expired()
+            ? 'Your login session has expired. Please log out and log in again.'
+            : 'Could not create the event. Please check the required fields and try again.'];
     }
     return ['ok' => true, 'message' => 'Event created.', 'id' => $result[0]['id'] ?? null];
 }
@@ -543,7 +675,9 @@ function update_event_admin(string $eventId, array $fields): array
     $token = $_SESSION['access_token'] ?? null;
     $result = supabase_request('events', 'id=eq.' . urlencode($eventId), 'PATCH', $fields, false, $token);
     if (empty($result)) {
-        return ['ok' => false, 'message' => 'Could not save changes. Please try again.'];
+        return ['ok' => false, 'message' => supabase_session_expired()
+            ? 'Your login session has expired. Please log out and log in again.'
+            : 'Could not save changes. Please try again.'];
     }
     return ['ok' => true, 'message' => 'Event updated.'];
 }

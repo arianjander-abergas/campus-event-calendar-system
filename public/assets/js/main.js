@@ -60,46 +60,70 @@ function wireSidebarToggle() {
 }
 
 /* ---------------- Calendar (right rail on the dashboard) ---------------- */
+// Shows the real current month; ‹ › change month. Days with a published
+// event (window.CALENDAR_EVENTS, from Supabase via enduser/dashboard.php)
+// get a dot, and hovering the day lists the event titles.
 function buildCalendar() {
   const grid = document.getElementById("calendar-grid");
   if (!grid) return; // not on the dashboard page
 
-  const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const label = document.getElementById("calendar-month");
+  const events = window.CALENDAR_EVENTS || [];
+  const today = new Date();
+  let year = today.getFullYear();
+  let month = today.getMonth(); // 0-11
 
-  // Matches the screenshot: May 2026, starting on a Sunday, with a few
-  // marker dots on scattered days. Replace with real event dates once
-  // events are pulled from Supabase (see db.getEvents()).
-  const weeks = [
-    [28, 29, 30, 1, 2, 3, 4],
-    [5, 6, 7, 8, 9, 10, 11],
-    [12, 13, 14, 15, 16, 17, 18],
-    [19, 20, 21, 22, 23, 24, 25],
-    [26, 27, 28, 29, 30, 31, 1],
-  ];
-  const mutedDays = new Set([28, 29, 30, 31, 1]); // days belonging to adjacent months
-  const markers = {
-    "3-4": "marker-blue",
-    "3-5": "marker-purple",
-    "4-1": "marker-orange",
-    "4-2": "marker-red",
-    "4-3": "marker-purple",
+  const pad = (n) => String(n).padStart(2, "0");
+  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  // Titles of events running on a date (start <= date <= end).
+  const eventsOn = (date) =>
+    events.filter((e) => e.start <= date && date <= (e.end || e.start)).map((e) => e.title);
+
+  const render = () => {
+    if (label) {
+      label.textContent = new Date(year, month, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+    }
+
+    let html = "";
+    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((d) => (html += `<div class="dow">${d}</div>`));
+
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrev = new Date(year, month, 0).getDate();
+    const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+
+    for (let i = 0; i < totalCells; i++) {
+      const day = i - firstDow + 1;
+      if (day < 1 || day > daysInMonth) {
+        // Leading/trailing days from the neighbouring months.
+        const shown = day < 1 ? daysInPrev + day : day - daysInMonth;
+        html += `<div class="day muted">${shown}</div>`;
+        continue;
+      }
+      const date = iso(year, month, day);
+      const titles = eventsOn(date);
+      const isToday = date === iso(today.getFullYear(), today.getMonth(), today.getDate());
+      html += `<div class="day${isToday ? " today" : ""}"${titles.length ? ` title="${escapeAttr(titles.join("\n"))}"` : ""}>${day}${
+        titles.length ? '<span class="marker marker-blue"></span>' : ""
+      }</div>`;
+    }
+    grid.innerHTML = html;
   };
 
-  let html = "";
-  dows.forEach((d) => (html += `<div class="dow">${d}</div>`));
+  const step = (delta) => {
+    month += delta;
+    if (month < 0) { month = 11; year--; }
+    if (month > 11) { month = 0; year++; }
+    render();
+  };
+  document.getElementById("calPrev")?.addEventListener("click", () => step(-1));
+  document.getElementById("calNext")?.addEventListener("click", () => step(1));
 
-  weeks.forEach((week, wi) => {
-    week.forEach((day, di) => {
-      const isMuted =
-        (wi === 0 && day > 20) || (wi === weeks.length - 1 && day < 20);
-      const markerClass = markers[`${wi}-${di}`];
-      html += `<div class="day${isMuted ? " muted" : ""}">${day}${
-        markerClass ? `<span class="marker ${markerClass}"></span>` : ""
-      }</div>`;
-    });
-  });
+  render();
+}
 
-  grid.innerHTML = html;
+function escapeAttr(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 /* ---------------- Event card clicks -> Event Details page ---------------- */

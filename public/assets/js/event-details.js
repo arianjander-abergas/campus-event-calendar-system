@@ -27,9 +27,12 @@ async function wireNotificationBell() {
   const dropdown = document.getElementById("notifDropdown");
   const dot = document.getElementById("notifDot");
   const list = document.getElementById("notifList");
-  if (!btn || !window.db) return;
+  if (!btn) return;
 
-  const notifications = await window.db.getNotifications(window.CURRENT_USER_ID);
+  // Loaded server-side by event-details.php with the user's session (RLS only
+  // returns a user's own notifications, so the anonymous JS client can't).
+  const notifications = window.USER_NOTIFICATIONS
+    ?? (window.db ? await window.db.getNotifications(window.CURRENT_USER_ID) : []);
   const unread = (notifications || []).filter((n) => n.status !== "read");
 
   if (unread.length > 0) {

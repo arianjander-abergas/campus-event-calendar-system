@@ -2,11 +2,17 @@
 require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
-$events = supabase_request('events');
+// Upcoming events: anything happening today first, then the next dates.
+$events = get_upcoming_events(3);
+$myRegistrations = get_my_registrations();
+$trending = get_trending_events();
+// Dates for the calendar dots (main.js buildCalendar()).
+$calendarEvents = array_map(fn($e) => ['title' => $e['title'], 'start' => $e['start_date'], 'end' => $e['end_date']],
+    supabase_request('events', 'select=title,start_date,end_date&status=eq.published'));
 // There is no `announcements` table in Supabase — the real table is
 // `notifications` (event_id/user_id nullable, title, message, status,
 // created_at). Pull the most recent ones for this panel.
-$announcements = supabase_request('notifications', 'select=*&order=created_at.desc&limit=6');
+$announcements = supabase_request('notifications', 'select=*&order=created_at.desc&limit=6', 'GET', null, false, $_SESSION['access_token'] ?? null);
 
 // Small helper to pull initials for the avatar bubble
 function initials(string $name): string {
@@ -39,7 +45,8 @@ function initials(string $name): string {
       <input type="text" placeholder="Search for events, organizations, or keywords">
     </div>
     <div class="topbar-right">
-      <div class="bell">🔔<span class="dot">2</span></div>
+      <?php $unread = count(array_filter($announcements, fn($n) => ($n['status'] ?? '') !== 'read')); ?>
+      <div class="bell">🔔<?php if ($unread > 0): ?><span class="dot"><?= $unread > 9 ? '9+' : $unread ?></span><?php endif; ?></div>
       <div class="user-chip">
         <div class="avatar"><?= htmlspecialchars(initials($user['full_name'])) ?></div>
         <div>
@@ -63,23 +70,24 @@ function initials(string $name): string {
       <a href="#" class="view-all">View All</a>
     </div>
     <div class="dash-events-row">
-      <?php foreach (array_slice($events, 0, 3) as $ev):
+      <?php if (empty($events)): ?>
+        <p class="events-empty">No upcoming events yet.</p>
+      <?php endif; ?>
+      <?php foreach ($events as $ev):
         // categories comes from a joined table, so it may be null/missing
         $categoryName = $ev['categories']['name'] ?? 'Event';
       ?>
         <article class="event-card" data-event-id="<?= htmlspecialchars((string)$ev['id']) ?>">
-          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url']) ?>');">
+          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url'] ?? '') ?>');">
             <span class="event-tag <?= $categoryName === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
               <?= htmlspecialchars($categoryName) ?>
             </span>
           </div>
           <div class="event-body">
             <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-            <div class="event-meta">📅 <?= htmlspecialchars($ev['start_date']) ?></div>
-            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue']) ?></div>
-            <!-- attendee_count no longer lives on the events row; it needs a
-                 separate count query (e.g. registrations count per event_id).
-                 Until that's wired up we just omit the "going" line. -->
+            <div class="event-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?></div>
+            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue'] ?: 'Online') ?></div>
+            <div class="event-meta">👥 <?= get_registration_counts()[$ev['id']] ?? 0 ?> going</div>
           </div>
         </article>
       <?php endforeach; ?>
@@ -95,32 +103,30 @@ function initials(string $name): string {
           <a href="#" class="view-all">View All</a>
         </div>
 
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-pace.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">JPSSITE PACE LEVEL UP v.6.2</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-badge badge-registered">Registered</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-osh.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">OSH Training or SIES-ACpEs</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-badge badge-unavailable">Not Available</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">GEN Z Night 2026</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
-          </div>
-          <span class="mini-badge badge-registered">Registered</span>
-        </div>
+        <?php if (empty($myRegistrations)): ?>
+          <p class="mini-meta">You haven't registered for any events yet.</p>
+        <?php endif; ?>
+        <?php foreach ($myRegistrations as $reg):
+          $ev = $reg['events'];
+          // "Not Available" once the event is cancelled or already over.
+          $unavailable = in_array($ev['status'], ['cancelled', 'completed'], true)
+              || ($ev['end_date'] ?? $ev['start_date']) < date('Y-m-d');
+        ?>
+          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <div class="mini-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url'] ?? '') ?>');"></div>
+            <div class="mini-info">
+              <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
+              <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars($ev['venue'] ?: 'Online') ?></div>
+            </div>
+            <?php if ($reg['status'] === 'attended'): ?>
+              <span class="mini-badge badge-registered">Attended</span>
+            <?php elseif ($unavailable): ?>
+              <span class="mini-badge badge-unavailable">Not Available</span>
+            <?php else: ?>
+              <span class="mini-badge badge-registered">Registered</span>
+            <?php endif; ?>
+          </a>
+        <?php endforeach; ?>
       </div>
 
       <div class="list-card" id="trending-events">
@@ -129,32 +135,19 @@ function initials(string $name): string {
           <a href="#" class="view-all">View All</a>
         </div>
 
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-liveband.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">JPSSITE Live Band Upsite</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-tawag.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">Tawag ng JPSSite</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">GEN Z Night 2026</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
+        <?php if (empty($trending)): ?>
+          <p class="mini-meta">No upcoming events yet.</p>
+        <?php endif; ?>
+        <?php foreach ($trending as $ev): ?>
+          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <div class="mini-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url'] ?? '') ?>');"></div>
+            <div class="mini-info">
+              <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
+              <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars($ev['venue'] ?: 'Online') ?></div>
+            </div>
+            <span class="mini-going">👥 <?= (int) $ev['going'] ?> going</span>
+          </a>
+        <?php endforeach; ?>
       </div>
     </div>
   </main>
@@ -162,9 +155,10 @@ function initials(string $name): string {
   <!-- Right rail -->
   <aside class="right-rail">
     <div class="rail-card" id="dashboard-calendar-card">
+      <div class="cal-head">
         <span>Calendar</span>
-        <span>May 2026</span>
-        <span style="display:flex; gap:4px;"><button>‹</button><button>›</button></span>
+        <span id="calendar-month"></span>
+        <span style="display:flex; gap:4px;"><button type="button" id="calPrev" aria-label="Previous month">‹</button><button type="button" id="calNext" aria-label="Next month">›</button></span>
       </div>
       <div class="cal-grid" id="calendar-grid">
         <!-- filled by js/main.js -->
@@ -193,7 +187,7 @@ function initials(string $name): string {
           </span>
           <div>
             <div class="ann-title"><?= htmlspecialchars($a['title']) ?></div>
-            <div class="ann-date"><?= htmlspecialchars($a['created_at']) ?></div>
+            <div class="ann-date"><?= htmlspecialchars(format_event_date($a['created_at'])) ?></div>
           </div>
         </div>
       <?php endforeach; ?>
@@ -205,6 +199,7 @@ function initials(string $name): string {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../assets/js/supabase-client.js"></script>
 <script src="../assets/js/sidebar.js"></script>
+<script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>
 <script src="../assets/js/main.js"></script>
 </body>
 </html>

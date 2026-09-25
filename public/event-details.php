@@ -13,27 +13,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'regis
     exit;
 }
 
+// Everything below comes from the Thesis Supabase project — no local sample data.
 $event = null;
 if ($eventId) {
-    $rows = supabase_request('events', 'select=*,categories(name),organizations(name,logo_url)&id=eq.' . urlencode($eventId) . '&limit=1');
-    if (!empty($rows)) {
-        $event = $rows[0];
-    }
-}
-
-// Falls back to the same placeholder content shown in the design if no id
-// is given, the id doesn't match a row, or Supabase is unreachable — the
-// page still looks right on its own (mirrors supabase_mock_data()'s intent).
-if (!$event) {
-    $event = [
-        'id' => $eventId,
-        'title' => 'JPSSITE PACE LEVEL UP v.6.2',
-        'description' => "Level up, Innovators! The grid is officially open, and we're ready to break the simulation. Whether you're a code, a creator, or a tech enthusiast. It's time to rise above the static and reach new heights of excellence.",
-        'start_date' => 'Month 00 0000',
-        'venue' => 'AVR 1, CITE Building',
-        'categories' => ['name' => 'Seminar'],
-        'organizations' => ['name' => 'JPSSITE Organization', 'logo_url' => null],
-    ];
+    $rows = supabase_request('events', EVENT_CARD_SELECT . '&id=eq.' . urlencode($eventId) . '&limit=1');
+    $event = $rows[0] ?? null;
+} else {
+    // Opened without an id (e.g. the sidebar's Calendar link): show the
+    // event happening today, or else the next upcoming one.
+    $event = get_upcoming_events(1)[0] ?? null;
+    $eventId = $event['id'] ?? null;
 }
 
 // Placeholder images (numbered IMAGE SLOTs — see assets/css/event-details.css).
@@ -44,19 +33,27 @@ $orgLogo = !empty($event['organizations']['logo_url']) ? $event['organizations']
 
 $categoryName = $event['categories']['name'] ?? 'Event';
 $orgName = $event['organizations']['name'] ?? 'Organizer';
-$alreadyRegistered = $eventId ? is_registered($eventId) : false;
+$alreadyRegistered = $event ? is_registered($eventId) : false;
 
-// Placeholder — event_programs / event_schedule_items aren't in the current
-// schema yet. Swap these for real queries once those tables exist; the
-// markup below is already shaped for it.
-$programs = [
-    ['badge' => 'Seminar', 'image' => $img . 'program-1.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Innovating the future through generative AI and low-code solution', 'time' => 'Time 0:00 AM - 00:00 AM'],
-    ['badge' => 'Contest', 'image' => $img . 'program-2.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Tawag ng JPSSITE : The Talent Showdown', 'time' => 'Time 00:00 AM - 00:00 PM'],
-    ['badge' => 'Special', 'image' => $img . 'program-3.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Live Band : Rise Through Rhythm', 'time' => 'Time 00:00 AM - 00:00 PM'],
-];
+// "Sep 20, 2026 | 1:00 PM - 3:00 PM" (time part left off when not set).
+function event_when(array $ev): string {
+    $time = format_event_time($ev['start_time'] ?? null);
+    if ($time !== '' && !empty($ev['end_time'])) {
+        $time .= ' - ' . format_event_time($ev['end_time']);
+    }
+    return format_event_date($ev['start_date'] ?? null) . ($time !== '' ? ' | ' . $time : '');
+}
 
-$morningProgram = ['Registration', 'Augustian Prayer', 'National Anthem', 'Orientation for Emergency Plan', 'Introduction', 'Seminar Speaker', 'Q & A', 'Awarding of Certificate', 'Ice Breaker', 'Reminders', 'Lunch Break'];
-$afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'Break', 'Game / Activities', 'Live Band', 'Awarding Ceremony', 'Closing remark', 'Closing Prayer'];
+// Schedule: this event's segments from event_programs, in sort_order.
+$schedule = $event ? get_event_programs($eventId) : [];
+
+// "Programs" cards: other published events, soonest first, so anything
+// happening today always shows up first.
+$programCards = get_upcoming_events(3, $eventId);
+
+// Notifications for the bell, fetched with the user's session so the
+// notifications RLS policy (user_id = auth.uid()) lets their rows through.
+$notifications = supabase_request('notifications', 'select=id,title,message,status,created_at&order=created_at.desc&limit=10', 'GET', null, false, $_SESSION['access_token'] ?? null);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -132,6 +129,12 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
       <div class="ed-flash ed-flash-error">Something went wrong registering you. Please try again.</div>
     <?php endif; ?>
 
+    <?php if (!$event): ?>
+    <section class="ed-hero ed-not-found">
+      <h1 class="ed-title">Event not found</h1>
+      <p>This event doesn't exist or isn't published yet. <a href="enduser/dashboard.php">Browse all events</a>.</p>
+    </section>
+    <?php else: ?>
     <!-- Event hero card -->
     <section class="ed-hero">
       <!-- IMAGE SLOT 1: Event poster (used when the event has no poster_url) | file: assets/images/event-details/event-poster.svg | 340×345 -->
@@ -153,7 +156,7 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
           <div class="ed-meta-row">
             <!-- IMAGE SLOT 8: Calendar icon | file: assets/images/event-details/icon-calendar.svg | 12×12 -->
             <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
-            <?= htmlspecialchars($event['start_date'] ?? 'TBA') ?>
+            <?= htmlspecialchars(event_when($event)) ?>
           </div>
         </div>
 
@@ -178,21 +181,27 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
         </div>
       </div>
     </section>
+    <?php endif; ?>
 
-    <!-- Programs -->
+    <!-- Programs: other published events, happening-today first -->
     <h2 class="ed-section-title">Programs</h2>
     <div class="ed-programs">
-      <?php foreach ($programs as $i => $p): ?>
-      <article class="ed-program-card">
-        <!-- IMAGE SLOT <?= $i + 3 ?>: Program <?= $i + 1 ?> image | file: <?= htmlspecialchars($p['image']) ?> | 225×200 -->
-        <img src="<?= htmlspecialchars($p['image']) ?>" alt="" class="ed-program-img">
+      <?php if (empty($programCards)): ?>
+        <p class="ed-empty">No other upcoming events yet.</p>
+      <?php endif; ?>
+      <?php foreach ($programCards as $i => $p):
+        $desc = (string) ($p['description'] ?? '');
+      ?>
+      <a class="ed-program-card" href="event-details.php?id=<?= urlencode($p['id']) ?>">
+        <!-- IMAGE SLOTS 3-5: Program card image (used when the event has no poster_url) | file: assets/images/event-details/program-<?= $i + 1 ?>.svg | 225×200 -->
+        <img src="<?= htmlspecialchars(!empty($p['poster_url']) ? $p['poster_url'] : $img . 'program-' . ($i + 1) . '.svg') ?>" alt="" class="ed-program-img">
         <div class="ed-program-body">
-          <span class="ed-program-badge"><?= htmlspecialchars($p['badge']) ?></span>
+          <span class="ed-program-badge"><?= htmlspecialchars($p['categories']['name'] ?? 'Event') ?></span>
           <h3 class="ed-program-title"><?= htmlspecialchars($p['title']) ?></h3>
-          <p class="ed-program-sub"><?= htmlspecialchars($p['subtitle']) ?></p>
-          <p class="ed-program-time"><?= htmlspecialchars($p['time']) ?></p>
+          <p class="ed-program-sub"><?= htmlspecialchars(mb_strimwidth($desc, 0, 90, '…')) ?></p>
+          <p class="ed-program-time"><?= htmlspecialchars(event_when($p)) ?></p>
         </div>
-      </article>
+      </a>
       <?php endforeach; ?>
     </div>
   </main>
@@ -202,25 +211,26 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
     <div class="ed-schedule">
       <h2 class="ed-schedule-title">Schedule</h2>
 
-      <div class="ed-schedule-head">Morning Program</div>
+      <?php if (empty($schedule)): ?>
+        <p class="ed-empty">No schedule posted yet.</p>
+      <?php else: ?>
+      <!-- event_programs rows in sort_order; speaker shown on the right -->
+      <div class="ed-schedule-head">Event Program</div>
       <ol class="ed-timeline">
-        <?php foreach ($morningProgram as $item): ?>
-        <li><span class="ed-tl-label"><?= htmlspecialchars($item) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time">0:00 - 0:00 AM</span></li>
+        <?php foreach ($schedule as $item): ?>
+        <li title="<?= htmlspecialchars($item['description'] ?? '') ?>"><span class="ed-tl-label"><?= htmlspecialchars($item['title']) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time"><?= htmlspecialchars($item['speaker'] ?? '') ?></span></li>
         <?php endforeach; ?>
       </ol>
-
-      <div class="ed-schedule-head">Afternoon Program</div>
-      <ol class="ed-timeline">
-        <?php foreach ($afternoonProgram as $item): ?>
-        <li><span class="ed-tl-label"><?= htmlspecialchars($item) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time">0:00 - 0:00 PM</span></li>
-        <?php endforeach; ?>
-      </ol>
+      <?php endif; ?>
     </div>
   </aside>
 
 </div>
 
-<script>window.CURRENT_USER_ID = <?= json_encode($user['id']) ?>;</script>
+<script>
+  window.CURRENT_USER_ID = <?= json_encode($user['id']) ?>;
+  window.USER_NOTIFICATIONS = <?= json_encode($notifications) ?>;
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/supabase-client.js"></script>
 <script src="assets/js/event-details.js"></script>
