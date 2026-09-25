@@ -75,43 +75,7 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 <div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar (same as dashboard.php, "Event" highlighted) -->
-  <aside class="sidebar">
-    <div class="sidebar-top">
-      <a href="index.php" class="brand">
-        <span class="brand-icon">📅</span>
-        <span class="brand-text">
-          <span class="campus">CAMPUS</span>
-          <span class="hub">EVENT HUB</span>
-        </span>
-      </a>
-      <button class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-    </div>
-
-    <nav class="side-nav">
-      <a href="index.php"><span class="icon">🏠</span> Home</a>
-      <a href="enduser/dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
-      <div class="side-nav-item has-submenu">
-        <button type="button" class="submenu-toggle is-current" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
-          <span class="icon">🎟️</span>
-          <span class="nav-label">Event</span>
-          <span class="chevron" aria-hidden="true">⌄</span>
-        </button>
-        <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="event-details.php" class="calendar-submenu-link">
-            <span class="icon">📅</span> Calendar
-          </a>
-        </div>
-      </div>
-    </nav>
-
-    <?php if (($user['role'] ?? 'user') === 'admin'): ?>
-      <div style="margin-top:auto;">
-        <a href="admin/event-organizer.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#fff; background:rgba(255,255,255,0.08);">
-          <span class="icon">🛠️</span> Admin View
-        </a>
-      </div>
-    <?php endif; ?>
-  </aside>
+  <?php include __DIR__ . '/../../includes/nav.php'; ?>
 
   <!-- Top bar -->
   <header class="dash-topbar ed-topbar">
