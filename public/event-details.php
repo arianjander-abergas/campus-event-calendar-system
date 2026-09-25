@@ -75,7 +75,7 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 <div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar (same as dashboard.php, "Event" highlighted) -->
-  <?php include __DIR__ . '/../../includes/nav.php'; ?>
+  <?php include __DIR__ . '/../includes/nav.php'; ?>
 
   <!-- Top bar -->
   <header class="dash-topbar ed-topbar">
