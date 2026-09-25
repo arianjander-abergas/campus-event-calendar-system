@@ -1,42 +1,53 @@
-
+<?php
+/**
+ * Sidebar for every dashboard-style page (student + admin).
+ * Set $activeNav before including to highlight the current page:
+ *   'dashboard' | 'events' | 'my-events' | 'event' | 'organizations' | 'profile'
+ *   'admin-events' | 'admin-taxonomy' | 'admin-users'
+ */
+$activeNav = $activeNav ?? '';
+$navUser = current_user();
+$navActive = fn(string $key): string => $activeNav === $key ? ' class="active" aria-current="page"' : '';
+$eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
+?>
 <aside class="sidebar">
-    <div class="sidebar-top">
-      <a href="<?= BASE_URL ?>/index.php" class="brand">
-        <span class="brand-icon">📅</span>
-        <span class="brand-text nav-label">
-          <span class="campus">CAMPUS</span>
-          <span class="hub">EVENT HUB</span>
-        </span>
-      </a>
-      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" aria-expanded="false">☰</button>
+  <div class="sidebar-top">
+    <a href="<?= BASE_URL ?>/index.php" class="brand">
+      <span class="brand-icon">📅</span>
+      <span class="brand-text">
+        <span class="campus">CAMPUS</span>
+        <span class="hub">EVENT HUB</span>
+      </span>
+    </a>
+  </div>
+
+  <nav class="side-nav" aria-label="Main">
+    <a href="<?= BASE_URL ?>/index.php"><span class="icon">🏠</span> Home</a>
+    <a href="<?= BASE_URL ?>/enduser/dashboard.php"<?= $navActive('dashboard') ?>><span class="icon">🗂️</span> Dashboard</a>
+
+    <div class="side-nav-item has-submenu">
+      <button type="button" class="submenu-toggle<?= $eventsOpen ? ' is-current' : '' ?>" id="eventDropdownBtn" aria-expanded="<?= $eventsOpen ? 'true' : 'false' ?>" aria-controls="eventSubmenu">
+        <span class="icon">🎟️</span>
+        <span>Events</span>
+        <span class="chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="event-submenu" id="eventSubmenu"<?= $eventsOpen ? '' : ' hidden' ?>>
+        <a href="<?= BASE_URL ?>/events.php"<?= $navActive('events') ?>><span class="icon">📋</span> All Events</a>
+        <a href="<?= BASE_URL ?>/events.php?mine=1"<?= $navActive('my-events') ?>><span class="icon">✅</span> My Events</a>
+        <a href="<?= BASE_URL ?>/event-details.php"<?= $navActive('event') ?>><span class="icon">📅</span> Next Event</a>
+      </div>
     </div>
 
-    <nav class="side-nav">
-      <a href="<?= BASE_URL ?>/index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
-      <a href="<?= BASE_URL ?>/enduser/dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
+    <a href="<?= BASE_URL ?>/organizations.php"<?= $navActive('organizations') ?>><span class="icon">🏛️</span> Organizations</a>
+    <a href="<?= BASE_URL ?>/enduser/profile.php"<?= $navActive('profile') ?>><span class="icon">👤</span> My Profile</a>
+  </nav>
 
-      <div class="side-nav-item has-submenu">
-        <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
-          <span class="icon">🎟️</span>
-          <span class="nav-label">Event</span>
-          <span class="chevron" aria-hidden="true">⌄</span>
-        </button>
-        <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="<?= BASE_URL ?>/event-details.php" class="calendar-submenu-link">
-            <span class="icon">📅</span> Calendar
-          </a>
-        </div>
-      </div>
+  <?php if (($navUser['role'] ?? '') === 'admin'): ?>
+    <nav class="side-nav side-admin" aria-label="Admin">
+      <div class="side-group-label">Admin</div>
+      <a href="<?= BASE_URL ?>/admin/event-organizer.php"<?= $navActive('admin-events') ?>><span class="icon">🛠️</span> Manage Events</a>
+      <a href="<?= BASE_URL ?>/admin/admin-taxonomy.php"<?= $navActive('admin-taxonomy') ?>><span class="icon">🏷️</span> Categories &amp; Orgs</a>
+      <a href="<?= BASE_URL ?>/admin/users.php"<?= $navActive('admin-users') ?>><span class="icon">👥</span> Users</a>
     </nav>
-
-    <?php if (($user['role'] ?? 'user') === 'admin'): ?>
-      <div style="margin-top:auto;">
-        <a href="<?= BASE_URL ?>/admin/event-organizer.php" class="admin-view-link">
-          <span class="icon">🛠️</span> <span class="nav-label">Admin View</span>
-        </a>
-      </div>
-    <?php endif; ?>
-    <!--new nav -->
-  </aside>
-  
-  
+  <?php endif; ?>
+</aside>

@@ -1,19 +1,20 @@
 <?php
 require_once __DIR__ . '/../../config/supabase.php';
-session_start_once();
 
-// If logged in, skip straight to the dashboard.
+// Where to go after logging in. Only paths on this site are allowed, so
+// "?redirect=https://evil.site" can't bounce people to another website.
+$defaultTarget = BASE_URL . '/enduser/dashboard.php';
+$redirectTo = safe_redirect_target(get_param('redirect') ?: post_param('redirect'), $defaultTarget);
+
 if (current_user()) {
-    header('Location: ../enduser/dashboard.php');
+    header('Location: ' . $redirectTo);
     exit;
 }
 
-$redirectTo = $_GET['redirect'] ?? $_POST['redirect'] ?? '../enduser/dashboard.php';
 $error = null;
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $email = post_param('email');
+    $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
 
     if ($email === '' || $password === '') {
         $error = 'Please enter both email and password.';
@@ -27,15 +28,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Short info messages for the buttons that don't have a backend yet
-// (Google sign-in, password reset) and for the Admin Login shortcut.
+// Google sign-in goes through Supabase once the Google provider is switched
+// on (Supabase Dashboard -> Authentication -> Sign In / Providers -> Google).
+$googleEnabled = auth_provider_enabled('google');
+if ($googleEnabled) {
+    session_start_once();
+    $_SESSION['after_login'] = $redirectTo; // auth/callback.php sends them here
+}
+
 $notices = [
-    'google' => 'Google sign-in isn\'t set up yet. Please log in with your email and password.',
-    'forgot' => 'Password reset isn\'t available yet. Please contact the site administrator.',
-    'admin'  => 'Log in with your admin account to open the Admin View.',
+    'google' => "Google sign-in isn't switched on yet. Please log in with your email and password.",
+    'admin'  => 'Log in with your admin account to open the admin pages.',
 ];
-$notice = $notices[$_GET['notice'] ?? ''] ?? null;
+$notice = $notices[get_param('notice')] ?? null;
 $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/admin/event-organizer.php');
+$flashes = render_flashes();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,8 +75,9 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
 
   <h1>Login to your account</h1>
 
+  <?= $flashes ?>
   <?php if ($error): ?>
-    <div class="login-alert"><?= htmlspecialchars($error) ?></div>
+    <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
   <?php elseif ($notice): ?>
     <div class="login-notice"><?= htmlspecialchars($notice) ?></div>
   <?php endif; ?>
@@ -85,12 +93,12 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
       </span>
       <input type="email" id="email" name="email" required autocomplete="email"
              placeholder="name@email.lcup.edu.ph"
-             value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+             value="<?= htmlspecialchars(post_param('email')) ?>">
     </div>
 
     <label for="password">Password</label>
     <div class="login-field">
-      <button type="button" class="login-field-icon" id="togglePassword" aria-label="Show password">
+      <button type="button" class="login-field-icon" data-toggle-password="password" aria-label="Show password">
         <!-- IMAGE SLOT 4: Password eye, default (password hidden) | file: assets/images/login/icon-eye-off.svg | 28×28 -->
         <img class="icon-hidden" src="../assets/images/login/icon-eye-off.svg" alt="" width="28" height="28">
         <!-- IMAGE SLOT 5: Password eye, shown after clicking (password visible) | file: assets/images/login/icon-eye.svg | 28×28 -->
@@ -100,7 +108,7 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
              placeholder="************************">
     </div>
 
-    <a href="login.php?notice=forgot" class="login-forgot">Forgot Password</a>
+    <a href="forgot-password.php" class="login-forgot">Forgot Password</a>
 
     <button type="submit" class="login-btn login-submit">Login</button>
   </form>
@@ -108,7 +116,7 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
   <div class="login-divider">Or Sign in with</div>
 
   <div class="login-socials">
-    <a href="login.php?notice=google" class="login-btn">
+    <a href="<?= htmlspecialchars($googleEnabled ? google_signin_url() : 'login.php?notice=google') ?>" class="login-btn">
       <!-- IMAGE SLOT 6: Google button icon | file: assets/images/login/icon-google.svg | 34×34 -->
       <img src="../assets/images/login/icon-google.svg" alt="" width="34" height="34">
       Google
@@ -123,20 +131,6 @@ $adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/adm
 
 <p class="login-signup">Don't have an account? <a href="register.php">Sign up</a></p>
 
-<script>
-  // Eye button: show/hide the password text.
-  (function () {
-    const btn = document.getElementById("togglePassword");
-    const input = document.getElementById("password");
-    btn.addEventListener("click", () => {
-      const show = input.type === "password";
-      input.type = show ? "text" : "password";
-      btn.querySelector(".icon-hidden").hidden = show;
-      btn.querySelector(".icon-visible").hidden = !show;
-      btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
-    });
-  })();
-</script>
-
+<script src="../assets/js/auth.js"></script>
 </body>
 </html>
