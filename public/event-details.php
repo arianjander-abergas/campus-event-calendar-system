@@ -3,64 +3,71 @@ require_once __DIR__ . '/../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
 
-$eventId = $_GET['id'] ?? null;
+$eventId = get_param('id');
+$activeNav = $eventId === '' ? 'event' : 'events'; // sidebar: "Next Event" vs "All Events"
 
-// ---- Handle "Register Now!" (PRG pattern: redirect after POST) ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'register' && $eventId) {
-    $result = register_for_event($eventId);
-    $flashKey = $result['ok'] ? 'registered' : 'register_error';
-    header('Location: event-details.php?id=' . urlencode($eventId) . '&' . $flashKey . '=1');
+// ---- Register / cancel (redirect after POST so a refresh doesn't resubmit) ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_uuid($eventId)) {
+    $action = post_param('action');
+    if ($action === 'register') {
+        $result = register_for_event($eventId);
+        flash($result['ok'] ? 'success' : 'error', $result['message']);
+    } elseif ($action === 'cancel_registration') {
+        $result = cancel_registration($eventId);
+        flash($result['ok'] ? 'success' : 'error', $result['message']);
+    }
+    header('Location: event-details.php?id=' . urlencode($eventId));
     exit;
 }
 
-// Everything below comes from the Thesis Supabase project — no local sample data.
-$event = null;
-if ($eventId) {
-    $rows = supabase_request('events', EVENT_CARD_SELECT . '&id=eq.' . urlencode($eventId) . '&limit=1');
-    $event = $rows[0] ?? null;
+// Everything below comes from the Thesis Supabase project.
+if ($eventId !== '') {
+    $event = get_event($eventId);
 } else {
-    // Opened without an id (e.g. the sidebar's Calendar link): show the
-    // event happening today, or else the next upcoming one.
+    // Opened without an id (sidebar "Next Event"): the event happening
+    // today, or else the next upcoming one.
     $event = get_upcoming_events(1)[0] ?? null;
-    $eventId = $event['id'] ?? null;
+    $eventId = $event['id'] ?? '';
 }
 
 // Placeholder images (numbered IMAGE SLOTs — see assets/css/event-details.css).
 // An event's own poster / organization logo from Supabase is used when set.
 $img = 'assets/images/event-details/';
-$posterUrl = !empty($event['poster_url']) ? $event['poster_url'] : $img . 'event-poster.svg';
-$orgLogo = !empty($event['organizations']['logo_url']) ? $event['organizations']['logo_url'] : $img . 'org-logo.svg';
-
-$categoryName = $event['categories']['name'] ?? 'Event';
+$posterUrl = asset_url($event['poster_url'] ?? null, $img . 'event-poster.svg');
+$orgLogo = asset_url($event['organizations']['logo_url'] ?? null, $img . 'org-logo.svg');
+$categoryName = $event['categories']['name'] ?? EVENT_TYPES[$event['event_type'] ?? 'other'] ?? 'Event';
 $orgName = $event['organizations']['name'] ?? 'Organizer';
-$alreadyRegistered = $event ? is_registered($eventId) : false;
 
-// "Sep 20, 2026 | 1:00 PM - 3:00 PM" (time part left off when not set).
-function event_when(array $ev): string {
-    $time = format_event_time($ev['start_time'] ?? null);
-    if ($time !== '' && !empty($ev['end_time'])) {
-        $time .= ' - ' . format_event_time($ev['end_time']);
-    }
-    return format_event_date($ev['start_date'] ?? null) . ($time !== '' ? ' | ' . $time : '');
-}
+$going = $event ? get_registration_count($eventId) : 0;
+$myRegistration = $event ? get_my_registration($eventId) : null;
+$reg = $event ? registration_state($event, $myRegistration, $going) : null;
 
 // Schedule: this event's segments from event_programs, in sort_order.
 $schedule = $event ? get_event_programs($eventId) : [];
 
 // "Programs" cards: other published events, soonest first, so anything
 // happening today always shows up first.
-$programCards = get_upcoming_events(3, $eventId);
+$programCards = get_upcoming_events(3, $eventId ?: null);
 
-// Notifications for the bell, fetched with the user's session so the
-// notifications RLS policy (user_id = auth.uid()) lets their rows through.
-$notifications = supabase_request('notifications', 'select=id,title,message,status,created_at&order=created_at.desc&limit=10', 'GET', null, false, $_SESSION['access_token'] ?? null);
+$notifications = get_my_notifications();
+$unreadCount = unread_count($notifications);
+
+$isAdmin = ($user['role'] ?? '') === 'admin';
+
+// Banner for events that aren't simply "published and upcoming".
+$banner = null;
+if ($event) {
+    if ($event['status'] === 'cancelled') $banner = ['error', 'This event was cancelled.'];
+    elseif ($event['status'] === 'draft') $banner = ['info', 'Draft — only admins can see this event until it is published.'];
+    elseif ($event['status'] === 'completed' || ($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Event Details — Campus Event Hub</title>
+<title><?= htmlspecialchars($event['title'] ?? 'Event Details') ?> — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap">
@@ -69,9 +76,8 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
 </head>
 <body class="event-details-page">
 
-<div class="dashboard-shell sidebar-pinned">
+<div class="dashboard-shell">
 
-  <!-- Sidebar (same as dashboard.php, "Event" highlighted) -->
   <?php include __DIR__ . '/../includes/nav.php'; ?>
 
   <!-- Top bar -->
@@ -79,21 +85,21 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
     <nav class="ed-breadcrumb" aria-label="Breadcrumb">
       <a href="enduser/dashboard.php">Dashboard</a>
       <span class="ed-crumb-sep">&gt;</span>
-      <a href="enduser/dashboard.php">Events</a>
+      <a href="events.php">Events</a>
       <span class="ed-crumb-sep">&gt;</span>
       <span class="ed-crumb-current">Event Details</span>
     </nav>
 
     <div class="ed-topbar-right">
-      <div class="ed-notif">
-        <button class="ed-bell" id="notifBtn" type="button" aria-label="Notifications">
+      <div class="ed-notif" data-notifications>
+        <button class="ed-bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
           <!-- IMAGE SLOT 9: Notification bell | file: assets/images/event-details/icon-bell.svg | 26×26 -->
           <img src="<?= $img ?>icon-bell.svg" alt="" width="26" height="26">
-          <span class="ed-bell-count" id="notifDot" hidden>0</span>
+          <span class="ed-bell-count" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
         </button>
-        <div class="ed-notif-dropdown" id="notifDropdown" hidden>
+        <div class="ed-notif-dropdown" data-notif-dropdown hidden>
           <div class="ed-notif-head">Notifications</div>
-          <div class="ed-notif-list" id="notifList"><div class="ed-notif-empty">No notifications yet.</div></div>
+          <div class="ed-notif-list" data-notif-list><div class="ed-notif-empty">No notifications yet.</div></div>
         </div>
       </div>
 
@@ -109,6 +115,8 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
           <img src="<?= $img ?>icon-chevron-down.svg" alt="" class="ed-user-chevron" width="18" height="18">
         </summary>
         <div class="ed-user-dropdown">
+          <a href="enduser/profile.php">My Profile</a>
+          <a href="events.php?mine=1">My Events</a>
           <a href="auth/logout.php">Log out</a>
         </div>
       </details>
@@ -117,24 +125,26 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
 
   <!-- Main content -->
   <main class="dash-main ed-main">
-    <a href="enduser/dashboard.php" class="ed-back">
+    <a href="events.php" class="ed-back">
       <!-- IMAGE SLOT 6: Back arrow | file: assets/images/event-details/icon-back.svg | 30×18 -->
       <img src="<?= $img ?>icon-back.svg" alt="" width="30" height="18">
       Back to All Events
     </a>
 
-    <?php if (isset($_GET['registered'])): ?>
-      <div class="ed-flash ed-flash-ok">You're registered! We'll notify you with any updates.</div>
-    <?php elseif (isset($_GET['register_error'])): ?>
-      <div class="ed-flash ed-flash-error">Something went wrong registering you. Please try again.</div>
-    <?php endif; ?>
+    <?php foreach (take_flashes() as $f): ?>
+      <div class="ed-flash <?= $f['type'] === 'success' ? 'ed-flash-ok' : ($f['type'] === 'error' ? 'ed-flash-error' : 'ed-flash-info') ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= htmlspecialchars($f['message']) ?></div>
+    <?php endforeach; ?>
 
     <?php if (!$event): ?>
     <section class="ed-hero ed-not-found">
-      <h1 class="ed-title">Event not found</h1>
-      <p>This event doesn't exist or isn't published yet. <a href="enduser/dashboard.php">Browse all events</a>.</p>
+      <h1 class="ed-title"><?= $eventId === '' ? 'No upcoming events' : 'Event not found' ?></h1>
+      <p><?= $eventId === '' ? 'There are no upcoming events right now.' : "This event doesn't exist or isn't published yet." ?> <a href="events.php">Browse all events</a>.</p>
     </section>
     <?php else: ?>
+      <?php if ($banner): ?>
+        <div class="ed-flash <?= $banner[0] === 'error' ? 'ed-flash-error' : 'ed-flash-info' ?>"><?= htmlspecialchars($banner[1]) ?></div>
+      <?php endif; ?>
+
     <!-- Event hero card -->
     <section class="ed-hero">
       <!-- IMAGE SLOT 1: Event poster (used when the event has no poster_url) | file: assets/images/event-details/event-poster.svg | 340×345 -->
@@ -143,21 +153,26 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
       <div class="ed-hero-info">
         <span class="ed-category"><?= htmlspecialchars($categoryName) ?></span>
         <h1 class="ed-title"><?= htmlspecialchars($event['title']) ?></h1>
-        <p class="ed-desc"><?= htmlspecialchars($event['description'] ?? '') ?></p>
+        <p class="ed-desc"><?= nl2br(htmlspecialchars($event['description'] ?? '')) ?></p>
 
         <div class="ed-meta">
-          <?php if (!empty($event['venue'])): ?>
           <div class="ed-meta-row">
             <!-- IMAGE SLOT 7: Location icon | file: assets/images/event-details/icon-location.svg | 12×12 -->
             <img src="<?= $img ?>icon-location.svg" alt="" width="12" height="12">
-            <?= htmlspecialchars($event['venue']) ?>
+            <?= htmlspecialchars(event_place($event)) ?><?= !empty($event['address']) ? ' — ' . htmlspecialchars($event['address']) : '' ?>
           </div>
-          <?php endif; ?>
           <div class="ed-meta-row">
             <!-- IMAGE SLOT 8: Calendar icon | file: assets/images/event-details/icon-calendar.svg | 12×12 -->
             <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
+          <?php if (!empty($event['is_online']) && !empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
+            <div class="ed-meta-row">🔗 <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
+          <?php endif; ?>
+          <div class="ed-meta-row">👥 <?= $going ?> going<?= !empty($event['registration_limit']) ? ' · ' . (int) $event['registration_limit'] . ' slots' : '' ?></div>
+          <?php if (!empty($event['contact_email']) || !empty($event['contact_number'])): ?>
+            <div class="ed-meta-row">✉️ <?= htmlspecialchars(implode(' · ', array_filter([$event['contact_email'] ?? '', $event['contact_number'] ?? '']))) ?></div>
+          <?php endif; ?>
         </div>
 
         <div class="ed-organizer">
@@ -165,18 +180,40 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
           <img src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="ed-org-logo">
           <div class="ed-org-text">
             <span>Organize by</span>
-            <span><?= htmlspecialchars($orgName) ?></span>
+            <?php if (!empty($event['organizations']['id'])): ?>
+              <a href="organizations.php#org-<?= htmlspecialchars($event['organizations']['id']) ?>"><?= htmlspecialchars($orgName) ?></a>
+            <?php else: ?>
+              <span><?= htmlspecialchars($orgName) ?></span>
+            <?php endif; ?>
           </div>
         </div>
 
         <div class="ed-register">
-          <?php if ($alreadyRegistered): ?>
-            <button class="ed-btn" disabled>Registered ✓</button>
-          <?php else: ?>
-            <form method="POST" action="event-details.php?id=<?= urlencode((string)$eventId) ?>">
+          <?php if ($reg['note'] !== ''): ?>
+            <p class="ed-reg-note"><?= htmlspecialchars($reg['note']) ?></p>
+          <?php endif; ?>
+          <?php if ($reg['can_register']): ?>
+            <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>">
               <input type="hidden" name="action" value="register">
               <button type="submit" class="ed-btn">Register Now!</button>
             </form>
+          <?php elseif ($reg['state'] === 'registered' || $reg['state'] === 'attended'): ?>
+            <div class="ed-reg-actions">
+              <button class="ed-btn" disabled><?= $reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓' ?></button>
+              <?php if ($reg['can_cancel']): ?>
+                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" onsubmit="return confirm('Cancel your registration for this event?');">
+                  <input type="hidden" name="action" value="cancel_registration">
+                  <button type="submit" class="ed-btn ed-btn-outline">Cancel registration</button>
+                </form>
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
+          <?php if ($isAdmin): ?>
+            <div class="ed-admin-links">
+              <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
+              <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Edit schedule</a>
+              <a href="admin/event-registrations.php?event=<?= urlencode($eventId) ?>">Registrations</a>
+            </div>
           <?php endif; ?>
         </div>
       </div>
@@ -189,16 +226,14 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
       <?php if (empty($programCards)): ?>
         <p class="ed-empty">No other upcoming events yet.</p>
       <?php endif; ?>
-      <?php foreach ($programCards as $i => $p):
-        $desc = (string) ($p['description'] ?? '');
-      ?>
+      <?php foreach ($programCards as $i => $p): ?>
       <a class="ed-program-card" href="event-details.php?id=<?= urlencode($p['id']) ?>">
         <!-- IMAGE SLOTS 3-5: Program card image (used when the event has no poster_url) | file: assets/images/event-details/program-<?= $i + 1 ?>.svg | 225×200 -->
-        <img src="<?= htmlspecialchars(!empty($p['poster_url']) ? $p['poster_url'] : $img . 'program-' . ($i + 1) . '.svg') ?>" alt="" class="ed-program-img">
+        <img src="<?= htmlspecialchars(asset_url($p['poster_url'] ?? null, $img . 'program-' . ($i + 1) . '.svg')) ?>" alt="" class="ed-program-img">
         <div class="ed-program-body">
           <span class="ed-program-badge"><?= htmlspecialchars($p['categories']['name'] ?? 'Event') ?></span>
           <h3 class="ed-program-title"><?= htmlspecialchars($p['title']) ?></h3>
-          <p class="ed-program-sub"><?= htmlspecialchars(mb_strimwidth($desc, 0, 90, '…')) ?></p>
+          <p class="ed-program-sub"><?= htmlspecialchars(excerpt($p['description'] ?? '', 90)) ?></p>
           <p class="ed-program-time"><?= htmlspecialchars(event_when($p)) ?></p>
         </div>
       </a>
@@ -212,7 +247,7 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
       <h2 class="ed-schedule-title">Schedule</h2>
 
       <?php if (empty($schedule)): ?>
-        <p class="ed-empty">No schedule posted yet.</p>
+        <p class="ed-empty">No schedule posted yet.<?php if ($isAdmin && $event): ?> <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Add one</a>.<?php endif; ?></p>
       <?php else: ?>
       <!-- event_programs rows in sort_order; speaker shown on the right -->
       <div class="ed-schedule-head">Event Program</div>
@@ -227,13 +262,7 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
 
 </div>
 
-<script>
-  window.CURRENT_USER_ID = <?= json_encode($user['id']) ?>;
-  window.USER_NOTIFICATIONS = <?= json_encode($notifications) ?>;
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/supabase-client.js"></script>
-<script src="assets/js/event-details.js"></script>
+<?= notifications_bootstrap($notifications) ?>
 <script src="assets/js/sidebar.js"></script>
 <?= presence_script_tag() ?>
 </body>

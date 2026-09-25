@@ -1,41 +1,56 @@
 <?php
 require_once __DIR__ . '/../../config/supabase.php';
-session_start_once();
 
 if (current_user()) {
-    header('Location: ../enduser/dashboard.php');
+    header('Location: ' . BASE_URL . '/enduser/dashboard.php');
     exit;
 }
 
+$organizations = get_organizations();
+$orgIds = array_column($organizations, 'id');
 $error = null;
 $success = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fullName = trim($_POST['full_name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $confirm = $_POST['confirm_password'] ?? '';
+    $fullName = post_param('full_name');
+    $email = post_param('email');
+    $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+    $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
+    $yearLevel = post_param('year_level');
+    $course = post_param('course');
+    $organizationId = post_param('organization_id');
 
     if ($fullName === '' || $email === '' || $password === '') {
-        $error = 'Please fill in all fields.';
+        $error = 'Please fill in your name, email and password.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please enter a valid email address.';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters.';
     } elseif ($password !== $confirm) {
         $error = 'Passwords do not match.';
+    } elseif ($yearLevel !== '' && !in_array($yearLevel, ['1', '2', '3', '4', '5'], true)) {
+        $error = 'Please choose a valid year level.';
+    } elseif ($organizationId !== '' && !in_array($organizationId, $orgIds, true)) {
+        $error = 'Please choose an organization from the list.';
     } else {
-        $result = supabase_auth_signup($email, $password, $fullName);
+        $result = supabase_auth_signup($email, $password, $fullName, [
+            'year_level' => $yearLevel !== '' ? (int) $yearLevel : null,
+            'course' => $course !== '' ? $course : null,
+            'organization_id' => $organizationId !== '' ? $organizationId : null,
+        ]);
+        if ($result['ok'] && empty($result['needsEmailConfirmation'])) {
+            flash('success', 'Welcome to Campus Event Hub, ' . explode(' ', $fullName)[0] . '!');
+            header('Location: ' . BASE_URL . '/enduser/dashboard.php');
+            exit;
+        }
         if ($result['ok']) {
-            if (!empty($result['needsEmailConfirmation'])) {
-                $success = $result['message'];
-            } else {
-                header('Location: ../enduser/dashboard.php');
-                exit;
-            }
+            $success = $result['message']; // "confirm your email" case
         } else {
             $error = $result['message'];
         }
     }
 }
+$old = fn(string $key): string => htmlspecialchars(post_param($key));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,47 +58,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign Up — Campus Event Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&display=swap">
 <link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/auth.css">
 </head>
-<body>
+<body class="login-page">
 
-<?php include __DIR__ . '/../../includes/header.php'; ?>
+<a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+  <img src="../assets/images/login/logo-mark.svg" alt="" class="login-logo-mark" width="72" height="68">
+  <span class="login-logo-text">
+    <span class="campus">CAMPUS</span>
+    <span class="hub">EVENT HUB</span>
+  </span>
+</a>
 
-<div class="auth-shell">
-  <div class="auth-card">
-    <h1 class="auth-title">Create your account</h1>
-    <p class="auth-sub">Sign up to register for JPSSITE, SIES, and ACpES events.</p>
+<main class="login-card register-card">
+  <a href="../index.php" class="login-close" aria-label="Close and go back home">
+    <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
+  </a>
 
-    <?php if ($error): ?>
-      <div class="auth-alert"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-    <?php if ($success): ?>
-      <div class="auth-success"><?= htmlspecialchars($success) ?></div>
-    <?php endif; ?>
+  <h1>Create your account</h1>
 
-    <?php if (!$success): ?>
-    <form method="POST" class="auth-form">
-      <label for="full_name">Full name</label>
-      <input type="text" id="full_name" name="full_name" required autocomplete="name"
-             value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>">
+  <?php if ($error): ?>
+    <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
+  <?php endif; ?>
+  <?php if ($success): ?>
+    <div class="login-notice"><?= htmlspecialchars($success) ?> <a href="login.php">Log in</a></div>
+  <?php endif; ?>
 
-      <label for="email">Email</label>
-      <input type="email" id="email" name="email" required autocomplete="email"
-             value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+  <?php if (!$success): ?>
+  <form method="POST" class="login-form register-form">
+    <div class="register-grid">
+      <div class="register-full">
+        <label for="full_name">Full Name</label>
+        <input type="text" id="full_name" name="full_name" class="login-input" required autocomplete="name"
+               placeholder="Juan Dela Cruz" value="<?= $old('full_name') ?>">
+      </div>
 
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" required autocomplete="new-password" minlength="6">
+      <div class="register-full">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" name="email" class="login-input" required autocomplete="email"
+               placeholder="name@email.lcup.edu.ph" value="<?= $old('email') ?>">
+      </div>
 
-      <label for="confirm_password">Confirm password</label>
-      <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password" minlength="6">
+      <div>
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" class="login-input" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters">
+      </div>
+      <div>
+        <label for="confirm_password">Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="6" autocomplete="new-password" placeholder="Type it again">
+      </div>
 
-      <button type="submit" class="btn btn-primary auth-submit">SIGN UP</button>
-    </form>
-    <?php endif; ?>
+      <div>
+        <label for="year_level">Year Level</label>
+        <select id="year_level" name="year_level" class="login-input">
+          <option value="">Not a student / Faculty</option>
+          <?php foreach ([1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'] as $y => $label): ?>
+            <option value="<?= $y ?>" <?= post_param('year_level') === (string) $y ? 'selected' : '' ?>><?= $label ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label for="course">Course</label>
+        <input type="text" id="course" name="course" class="login-input" list="course-options" placeholder="e.g. BSIT" value="<?= $old('course') ?>">
+        <datalist id="course-options">
+          <option value="BSIT"><option value="BSCS"><option value="BSCpE"><option value="BSECE"><option value="BSEE">
+          <option value="BSA"><option value="BSBA"><option value="BSN"><option value="BSPsych"><option value="BSEd">
+        </datalist>
+      </div>
 
-    <p class="auth-footnote">Already have an account? <a href="login.php">Log in</a></p>
-  </div>
-</div>
+      <div class="register-full">
+        <label for="organization_id">Organization <span class="login-optional">(optional)</span></label>
+        <select id="organization_id" name="organization_id" class="login-input">
+          <option value="">None</option>
+          <?php foreach ($organizations as $o): ?>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= post_param('organization_id') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="login-btn login-submit">Sign Up</button>
+  </form>
+  <?php endif; ?>
+</main>
+
+<p class="login-signup">Already have an account? <a href="login.php">Log in</a></p>
 
 </body>
 </html>

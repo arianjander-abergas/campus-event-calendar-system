@@ -36,7 +36,7 @@
 }
 
 /* Wider right column than other dashboard pages so schedule items fit on one line. */
-.event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 240px 1fr 340px; }
+.event-details-page .dashboard-shell { grid-template-columns: 240px minmax(0, 1fr) 340px; }
 
 /* Sidebar: highlight "Event" as the current section on this page. */
 .event-details-page .submenu-toggle.is-current {
@@ -189,8 +189,8 @@
   text-align: center;
   letter-spacing: 0.5px;
 }
-.ed-title { margin: 22px 0 8px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.2px; }
-.ed-desc { margin: 0 0 30px; font-size: 0.68rem; line-height: 1.55; color: #333; max-width: 320px; }
+.ed-title { margin: 22px 0 8px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.2px; overflow-wrap: anywhere; }
+.ed-desc { margin: 0 0 30px; font-size: 0.68rem; line-height: 1.55; color: #333; max-width: 320px; overflow-wrap: anywhere; }
 
 .ed-meta { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; }
 .ed-meta-row { display: flex; align-items: center; gap: 10px; font-size: 0.55rem; color: #555; }
@@ -249,7 +249,7 @@
   color: #fff;
   font-size: 0.55rem;
 }
-.ed-program-title { margin: 12px 0 8px; font-size: 0.78rem; font-weight: 600; }
+.ed-program-title { margin: 12px 0 8px; font-size: 0.78rem; font-weight: 600; overflow-wrap: anywhere; }
 .ed-program-sub { margin: 0 0 14px; font-size: 0.52rem; line-height: 1.5; text-transform: uppercase; color: #444; }
 .ed-program-time { margin: auto 0 0; font-size: 0.52rem; color: #444; }
 
@@ -314,18 +314,28 @@
 /* Line keeps going a little past the last item, like the design. */
 .ed-timeline li:last-child .ed-tl-dot::before { bottom: -40px; }
 
+/* ---- Registration box, cancel button, admin links ---- */
+.ed-reg-note { margin: 0 0 8px; font-size: 0.78rem; color: #444; text-align: right; }
+.ed-reg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ed-btn-outline { background: #fff; color: #b42318; border: 1.5px solid #f3b4b0; }
+.ed-btn-outline:hover:not(:disabled) { background: #fef2f2; color: #b42318; }
+.ed-admin-links { display: flex; gap: 14px; justify-content: flex-end; margin-top: 12px; font-size: 0.78rem; }
+.ed-admin-links a { color: var(--ed-navy); font-weight: 600; }
+.ed-admin-links a:hover { text-decoration: underline; }
+.ed-org-text a { color: var(--ed-navy); font-weight: 500; }
+.ed-org-text a:hover { text-decoration: underline; }
+.ed-meta-row a { color: var(--ed-navy); font-weight: 600; text-decoration: underline; }
+.ed-flash-info { background: #eaf2fd; color: #1a4f9c; }
+.ed-empty a { color: var(--ed-navy); font-weight: 600; }
+.ed-notif-list .notif-item { display: block; color: inherit; }
+a.notif-item:hover { background: #f8fafc; }
+.ed-notif-list .notif-time { margin: 4px 0 0; font-size: 0.7rem; color: #9ca3af; }
+
 /* ---- Responsive ---- */
 @media (max-width: 1100px) {
-  /* style.css hides .right-rail at this width; keep the schedule and
-     move it below the main content instead. */
-  .event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 220px 1fr; grid-template-rows: auto auto 1fr; }
-  .event-details-page .dashboard-shell.sidebar-pinned .sidebar { grid-row: 1 / span 3; }
-  .event-details-page .ed-rail {
-    display: block;
-    grid-column: 2;
-    grid-row: 3;
-    padding: 0 22px 40px;
-  }
+  /* The schedule moves below the main content (style.css places .right-rail in row 3). */
+  .event-details-page .dashboard-shell { grid-template-columns: 220px minmax(0, 1fr); }
+  .event-details-page .ed-rail { display: block; padding: 0 22px 40px; }
 }
 @media (max-width: 900px) {
   .ed-hero { grid-template-columns: 1fr; }
@@ -333,9 +343,8 @@
   .ed-hero-info { padding-top: 0; }
   .ed-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-width: 700px) {
-  .event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 1fr; grid-template-rows: none; }
-  .event-details-page .dashboard-shell.sidebar-pinned .sidebar { grid-row: 1; }
+@media (max-width: 760px) {
+  .event-details-page .dashboard-shell { grid-template-columns: 1fr; }
   .ed-topbar { padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
   .ed-user-text { display: none; }
   .ed-user-chevron { margin-left: 4px; }
@@ -343,10 +352,12 @@
   .ed-back { margin-left: 0; }
   .ed-hero { padding: 16px; }
   .ed-programs { grid-template-columns: 1fr; }
-  .event-details-page .ed-rail { grid-column: 1; grid-row: 4; padding: 0 16px 32px; }
+  .event-details-page .ed-rail { padding: 0 16px 32px; }
+  .ed-reg-note { text-align: left; }
+  .ed-reg-actions, .ed-admin-links { justify-content: flex-start; }
 }
 
-/* ---- Empty / not-found states (no local sample data) ---- */
+/* ---- Empty / not-found states ---- */
 .ed-empty { margin: 8px 0 0; font-size: 0.85rem; color: var(--ed-muted); grid-column: 1 / -1; }
 .ed-not-found { display: block; }
 .ed-not-found .ed-title { margin-top: 0; }
