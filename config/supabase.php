@@ -293,6 +293,64 @@ function get_my_registrations(int $limit = 5): array
     return array_values(array_filter($rows, fn($r) => !empty($r['events'])));
 }
 
+// =============================================================================
+// SITE STATS & ACTIVE USERS
+// =============================================================================
+
+/**
+ * Live landing-page counters from the site_stats() database function:
+ * published events, organizations, active users, registrations.
+ * @return array<array{key:string,label:string,value:string}> [] if Supabase is unreachable
+ */
+function get_site_stats(): array
+{
+    $row = supabase_request('rpc/site_stats')[0] ?? null;
+    if (!$row) return [];
+    $labels = ['events' => 'Events', 'organizations' => 'Organizations', 'active_users' => 'Active Users', 'registrations' => 'Registrations'];
+    $stats = [];
+    foreach ($labels as $key => $label) {
+        $stats[] = ['key' => $key, 'label' => $label, 'value' => format_stat_count($row[$key] ?? 0)];
+    }
+    return $stats;
+}
+
+/** 950 -> '950', 1234 -> '1.2k', 3400000 -> '3.4M' (same rule as formatStatCount() in main.js). */
+function format_stat_count($n): string
+{
+    $n = (int) $n;
+    if ($n < 1000) return (string) $n;
+    if ($n < 1000000) return rtrim(rtrim(number_format($n / 1000, 1, '.', ''), '0'), '.') . 'k';
+    return rtrim(rtrim(number_format($n / 1000000, 1, '.', ''), '0'), '.') . 'M';
+}
+
+/**
+ * Active Users heartbeat for the logged-in user. Pages call this through
+ * api/presence.php (see assets/js/presence.js): 'ping' every ~30s while a
+ * page is open, 'leave' on logout / closing the tab. A user counts as
+ * active while they've pinged in the last 2 minutes.
+ */
+function presence_ping(): void
+{
+    if (current_user()) {
+        supabase_request('rpc/touch_presence', '', 'POST', null, false, $_SESSION['access_token'] ?? null);
+    }
+}
+
+function presence_clear(): void
+{
+    if (current_user()) {
+        supabase_request('rpc/clear_presence', '', 'POST', null, false, $_SESSION['access_token'] ?? null);
+    }
+}
+
+/** <script> tags for the Active Users heartbeat — output only for logged-in users. */
+function presence_script_tag(): string
+{
+    if (!current_user()) return '';
+    return '<script>window.PRESENCE_URL = ' . json_encode(BASE_URL . '/api/presence.php') . ';</script>' . "\n"
+        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/presence.js') . '"></script>';
+}
+
 /** '2026-09-20' -> 'Sep 20, 2026'; empty -> 'TBA'. */
 function format_event_date(?string $date): string
 {
@@ -433,6 +491,7 @@ function supabase_session_expired(): bool
 function supabase_auth_signout(): void
 {
     session_start_once();
+    presence_clear(); // Active Users -1 right away
     $accessToken = $_SESSION['access_token'] ?? null;
     if ($accessToken) {
         supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/logout', [

@@ -201,5 +201,6 @@ function initials(string $name): string {
 <script src="../assets/js/sidebar.js"></script>
 <script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>
 <script src="../assets/js/main.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

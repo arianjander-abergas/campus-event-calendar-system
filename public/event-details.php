@@ -235,5 +235,6 @@ $notifications = supabase_request('notifications', 'select=id,title,message,stat
 <script src="assets/js/supabase-client.js"></script>
 <script src="assets/js/event-details.js"></script>
 <script src="assets/js/sidebar.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

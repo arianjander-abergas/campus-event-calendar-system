@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   buildCalendar();
   wireEventCardClicks();
   wireSidebarToggle();
+  wireLiveStats();
 });
 
 /* ---------------- Sidebar: collapsed by default, expands on press ---------------- */
@@ -135,4 +136,29 @@ function wireEventCardClicks() {
       window.location.href = `${SITE_ROOT}event-details.php?id=${encodeURIComponent(eventId)}`;
     });
   });
+}
+/* ---------------- Home page stats: refresh live every 30s ---------------- */
+// The numbers come from the site_stats() database function; Active Users
+// goes up/down as logged-in people open or close the site.
+function wireLiveStats() {
+  const block = document.querySelector(".stats-block");
+  if (!block || !window.db) return; // not on the home page
+
+  const refresh = async () => {
+    const stats = await window.db.getSiteStats();
+    if (!stats) return;
+    block.querySelectorAll("[data-stat]").forEach((el) => {
+      const value = stats[el.dataset.stat];
+      if (value !== undefined) el.textContent = formatStatCount(value);
+    });
+  };
+  setInterval(refresh, 30000);
+}
+
+// 950 -> "950", 1234 -> "1.2k", 3400000 -> "3.4M" (same rule as format_stat_count() in PHP).
+function formatStatCount(n) {
+  n = Number(n) || 0;
+  if (n < 1000) return String(n);
+  const short = (v) => v.toFixed(1).replace(/\.0$/, "");
+  return n < 1000000 ? short(n / 1000) + "k" : short(n / 1000000) + "M";
 }
