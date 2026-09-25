@@ -28,42 +28,34 @@ if (!$event) {
     $event = [
         'id' => $eventId,
         'title' => 'JPSSITE PACE LEVEL UP v.6.2',
-        'description' => "Level up, innovators! The grid is officially open, and we're ready to break the simulation. Whether you're a coder, a creator, or a tech enthusiast, it's time to rise above the static and reach new heights of excellence.",
-        'start_date' => 'TBA',
-        'venue' => 'AVR, CITE Building',
-        'registration_limit' => null,
+        'description' => "Level up, Innovators! The grid is officially open, and we're ready to break the simulation. Whether you're a code, a creator, or a tech enthusiast. It's time to rise above the static and reach new heights of excellence.",
+        'start_date' => 'Month 00 0000',
+        'venue' => 'AVR 1, CITE Building',
         'categories' => ['name' => 'Seminar'],
-        'organizations' => ['name' => 'JPSSITE Organization', 'logo_url' => 'assets/images/org-jpssite.jpg'],
+        'organizations' => ['name' => 'JPSSITE Organization', 'logo_url' => null],
     ];
 }
 
+// Placeholder images (numbered IMAGE SLOTs — see assets/css/event-details.css).
+// An event's own poster / organization logo from Supabase is used when set.
+$img = 'assets/images/event-details/';
+$posterUrl = !empty($event['poster_url']) ? $event['poster_url'] : $img . 'event-poster.svg';
+$orgLogo = !empty($event['organizations']['logo_url']) ? $event['organizations']['logo_url'] : $img . 'org-logo.svg';
+
 $categoryName = $event['categories']['name'] ?? 'Event';
 $orgName = $event['organizations']['name'] ?? 'Organizer';
-$orgLogo = $event['organizations']['logo_url'] ?? 'assets/images/org-jpssite.jpg';
-$seatsLabel = !empty($event['registration_limit']) ? $event['registration_limit'] . ' slots available' : 'Free / Slots available';
-
 $alreadyRegistered = $eventId ? is_registered($eventId) : false;
-$registeredCount = $eventId ? get_registration_count($eventId) : 0;
-
-function initials(string $name): string {
-    $parts = explode(' ', trim($name));
-    $out = '';
-    foreach (array_slice($parts, 0, 2) as $p) { $out .= substr($p, 0, 1); }
-    return strtoupper($out) ?: 'U';
-}
-
-$heroImages = ['assets/images/event-hero-1.jpg', 'assets/images/event-hero-2.jpg', 'assets/images/event-hero-3.jpg'];
 
 // Placeholder — event_programs / event_schedule_items aren't in the current
-// schema yet (see README note further down). Swap these for real queries
-// once those tables exist; the markup below is already shaped for it.
+// schema yet. Swap these for real queries once those tables exist; the
+// markup below is already shaped for it.
 $programs = [
-    ['badge' => 'Seminar', 'image' => 'assets/images/program-seminar.jpg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Innovating the future through generative AI and low-code solutions', 'time' => '0:00 AM - 0:00 AM'],
-    ['badge' => 'Contest', 'image' => 'assets/images/program-contest.jpg', 'title' => 'Tawag ng JPSSITE', 'subtitle' => 'The Talent Showdown', 'time' => '0:00 PM - 0:00 PM'],
-    ['badge' => 'Social', 'image' => 'assets/images/program-social.jpg', 'title' => 'Live Band: Rise Through Rhythm', 'subtitle' => 'Close out the day with music', 'time' => '0:00 PM - 0:00 PM'],
+    ['badge' => 'Seminar', 'image' => $img . 'program-1.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Innovating the future through generative AI and low-code solution', 'time' => 'Time 0:00 AM - 00:00 AM'],
+    ['badge' => 'Contest', 'image' => $img . 'program-2.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Tawag ng JPSSITE : The Talent Showdown', 'time' => 'Time 00:00 AM - 00:00 PM'],
+    ['badge' => 'Special', 'image' => $img . 'program-3.svg', 'title' => 'JPSSITE PACE LEVEL UP v.6.2', 'subtitle' => 'Live Band : Rise Through Rhythm', 'time' => 'Time 00:00 AM - 00:00 PM'],
 ];
 
-$morningProgram = ['Registration', 'Augustian Prayer', 'National Anthem', 'Orientation for Emergency Plan', 'Introduction', 'Seminar Speaker', 'Q&A', 'Awarding of Certificate', 'Ice Breaker', 'Reminders', 'Lunch Break'];
+$morningProgram = ['Registration', 'Augustian Prayer', 'National Anthem', 'Orientation for Emergency Plan', 'Introduction', 'Seminar Speaker', 'Q & A', 'Awarding of Certificate', 'Ice Breaker', 'Reminders', 'Lunch Break'];
 $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'Break', 'Game / Activities', 'Live Band', 'Awarding Ceremony', 'Closing remark', 'Closing Prayer'];
 ?>
 <!DOCTYPE html>
@@ -72,146 +64,133 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Event Details — Campus Event Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/event-details.css">
 </head>
-<body>
+<body class="event-details-page">
 
 <div class="dashboard-shell sidebar-pinned">
 
   <!-- Sidebar (same as dashboard.php, "Event" highlighted) -->
-  <aside class="sidebar">
-    <div class="sidebar-top">
-      <a href="index.php" class="brand">
-        <span class="brand-icon">📅</span>
-        <span class="brand-text">
-          <span class="campus">CAMPUS</span>
-          <span class="hub">EVENT HUB</span>
-        </span>
-      </a>
-      <button class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-    </div>
-
-    <nav class="side-nav">
-      <a href="index.php"><span class="icon">🏠</span> Home</a>
-      <a href="enduser/dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
-      <div class="side-nav-item has-submenu">
-        <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
-          <span class="icon">🎟️</span>
-          <span class="nav-label">Event</span>
-          <span class="chevron" aria-hidden="true">⌄</span>
-        </button>
-        <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="event-details.php" class="calendar-submenu-link">
-            <span class="icon">📅</span> Calendar
-          </a>
-        </div>
-      </div>
-    </nav>
-
-    <?php if (($user['role'] ?? 'user') === 'admin'): ?>
-      <div style="margin-top:auto;">
-        <a href="admin/event-organizer.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#fff; background:rgba(255,255,255,0.08);">
-          <span class="icon">🛠️</span> Admin View
-        </a>
-      </div>
-    <?php endif; ?>
-  </aside>
+  <?php include __DIR__ . '/../../includes/nav.php'; ?>
 
   <!-- Top bar -->
-  <header class="dash-topbar">
-    <nav class="breadcrumb" aria-label="Breadcrumb">
+  <header class="dash-topbar ed-topbar">
+    <nav class="ed-breadcrumb" aria-label="Breadcrumb">
       <a href="enduser/dashboard.php">Dashboard</a>
-      <span class="crumb-sep">›</span>
-      <a href="enduser/dashboard.php#events">Events</a>
-      <span class="crumb-sep">›</span>
-      <span class="crumb-current">Event Details</span>
+      <span class="ed-crumb-sep">&gt;</span>
+      <a href="enduser/dashboard.php">Events</a>
+      <span class="ed-crumb-sep">&gt;</span>
+      <span class="ed-crumb-current">Event Details</span>
     </nav>
-    <div class="topbar-right">
-      <div class="notif-wrap">
-        <button class="bell" id="notifBtn" type="button" aria-label="Notifications">
-          🔔<span class="dot" id="notifDot" hidden>0</span>
+
+    <div class="ed-topbar-right">
+      <div class="ed-notif">
+        <button class="ed-bell" id="notifBtn" type="button" aria-label="Notifications">
+          <!-- IMAGE SLOT 9: Notification bell | file: assets/images/event-details/icon-bell.svg | 26×26 -->
+          <img src="<?= $img ?>icon-bell.svg" alt="" width="26" height="26">
+          <span class="ed-bell-count" id="notifDot" hidden>0</span>
         </button>
-        <div class="notif-dropdown" id="notifDropdown" hidden>
-          <div class="notif-dropdown-head">Notifications</div>
-          <div class="notif-list" id="notifList"><div class="notif-empty">No notifications yet.</div></div>
+        <div class="ed-notif-dropdown" id="notifDropdown" hidden>
+          <div class="ed-notif-head">Notifications</div>
+          <div class="ed-notif-list" id="notifList"><div class="ed-notif-empty">No notifications yet.</div></div>
         </div>
       </div>
-      <div class="user-chip">
-        <div class="avatar"><?= htmlspecialchars(initials($user['full_name'])) ?></div>
-        <div>
-          <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
-          <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
+
+      <details class="ed-user-menu">
+        <summary>
+          <!-- IMAGE SLOT 10: User avatar | file: assets/images/event-details/avatar.svg | 50×50 -->
+          <img src="<?= $img ?>avatar.svg" alt="" class="ed-avatar" width="50" height="50">
+          <span class="ed-user-text">
+            <span class="ed-user-name"><?= htmlspecialchars($user['full_name']) ?></span>
+            <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'])) ?></span>
+          </span>
+          <!-- IMAGE SLOT 11: User menu arrow | file: assets/images/event-details/icon-chevron-down.svg | 18×18 -->
+          <img src="<?= $img ?>icon-chevron-down.svg" alt="" class="ed-user-chevron" width="18" height="18">
+        </summary>
+        <div class="ed-user-dropdown">
+          <a href="auth/logout.php">Log out</a>
         </div>
-        <a href="auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
-      </div>
+      </details>
     </div>
   </header>
 
   <!-- Main content -->
-  <main class="dash-main">
-    <a href="enduser/dashboard.php" class="back-link">‹ Back to All Events</a>
+  <main class="dash-main ed-main">
+    <a href="enduser/dashboard.php" class="ed-back">
+      <!-- IMAGE SLOT 6: Back arrow | file: assets/images/event-details/icon-back.svg | 30×18 -->
+      <img src="<?= $img ?>icon-back.svg" alt="" width="30" height="18">
+      Back to All Events
+    </a>
 
     <?php if (isset($_GET['registered'])): ?>
-      <div class="auth-success" style="margin-bottom:16px;">You're registered! We'll notify you with any updates.</div>
+      <div class="ed-flash ed-flash-ok">You're registered! We'll notify you with any updates.</div>
     <?php elseif (isset($_GET['register_error'])): ?>
-      <div class="auth-alert" style="margin-bottom:16px;">Something went wrong registering you. Please try again.</div>
+      <div class="ed-flash ed-flash-error">Something went wrong registering you. Please try again.</div>
     <?php endif; ?>
 
     <!-- Event hero card -->
-    <section class="event-hero">
-      <div class="hero-gallery">
-        <div class="hero-gallery-img" id="heroImage" style="background-image:url('<?= htmlspecialchars($heroImages[0]) ?>');"></div>
-        <div class="hero-dots">
-          <?php foreach ($heroImages as $i => $img): ?>
-            <button type="button" class="hero-dot <?= $i === 0 ? 'active' : '' ?>" data-src="<?= htmlspecialchars($img) ?>" aria-label="Show image <?= $i + 1 ?>"></button>
-          <?php endforeach; ?>
-        </div>
-      </div>
+    <section class="ed-hero">
+      <!-- IMAGE SLOT 1: Event poster (used when the event has no poster_url) | file: assets/images/event-details/event-poster.svg | 340×345 -->
+      <img src="<?= htmlspecialchars($posterUrl) ?>" alt="<?= htmlspecialchars($event['title']) ?> poster" class="ed-poster">
 
-      <div class="hero-info">
-        <span class="event-tag tag-seminar" style="position:static; display:inline-block;"><?= htmlspecialchars($categoryName) ?></span>
-        <h1 class="hero-title"><?= htmlspecialchars($event['title']) ?></h1>
-        <p class="hero-desc"><?= htmlspecialchars($event['description']) ?></p>
+      <div class="ed-hero-info">
+        <span class="ed-category"><?= htmlspecialchars($categoryName) ?></span>
+        <h1 class="ed-title"><?= htmlspecialchars($event['title']) ?></h1>
+        <p class="ed-desc"><?= htmlspecialchars($event['description'] ?? '') ?></p>
 
-        <div class="hero-meta">
-          <div class="meta-row">👥 <?= htmlspecialchars($seatsLabel) ?> <?= $registeredCount > 0 ? '· ' . $registeredCount . ' registered' : '' ?></div>
-          <div class="meta-row">📅 <?= htmlspecialchars($event['start_date'] ?? 'TBA') ?></div>
+        <div class="ed-meta">
           <?php if (!empty($event['venue'])): ?>
-          <div class="meta-row">📍 <?= htmlspecialchars($event['venue']) ?></div>
+          <div class="ed-meta-row">
+            <!-- IMAGE SLOT 7: Location icon | file: assets/images/event-details/icon-location.svg | 12×12 -->
+            <img src="<?= $img ?>icon-location.svg" alt="" width="12" height="12">
+            <?= htmlspecialchars($event['venue']) ?>
+          </div>
+          <?php endif; ?>
+          <div class="ed-meta-row">
+            <!-- IMAGE SLOT 8: Calendar icon | file: assets/images/event-details/icon-calendar.svg | 12×12 -->
+            <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
+            <?= htmlspecialchars($event['start_date'] ?? 'TBA') ?>
+          </div>
+        </div>
+
+        <div class="ed-organizer">
+          <!-- IMAGE SLOT 2: Organization logo (used when the org has no logo_url) | file: assets/images/event-details/org-logo.svg | 72×72 -->
+          <img src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="ed-org-logo">
+          <div class="ed-org-text">
+            <span>Organize by</span>
+            <span><?= htmlspecialchars($orgName) ?></span>
+          </div>
+        </div>
+
+        <div class="ed-register">
+          <?php if ($alreadyRegistered): ?>
+            <button class="ed-btn" disabled>Registered ✓</button>
+          <?php else: ?>
+            <form method="POST" action="event-details.php?id=<?= urlencode((string)$eventId) ?>">
+              <input type="hidden" name="action" value="register">
+              <button type="submit" class="ed-btn">Register Now!</button>
+            </form>
           <?php endif; ?>
         </div>
-
-        <div class="hero-organizer">
-          <span class="organizer-label">Organize by</span>
-          <img src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="organizer-logo">
-          <span class="organizer-name"><?= htmlspecialchars($orgName) ?></span>
-        </div>
-
-        <?php if ($alreadyRegistered): ?>
-          <button class="btn btn-primary" disabled>Registered ✓</button>
-        <?php else: ?>
-          <form method="POST" action="event-details.php?id=<?= urlencode((string)$eventId) ?>">
-            <input type="hidden" name="action" value="register">
-            <button type="submit" class="btn btn-primary">Register Now!</button>
-          </form>
-        <?php endif; ?>
       </div>
     </section>
 
     <!-- Programs -->
-    <div class="section-head" style="margin-top:28px;">
-      <h2>Programs</h2>
-    </div>
-    <div class="programs-grid">
-      <?php foreach ($programs as $p): ?>
-      <article class="event-card">
-        <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($p['image']) ?>');">
-          <span class="event-tag tag-seminar"><?= htmlspecialchars($p['badge']) ?></span>
-        </div>
-        <div class="event-body">
-          <h3 class="event-name"><?= htmlspecialchars($p['title']) ?></h3>
-          <div class="event-meta"><?= htmlspecialchars($p['subtitle']) ?></div>
-          <div class="event-meta" style="color:var(--blue-accent); font-weight:600;"><?= htmlspecialchars($p['time']) ?></div>
+    <h2 class="ed-section-title">Programs</h2>
+    <div class="ed-programs">
+      <?php foreach ($programs as $i => $p): ?>
+      <article class="ed-program-card">
+        <!-- IMAGE SLOT <?= $i + 3 ?>: Program <?= $i + 1 ?> image | file: <?= htmlspecialchars($p['image']) ?> | 225×200 -->
+        <img src="<?= htmlspecialchars($p['image']) ?>" alt="" class="ed-program-img">
+        <div class="ed-program-body">
+          <span class="ed-program-badge"><?= htmlspecialchars($p['badge']) ?></span>
+          <h3 class="ed-program-title"><?= htmlspecialchars($p['title']) ?></h3>
+          <p class="ed-program-sub"><?= htmlspecialchars($p['subtitle']) ?></p>
+          <p class="ed-program-time"><?= htmlspecialchars($p['time']) ?></p>
         </div>
       </article>
       <?php endforeach; ?>
@@ -219,19 +198,21 @@ $afternoonProgram = ['Registration', 'Tawag ng JPSSITE', 'Game / Activities', 'B
   </main>
 
   <!-- Right rail: schedule -->
-  <aside class="right-rail">
-    <div class="rail-card schedule-card">
-      <div class="schedule-header">Morning Program</div>
-      <ol class="schedule-list">
+  <aside class="right-rail ed-rail">
+    <div class="ed-schedule">
+      <h2 class="ed-schedule-title">Schedule</h2>
+
+      <div class="ed-schedule-head">Morning Program</div>
+      <ol class="ed-timeline">
         <?php foreach ($morningProgram as $item): ?>
-        <li><span class="schedule-dot"></span><span class="schedule-label"><?= htmlspecialchars($item) ?></span><span class="schedule-time">0:00 - 0:00 AM</span></li>
+        <li><span class="ed-tl-label"><?= htmlspecialchars($item) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time">0:00 - 0:00 AM</span></li>
         <?php endforeach; ?>
       </ol>
 
-      <div class="schedule-header">Afternoon Program</div>
-      <ol class="schedule-list">
+      <div class="ed-schedule-head">Afternoon Program</div>
+      <ol class="ed-timeline">
         <?php foreach ($afternoonProgram as $item): ?>
-        <li><span class="schedule-dot"></span><span class="schedule-label"><?= htmlspecialchars($item) ?></span><span class="schedule-time">0:00 - 0:00 PM</span></li>
+        <li><span class="ed-tl-label"><?= htmlspecialchars($item) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time">0:00 - 0:00 PM</span></li>
         <?php endforeach; ?>
       </ol>
     </div>
