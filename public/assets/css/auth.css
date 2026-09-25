@@ -1,6 +1,17 @@
 /* ============================================================
    Campus Event Hub — LOGIN page (auth/login.php)
    Loaded after style.css; everything is scoped to .login-page.
+
+   IMAGE SLOTS (placeholders to replace — keep the same file names,
+   or change the matching <img src> in auth/login.php):
+     SLOT 1  Logo mark ............ images/login/logo-mark.svg   72×68
+     SLOT 2  Close (✕) button ..... images/login/icon-close.svg  26×26
+     SLOT 3  Email field icon ..... images/login/icon-email.svg  28×28
+     SLOT 4  Eye (pw hidden) ...... images/login/icon-eye-off.svg 28×28
+     SLOT 5  Eye (pw visible) ..... images/login/icon-eye.svg    28×28
+     SLOT 6  Google button icon ... images/login/icon-google.svg 34×34
+     SLOT 7  Admin button icon .... images/login/icon-admin.svg  34×34
+   Any image size works; the rules marked "IMAGE SLOT" below scale it to fit.
    ============================================================ */
 
 .login-page {
@@ -30,6 +41,7 @@
   margin-bottom: 26px;
   text-decoration: none;
 }
+/* IMAGE SLOT 1 — logo mark */
 .login-logo-mark { width: 72px; height: 68px; flex-shrink: 0; object-fit: contain; }
 .login-logo-text { display: flex; flex-direction: column; line-height: 0.9; }
 .login-logo-text .campus {
@@ -67,6 +79,7 @@
   color: #444;
   line-height: 0;
 }
+/* IMAGE SLOT 2 — close (✕) button */
 .login-close img { width: 26px; height: 26px; display: block; }
 .login-close:hover { color: #000; }
 
@@ -112,6 +125,7 @@
   padding: 0;
 }
 button.login-field-icon { cursor: pointer; }
+/* IMAGE SLOTS 3, 4, 5 — email icon + password eye icons */
 .login-field-icon img { width: 28px; height: 28px; object-fit: contain; }
 .login-field-icon img[hidden] { display: none; }
 .login-field input {
@@ -182,6 +196,7 @@ button.login-field-icon { cursor: pointer; }
   justify-content: center;
   gap: 52px;
 }
+/* IMAGE SLOTS 6, 7 — Google + Admin Login button icons */
 .login-socials .login-btn img { width: 34px; height: 34px; flex-shrink: 0; object-fit: contain; }
 
 .login-signup {

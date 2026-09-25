@@ -1,0 +1,347 @@
+/* ============================================================
+   Campus Event Hub — EVENT DETAILS page (event-details.php)
+   Loaded after style.css; everything is scoped to .event-details-page
+   and uses "ed-" class names so it can't clash with other pages.
+
+   IMAGE SLOTS (placeholders to replace — keep the same file names,
+   or change the matching <img src> in event-details.php).
+   All files are in assets/images/event-details/:
+     SLOT 1   Event poster ........... event-poster.svg       340×345 *
+     SLOT 2   Organization logo ...... org-logo.svg           72×72 (shown round) *
+     SLOT 3   Program 1 image ........ program-1.svg          225×200
+     SLOT 4   Program 2 image ........ program-2.svg          225×200
+     SLOT 5   Program 3 image ........ program-3.svg          225×200
+     SLOT 6   Back arrow ............. icon-back.svg          30×18
+     SLOT 7   Location icon .......... icon-location.svg      12×12
+     SLOT 8   Calendar icon .......... icon-calendar.svg      12×12
+     SLOT 9   Notification bell ...... icon-bell.svg          26×26
+     SLOT 10  User avatar ............ avatar.svg             50×50 (shown round)
+     SLOT 11  User menu arrow ........ icon-chevron-down.svg  18×18
+   * Only used when the event / organization in Supabase has no
+     poster_url / logo_url of its own.
+   Any image size works; the rules marked "IMAGE SLOT" below scale it to fit.
+   ============================================================ */
+
+.event-details-page {
+  --ed-bg: #ebebeb;
+  --ed-navy: #1f3f8f;
+  --ed-navy-dark: #17326f;
+  --ed-text: #111;
+  --ed-muted: #555;
+  --ed-line: #2c4a8f;
+
+  font-family: "Lexend", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--ed-bg);
+  color: var(--ed-text);
+}
+
+/* Wider right column than other dashboard pages so schedule items fit on one line. */
+.event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 240px 1fr 340px; }
+
+/* Sidebar: highlight "Event" as the current section on this page. */
+.event-details-page .submenu-toggle.is-current {
+  background: #2c4f9e;
+  color: #fff;
+}
+
+/* ---- Top bar ---- */
+.ed-topbar {
+  padding: 18px 40px 18px 42px;
+  min-height: 88px;
+  border-bottom: 1px solid #d6d6d6;
+}
+.ed-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: #333; }
+.ed-breadcrumb a { color: #333; }
+.ed-breadcrumb a:hover { color: var(--ed-navy); }
+.ed-crumb-sep { color: #666; }
+.ed-crumb-current { color: #111; font-weight: 500; }
+
+.ed-topbar-right { display: flex; align-items: center; gap: 30px; }
+
+/* Notification bell */
+.ed-notif { position: relative; }
+.ed-bell {
+  position: relative;
+  display: flex;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+}
+/* IMAGE SLOT 9 — notification bell */
+.ed-bell img { width: 26px; height: 26px; object-fit: contain; display: block; }
+.ed-bell-count {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #e53935;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ed-bell-count[hidden] { display: none; }
+.ed-notif-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -10px;
+  width: 300px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  overflow: hidden;
+}
+.ed-notif-dropdown[hidden] { display: none; }
+.ed-notif-head { padding: 12px 16px; font-weight: 700; border-bottom: 1px solid #eee; }
+.ed-notif-list { max-height: 320px; overflow-y: auto; }
+.ed-notif-empty { padding: 16px; font-size: 0.85rem; color: var(--ed-muted); }
+.ed-notif-list .notif-item { padding: 10px 16px; border-bottom: 1px solid #f1f1f1; }
+.ed-notif-list .notif-item.unread { background: #f3f6fd; }
+.ed-notif-list .notif-title { margin: 0 0 2px; font-weight: 600; font-size: 0.85rem; }
+.ed-notif-list .notif-message { margin: 0; font-size: 0.8rem; color: var(--ed-muted); }
+
+/* User menu (click the name/arrow to show "Log out") */
+.ed-user-menu { position: relative; }
+.ed-user-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+}
+.ed-user-menu summary::-webkit-details-marker { display: none; }
+/* IMAGE SLOT 10 — user avatar */
+.ed-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.ed-user-text { display: flex; flex-direction: column; line-height: 1.2; }
+.ed-user-name { font-weight: 600; font-size: 0.95rem; color: #111; }
+.ed-user-role { font-size: 0.8rem; color: var(--ed-muted); }
+/* IMAGE SLOT 11 — user menu arrow */
+.ed-user-chevron { width: 18px; height: 18px; object-fit: contain; margin-left: 18px; transition: transform 0.15s ease; }
+.ed-user-menu[open] .ed-user-chevron { transform: rotate(180deg); }
+.ed-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 160px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  padding: 6px;
+}
+.ed-user-dropdown a { display: block; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; color: #222; }
+.ed-user-dropdown a:hover { background: #f1f3f8; }
+
+/* ---- Main column ---- */
+.ed-main { padding: 28px 22px 40px 22px; min-width: 0; }
+
+.ed-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 16px 20px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ed-navy);
+}
+/* IMAGE SLOT 6 — back arrow */
+.ed-back img { width: 30px; height: 18px; object-fit: contain; }
+.ed-back:hover { text-decoration: underline; }
+
+.ed-flash { margin: 0 0 14px; padding: 10px 14px; border-radius: 8px; font-size: 0.88rem; }
+.ed-flash-ok { background: #e7f6ec; color: #1e6b3a; }
+.ed-flash-error { background: #fdecec; color: #b42318; }
+
+/* Event hero card */
+.ed-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) 1fr;
+  gap: 20px;
+  padding: 22px 28px 22px 28px;
+  background: #fff;
+  border-radius: 16px;
+}
+/* IMAGE SLOT 1 — event poster */
+.ed-poster {
+  width: 100%;
+  aspect-ratio: 340 / 345;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+.ed-hero-info { display: flex; flex-direction: column; padding-top: 36px; min-width: 0; }
+.ed-category {
+  align-self: flex-start;
+  min-width: 146px;
+  padding: 6px 20px;
+  border-radius: 4px;
+  background: var(--ed-navy);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+.ed-title { margin: 22px 0 8px; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.2px; }
+.ed-desc { margin: 0 0 30px; font-size: 0.68rem; line-height: 1.55; color: #333; max-width: 320px; }
+
+.ed-meta { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; }
+.ed-meta-row { display: flex; align-items: center; gap: 10px; font-size: 0.55rem; color: #555; }
+/* IMAGE SLOTS 7, 8 — location + calendar icons */
+.ed-meta-row img { width: 12px; height: 12px; object-fit: contain; flex-shrink: 0; }
+
+.ed-organizer { display: flex; align-items: center; gap: 12px; margin-top: 12px; margin-left: -8px; }
+/* IMAGE SLOT 2 — organization logo */
+.ed-org-logo { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.ed-org-text { display: flex; flex-direction: column; gap: 4px; font-size: 0.88rem; color: #333; letter-spacing: 0.3px; }
+
+.ed-register { margin-top: auto; align-self: flex-end; padding-top: 16px; }
+.ed-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 5px;
+  background: var(--ed-navy);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ed-btn:hover:not(:disabled) { background: var(--ed-navy-dark); }
+.ed-btn:disabled { background: #5d7ab8; cursor: default; }
+
+/* Programs */
+.ed-section-title { margin: 12px 0 6px 6px; font-size: 1.2rem; font-weight: 600; }
+.ed-programs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.ed-program-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* IMAGE SLOTS 3, 4, 5 — program images */
+.ed-program-img {
+  width: 100%;
+  aspect-ratio: 225 / 200;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px 12px 0 0;
+}
+.ed-program-body { display: flex; flex-direction: column; align-items: center; padding: 10px 12px 18px; text-align: center; }
+.ed-program-badge {
+  align-self: flex-start;
+  margin-left: 8px;
+  padding: 3px 20px;
+  border-radius: 4px;
+  background: var(--ed-navy);
+  color: #fff;
+  font-size: 0.55rem;
+}
+.ed-program-title { margin: 12px 0 8px; font-size: 0.78rem; font-weight: 600; }
+.ed-program-sub { margin: 0 0 14px; font-size: 0.52rem; line-height: 1.5; text-transform: uppercase; color: #444; }
+.ed-program-time { margin: auto 0 0; font-size: 0.52rem; color: #444; }
+
+/* ---- Right rail: schedule ---- */
+.event-details-page .ed-rail {
+  padding: 58px 30px 40px 6px;
+  background: transparent;
+  border-left: none;
+}
+.ed-schedule {
+  padding: 16px 20px 30px 12px;
+  background: #fff;
+  border-radius: 16px;
+}
+.ed-schedule-title { margin: 0 0 12px 1px; font-size: 1.05rem; font-weight: 600; }
+.ed-schedule-head {
+  padding: 3px 16px;
+  border-radius: 3px;
+  background: var(--ed-navy);
+  color: #fff;
+  font-size: 0.95rem;
+  letter-spacing: 0.4px;
+}
+.ed-timeline { list-style: none; margin: 0; padding: 12px 0 64px; }
+.ed-timeline:last-child { padding-bottom: 28px; }
+.ed-timeline li {
+  display: grid;
+  grid-template-columns: 1fr 18px auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 21px;
+  font-size: 0.7rem;
+  color: #444;
+  letter-spacing: 0.3px;
+}
+.ed-tl-label { padding: 2px 0; }
+.ed-tl-time { white-space: nowrap; }
+/* Vertical timeline line + dot, drawn in the middle column */
+.ed-tl-dot { position: relative; align-self: stretch; }
+.ed-tl-dot::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--ed-line);
+}
+.ed-timeline li:first-child .ed-tl-dot::before { top: 50%; }
+.ed-tl-dot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0e2a5e;
+  transform: translate(-50%, -50%);
+}
+/* Line keeps going a little past the last item, like the design. */
+.ed-timeline li:last-child .ed-tl-dot::before { bottom: -40px; }
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  /* style.css hides .right-rail at this width; keep the schedule and
+     move it below the main content instead. */
+  .event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 220px 1fr; grid-template-rows: auto auto 1fr; }
+  .event-details-page .dashboard-shell.sidebar-pinned .sidebar { grid-row: 1 / span 3; }
+  .event-details-page .ed-rail {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    padding: 0 22px 40px;
+  }
+}
+@media (max-width: 900px) {
+  .ed-hero { grid-template-columns: 1fr; }
+  .ed-poster { max-width: 340px; }
+  .ed-hero-info { padding-top: 0; }
+  .ed-programs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .event-details-page .dashboard-shell.sidebar-pinned { grid-template-columns: 1fr; grid-template-rows: none; }
+  .event-details-page .dashboard-shell.sidebar-pinned .sidebar { grid-row: 1; }
+  .ed-topbar { padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
+  .ed-user-text { display: none; }
+  .ed-user-chevron { margin-left: 4px; }
+  .ed-main { padding: 20px 16px 24px; }
+  .ed-back { margin-left: 0; }
+  .ed-hero { padding: 16px; }
+  .ed-programs { grid-template-columns: 1fr; }
+  .event-details-page .ed-rail { grid-column: 1; grid-row: 4; padding: 0 16px 32px; }
+}

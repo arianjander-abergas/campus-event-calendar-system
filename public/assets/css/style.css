@@ -522,6 +522,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 500;
   color: #a9b9dc;
 }
+.event-submenu[hidden] { display: none; } /* display:flex above would otherwise override the hidden attribute */
 .event-submenu a:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .event-submenu a .icon { width: 16px; text-align: center; flex-shrink: 0; }
 
