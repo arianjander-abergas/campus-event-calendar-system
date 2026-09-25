@@ -28,7 +28,8 @@ function initials(string $name): string {
 
 <div class="dashboard-shell sidebar-pinned">
 
-  <!-- Sidebar -->
+  <!-- Sidebar
+   -->
   <?php include __DIR__ . '/../../includes/nav.php'; ?>
 
   <!-- Top bar -->
