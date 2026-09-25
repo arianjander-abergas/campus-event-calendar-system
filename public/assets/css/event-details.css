@@ -345,3 +345,14 @@
   .ed-programs { grid-template-columns: 1fr; }
   .event-details-page .ed-rail { grid-column: 1; grid-row: 4; padding: 0 16px 32px; }
 }
+
+/* ---- Empty / not-found states (no local sample data) ---- */
+.ed-empty { margin: 8px 0 0; font-size: 0.85rem; color: var(--ed-muted); grid-column: 1 / -1; }
+.ed-not-found { display: block; }
+.ed-not-found .ed-title { margin-top: 0; }
+.ed-not-found p { margin: 0; font-size: 0.9rem; color: #333; }
+.ed-not-found a { color: var(--ed-navy); font-weight: 600; }
+
+/* Program cards link to their event */
+a.ed-program-card { color: inherit; }
+a.ed-program-card:hover .ed-program-title { color: var(--ed-navy); }

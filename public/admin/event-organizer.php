@@ -54,6 +54,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     $intent = $_POST['intent'] ?? 'draft'; // 'draft' or 'publish' — which button was clicked
     $existingId = $_POST['id'] ?? null;
 
+    // Collect everything the user typed FIRST, so that if validation (or the
+    // save) fails, the form is re-shown with their values instead of blank.
+    $fields = [
+        'title' => $title,
+        'category_id' => $categoryId,
+        'organization_id' => $organizationId,
+        'event_type' => $eventType,
+        'description' => $description,
+        'start_date' => $startDate,
+        'start_time' => $startTime !== '' ? $startTime : null,
+        'end_date' => $endDate,
+        'end_time' => $endTime !== '' ? $endTime : null,
+        'venue' => $venue !== '' ? $venue : null,
+        'is_online' => $onlineLink !== '',
+        'online_event_link' => $onlineLink !== '' ? $onlineLink : null,
+        'address' => $address !== '' ? $address : null,
+        'poster_url' => $posterUrl !== '' ? $posterUrl : null,
+        'registration_limit' => $registrationLimit !== '' ? (int)$registrationLimit : null,
+        'registration_deadline' => $registrationDeadline !== '' ? $registrationDeadline : null,
+        'contact_email' => $contactEmail !== '' ? $contactEmail : null,
+        'contact_number' => $contactNumber !== '' ? $contactNumber : null,
+        'enable_registration' => $enableRegistration,
+        'send_notification' => $sendNotification,
+        'is_published' => $intent === 'publish',
+        'status' => $intent === 'publish' ? 'published' : 'draft',
+    ];
+
     if ($title === '') $errors[] = 'Event title is required.';
     if ($categoryId === '') $errors[] = 'Category is required.';
     if ($organizationId === '') $errors[] = 'Organization is required.';
@@ -61,34 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     if (strlen($description) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
     if ($startDate === '') $errors[] = 'Start date is required.';
     if ($endDate === '') $errors[] = 'End date is required.';
+    if ($startDate !== '' && $endDate !== '' && $endDate < $startDate) $errors[] = "End date can't be before the start date.";
     if ($venue === '' && $onlineLink === '') $errors[] = 'Provide a venue or an online event link.';
 
     if (empty($errors)) {
-        $fields = [
-            'title' => $title,
-            'category_id' => $categoryId,
-            'organization_id' => $organizationId,
-            'event_type' => $eventType,
-            'description' => $description,
-            'start_date' => $startDate,
-            'start_time' => $startTime !== '' ? $startTime : null,
-            'end_date' => $endDate,
-            'end_time' => $endTime !== '' ? $endTime : null,
-            'venue' => $venue !== '' ? $venue : null,
-            'is_online' => $onlineLink !== '',
-            'online_event_link' => $onlineLink !== '' ? $onlineLink : null,
-            'address' => $address !== '' ? $address : null,
-            'poster_url' => $posterUrl !== '' ? $posterUrl : null,
-            'registration_limit' => $registrationLimit !== '' ? (int)$registrationLimit : null,
-            'registration_deadline' => $registrationDeadline !== '' ? $registrationDeadline : null,
-            'contact_email' => $contactEmail !== '' ? $contactEmail : null,
-            'contact_number' => $contactNumber !== '' ? $contactNumber : null,
-            'enable_registration' => $enableRegistration,
-            'send_notification' => $sendNotification,
-            'is_published' => $intent === 'publish',
-            'status' => $intent === 'publish' ? 'published' : 'draft',
-        ];
-
         if ($existingId) {
             $result = update_event_admin($existingId, $fields);
             if ($result['ok']) {

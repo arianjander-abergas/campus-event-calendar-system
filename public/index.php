@@ -2,7 +2,8 @@
 require_once __DIR__ . '/../config/supabase.php';
 
 $events = supabase_request('events');
-$stats = supabase_request('stats');
+$stats = supabase_request('stats', 'select=label,value&order=sort_order.asc');
+$todayEvents = get_events_today();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,23 +75,24 @@ $stats = supabase_request('stats');
 
   <section class="events-section">
     <div class="events-grid" id="events-grid">
+      <?php if (empty($events)): ?>
+        <p class="events-empty">No events yet. Check back soon!</p>
+      <?php endif; ?>
       <?php foreach ($events as $ev):
         // categories comes from a joined table, so it may be null/missing
         $categoryName = $ev['categories']['name'] ?? 'Event';
       ?>
         <article class="event-card" data-event-id="<?= htmlspecialchars((string)$ev['id']) ?>">
-          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url']) ?>');">
+          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url'] ?? '') ?>');">
             <span class="event-tag <?= $categoryName === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
               <?= htmlspecialchars($categoryName) ?>
             </span>
           </div>
           <div class="event-body">
             <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-            <div class="event-meta">📅 <?= htmlspecialchars($ev['start_date']) ?></div>
-            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue']) ?></div>
-            <!-- attendee_count no longer lives on the events row; it needs a
-                 separate count query (e.g. registrations count per event_id).
-                 Until that's wired up we just omit the "going" line. -->
+            <div class="event-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?></div>
+            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue'] ?: 'Online') ?></div>
+            <div class="event-meta">👥 <?= get_registration_counts()[$ev['id']] ?? 0 ?> going</div>
           </div>
         </article>
       <?php endforeach; ?>
@@ -98,27 +100,18 @@ $stats = supabase_request('stats');
 
     <aside class="upcoming-panel">
       <h3>Upcoming Today</h3>
-      <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/images/event-liveband.jpg');"></div>
-        <div class="upcoming-info">
-          <div class="u-title">JPSSITE Live Band Upsite</div>
-          <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
-        </div>
-      </div>
-      <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/images/event-tawag.jpg');"></div>
-        <div class="upcoming-info">
-          <div class="u-title">Tawag ng JPSSite</div>
-          <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
-        </div>
-      </div>
-      <div class="upcoming-item">
-        <div class="upcoming-thumb" style="background-image:url('assets/images/event-genz.jpg');"></div>
-        <div class="upcoming-info">
-          <div class="u-title">GEN Z Night 2026</div>
-          <div class="u-meta">Month 00 0000 | AVR 1, CITE Building</div>
-        </div>
-      </div>
+      <?php if (empty($todayEvents)): ?>
+        <p class="u-meta">No events happening today.</p>
+      <?php endif; ?>
+      <?php foreach ($todayEvents as $ev): ?>
+        <a class="upcoming-item" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+          <div class="upcoming-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url'] ?? '') ?>');"></div>
+          <div class="upcoming-info">
+            <div class="u-title"><?= htmlspecialchars($ev['title']) ?></div>
+            <div class="u-meta"><?= htmlspecialchars(trim(format_event_time($ev['start_time']) . ' | ' . ($ev['venue'] ?: 'Online'), ' |')) ?></div>
+          </div>
+        </a>
+      <?php endforeach; ?>
     </aside>
   </section>
 

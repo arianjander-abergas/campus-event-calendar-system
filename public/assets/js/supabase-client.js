@@ -6,7 +6,7 @@ let supabaseClient = null;
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient;
   if (typeof window.supabase === "undefined") {
-    console.warn("[Supabase] JS library not loaded — add the CDN script tag. Falling back to mock mode.");
+    console.warn("[Supabase] JS library not loaded — add the CDN script tag.");
     return null;
   }
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -27,7 +27,7 @@ const db = {
       if (!error) return data;
       console.error("[Supabase] getEvents error:", error);
     }
-    return window.MOCK_EVENTS || [];
+    return []; // no local sample data
   },
 
   async getNotifications(userId) {
@@ -41,7 +41,7 @@ const db = {
       if (!error) return data;
       console.error("[Supabase] getNotifications error:", error);
     }
-    return window.MOCK_ANNOUNCEMENTS || [];
+    return []; // no local sample data
   },
 
   async registerForEvent(eventId, userId) {
@@ -53,8 +53,7 @@ const db = {
       if (!error) return data;
       console.error("[Supabase] registerForEvent error:", error);
     }
-    console.info("[Mock mode] Would register user", userId, "for event", eventId);
-    return { mock: true };
+    return null;
   },
 
   async getAttendeeCount(eventId) {
@@ -76,8 +75,7 @@ const db = {
       const client = getSupabaseClient();
       return client.auth.signInWithPassword({ email, password });
     }
-    console.info("[Mock mode] Would sign in as", email);
-    return { data: null, error: { message: "Supabase not configured (mock mode)." } };
+    return { data: null, error: { message: "Supabase is not configured." } };
   },
 };
 
