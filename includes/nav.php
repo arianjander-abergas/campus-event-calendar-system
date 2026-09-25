@@ -13,7 +13,7 @@
 
     <nav class="side-nav">
       <a href="../index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
-      <a href="dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
+      <a href="enduser/dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
 
       <div class="side-nav-item has-submenu">
         <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
