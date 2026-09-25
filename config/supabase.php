@@ -75,7 +75,8 @@ function detect_base_url(): string
 // notifications(id uuid pk, event_id -> events.id (nullable), user_id -> profiles.id (nullable),
 //               title text, message text, status notification_status['pending'|'sent'|'failed'|'read'],
 //               created_at, sent_at)
-// stats(id uuid pk, label text, value text, sort_order int, created_at, updated_at)
+// user_presence(user_id pk -> profiles.id, last_seen_at)  -- Active Users heartbeat (no direct access)
+// rpc site_stats() -> (events, organizations, active_users, registrations): live home-page counters.
 // rpc event_registration_counts() -> (event_id, going): registration totals per published
 //     event, without exposing who registered.
 //
