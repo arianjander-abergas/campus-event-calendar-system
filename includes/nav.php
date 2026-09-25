@@ -1,7 +1,7 @@
 
 <aside class="sidebar">
     <div class="sidebar-top">
-      <a href="../index.php" class="brand">
+      <a href="<?= BASE_URL ?>/index.php" class="brand">
         <span class="brand-icon">📅</span>
         <span class="brand-text nav-label">
           <span class="campus">CAMPUS</span>
@@ -12,8 +12,8 @@
     </div>
 
     <nav class="side-nav">
-      <a href="../index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
-      <a href="enduser/dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
+      <a href="<?= BASE_URL ?>/index.php"><span class="icon">🏠</span> <span class="nav-label">Home</span></a>
+      <a href="<?= BASE_URL ?>/enduser/dashboard.php" class="active"><span class="icon">🗂️</span> <span class="nav-label">Dashboard</span></a>
 
       <div class="side-nav-item has-submenu">
         <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
@@ -22,7 +22,7 @@
           <span class="chevron" aria-hidden="true">⌄</span>
         </button>
         <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="../event-details.php" class="calendar-submenu-link">
+          <a href="<?= BASE_URL ?>/event-details.php" class="calendar-submenu-link">
             <span class="icon">📅</span> Calendar
           </a>
         </div>
@@ -31,7 +31,7 @@
 
     <?php if (($user['role'] ?? 'user') === 'admin'): ?>
       <div style="margin-top:auto;">
-        <a href="../admin/event-organizer.php" class="admin-view-link">
+        <a href="<?= BASE_URL ?>/admin/event-organizer.php" class="admin-view-link">
           <span class="icon">🛠️</span> <span class="nav-label">Admin View</span>
         </a>
       </div>
