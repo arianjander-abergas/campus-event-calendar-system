@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../config/supabase.php';
 
 $events = supabase_request('events');
-$stats = supabase_request('stats', 'select=label,value&order=sort_order.asc');
+// Live counters (Events, Organizations, Active Users, Registrations) — refreshed
+// every 30s in the browser by main.js wireLiveStats().
+$stats = get_site_stats();
 $todayEvents = get_events_today();
 ?>
 <!DOCTYPE html>
@@ -66,7 +68,7 @@ $todayEvents = get_events_today();
     <div class="stats-block">
       <?php foreach ($stats as $s): ?>
         <div class="stat">
-          <div class="stat-value"><?= htmlspecialchars($s['value']) ?></div>
+          <div class="stat-value" data-stat="<?= htmlspecialchars($s['key']) ?>"><?= htmlspecialchars($s['value']) ?></div>
           <div class="stat-label"><?= htmlspecialchars($s['label']) ?></div>
         </div>
       <?php endforeach; ?>
@@ -129,5 +131,6 @@ $todayEvents = get_events_today();
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/supabase-client.js"></script>
 <script src="assets/js/main.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

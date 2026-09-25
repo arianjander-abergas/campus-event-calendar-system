@@ -326,5 +326,6 @@ $orgVal = fn(string $key, $default = '') => htmlspecialchars((string)($of[$key] 
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

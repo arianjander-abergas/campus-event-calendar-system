@@ -70,6 +70,18 @@ const db = {
     return 0;
   },
 
+  // Live landing-page counters: { events, organizations, active_users, registrations }.
+  async getSiteStats() {
+    const client = getSupabaseClient();
+    if (!client) return null;
+    const { data, error } = await client.rpc("site_stats");
+    if (error) {
+      console.error("[Supabase] getSiteStats error:", error);
+      return null;
+    }
+    return data?.[0] ?? null;
+  },
+
   async signIn(email, password) {
     if (isSupabaseConfigured()) {
       const client = getSupabaseClient();
