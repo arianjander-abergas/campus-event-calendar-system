@@ -1,5 +1,10 @@
 <?php
-/** Admin: who registered for an event, attendance, and a CSV export. */
+/**
+ * Admin: who registered for an event, attendance (one by one or several at
+ * once), a CSV export, and links to the printable attendance sheet and the
+ * evaluation results. Marking someone Attended records the time and asks
+ * them to evaluate the event.
+ */
 require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_admin();
@@ -13,9 +18,11 @@ if (!$event) {
 }
 $back = 'event-registrations.php?event=' . urlencode($eventId);
 
+// ---- Attendance: one row (id) or the ticked rows (ids[]) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_status') {
-    $result = set_registration_status_admin(post_param('id'), post_param('status'));
-    if (!$result['ok']) flash('error', $result['message']);
+    $ids = is_array($_POST['ids'] ?? null) ? array_filter($_POST['ids'], 'is_string') : [post_param('id')];
+    $result = set_registration_status_admin($event, $ids, post_param('status'));
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
     header('Location: ' . $back);
     exit;
 }
@@ -26,27 +33,21 @@ $yearLabel = fn($y) => $y ? $y . (['', 'st', 'nd', 'rd'][$y] ?? 'th') . ' Year' 
 
 // ---- CSV export (opens in Excel / Google Sheets) ----
 if (get_param('export') === 'csv') {
-    $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($event['title'])), '-') ?: 'event';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="registrations-' . $slug . '.csv"');
-    $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF"); // so Excel reads the names as UTF-8
-    fputcsv($out, ['Name', 'Year Level', 'Course', 'Organization', 'Status', 'Registered At']);
-    foreach ($registrations as $r) {
-        fputcsv($out, [
+    send_csv('registrations-' . slugify($event['title'], 'event') . '.csv',
+        ['Name', 'Year Level', 'Course', 'Organization', 'Status', 'Registered At', 'Time In'],
+        array_map(fn($r) => [
             $r['profiles']['full_name'] ?? '',
             $yearLabel($r['profiles']['year_level'] ?? null),
             $r['profiles']['course'] ?? '',
             $r['profiles']['organizations']['name'] ?? '',
             $statusLabels[$r['status']] ?? $r['status'],
             date('Y-m-d H:i', strtotime($r['registered_at'])),
-        ]);
-    }
-    fclose($out);
-    exit;
+            !empty($r['attended_at']) ? date('Y-m-d H:i', strtotime($r['attended_at'])) : '',
+        ], $registrations));
 }
 
 $totals = array_count_values(array_column($registrations, 'status'));
+$evaluationCount = count(supabase_user_request('event_evaluations', 'select=id&event_id=eq.' . urlencode($eventId)));
 $activeNav = 'admin-events';
 $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
 ?>
@@ -72,9 +73,13 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
         <h1 class="page-title">Registrations</h1>
         <p class="page-sub"><?= htmlspecialchars($event['title']) ?> · <?= htmlspecialchars(event_when($event)) ?></p>
       </div>
-      <?php if ($registrations): ?>
-        <a href="<?= htmlspecialchars($back) ?>&amp;export=csv" class="btn btn-outline">Download CSV</a>
-      <?php endif; ?>
+      <div class="page-head-actions">
+        <a href="attendance-print.php?event=<?= urlencode($eventId) ?>" class="btn btn-outline">Print attendance</a>
+        <a href="event-evaluations.php?event=<?= urlencode($eventId) ?>" class="btn btn-outline">Evaluation results</a>
+        <?php if ($registrations): ?>
+          <a href="<?= htmlspecialchars($back) ?>&amp;export=csv" class="btn btn-outline">Download CSV</a>
+        <?php endif; ?>
+      </div>
     </div>
 
     <?= render_flashes() ?>
@@ -84,23 +89,41 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
       <div class="admin-stat"><strong><?= $totals['attended'] ?? 0 ?></strong><span>Attended</span></div>
       <div class="admin-stat"><strong><?= $totals['no_show'] ?? 0 ?></strong><span>No-show</span></div>
       <div class="admin-stat"><strong><?= $totals['cancelled'] ?? 0 ?></strong><span>Cancelled</span></div>
+      <div class="admin-stat"><strong><?= $evaluationCount ?></strong><span>Evaluations</span></div>
     </div>
+
+    <?php if ($registrations): ?>
+      <!-- Bulk attendance: the checkboxes in the table belong to this form (form="bulkForm"). -->
+      <form method="POST" action="<?= htmlspecialchars($back) ?>" id="bulkForm" class="bulk-bar">
+        <input type="hidden" name="action" value="set_status">
+        <span>Mark ticked people as:</span>
+        <button type="submit" name="status" value="attended" class="btn-sm btn-sm-accent">Attended</button>
+        <button type="submit" name="status" value="no_show" class="btn-sm">No-show</button>
+        <button type="submit" name="status" value="registered" class="btn-sm">Reset</button>
+        <span class="admin-hint" style="margin:0">People marked Attended get a notification asking them to evaluate the event.</span>
+      </form>
+    <?php endif; ?>
 
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
-          <tr><th>Name</th><th>Year &amp; Course</th><th>Organization</th><th>Registered</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr>
+          <tr>
+            <th><?php if ($registrations): ?><input type="checkbox" aria-label="Tick everyone" data-check-all><?php endif; ?></th>
+            <th>Name</th><th>Year &amp; Course</th><th>Organization</th><th>Registered</th><th>Time in</th><th>Status</th><th><span class="visually-hidden">Actions</span></th>
+          </tr>
         </thead>
         <tbody>
           <?php if (empty($registrations)): ?>
-            <tr><td colspan="6" class="admin-table-empty">No one has registered yet.</td></tr>
+            <tr><td colspan="8" class="admin-table-empty">No one has registered yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($registrations as $r): ?>
             <tr>
+              <td><input type="checkbox" name="ids[]" value="<?= htmlspecialchars($r['id']) ?>" form="bulkForm" aria-label="Tick <?= htmlspecialchars($r['profiles']['full_name'] ?? 'this person') ?>"></td>
               <td><strong><?= htmlspecialchars($r['profiles']['full_name'] ?? 'Unknown') ?></strong></td>
               <td><?= htmlspecialchars(trim($yearLabel($r['profiles']['year_level'] ?? null) . ' ' . ($r['profiles']['course'] ?? ''))) ?: '—' ?></td>
               <td><?= htmlspecialchars($r['profiles']['organizations']['name'] ?? '—') ?></td>
-              <td><?= htmlspecialchars(date('M j, Y g:i A', strtotime($r['registered_at']))) ?></td>
+              <td class="nowrap"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($r['registered_at']))) ?></td>
+              <td class="nowrap"><?= !empty($r['attended_at']) ? htmlspecialchars(date('M j, g:i A', strtotime($r['attended_at']))) : '—' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($r['status']) ?>"><?= htmlspecialchars($statusLabels[$r['status']] ?? $r['status']) ?></span></td>
               <td class="admin-row-actions">
                 <form method="POST" action="<?= htmlspecialchars($back) ?>">
@@ -120,6 +143,14 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
 
 </div>
 
+<script>
+// "Tick everyone" checkbox in the table header.
+document.querySelectorAll('[data-check-all]').forEach(function (all) {
+  all.addEventListener('change', function () {
+    document.querySelectorAll('input[name="ids[]"]').forEach(function (box) { box.checked = all.checked; });
+  });
+});
+</script>
 <script src="../assets/js/sidebar.js"></script>
 <?= presence_script_tag() ?>
 </body>

@@ -3,7 +3,8 @@
  * Sidebar for every dashboard-style page (student + admin).
  * Set $activeNav before including to highlight the current page:
  *   'dashboard' | 'events' | 'my-events' | 'event' | 'organizations' | 'profile'
- *   'admin-events' | 'admin-taxonomy' | 'admin-users'
+ *   'admin-dashboard' | 'admin-events' | 'admin-reports' | 'admin-evaluation'
+ *   'admin-taxonomy' | 'admin-calendar' | 'admin-users'
  */
 $activeNav = $activeNav ?? '';
 $navUser = current_user();
@@ -13,7 +14,7 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
 <aside class="sidebar">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
-      <span class="brand-icon">📅</span>
+      <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
       <span class="brand-text">
         <span class="campus">CAMPUS</span>
         <span class="hub">EVENT HUB</span>
@@ -45,8 +46,12 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
   <?php if (($navUser['role'] ?? '') === 'admin'): ?>
     <nav class="side-nav side-admin" aria-label="Admin">
       <div class="side-group-label">Admin</div>
+      <a href="<?= BASE_URL ?>/admin/dashboard.php"<?= $navActive('admin-dashboard') ?>><span class="icon">📊</span> Admin Dashboard</a>
       <a href="<?= BASE_URL ?>/admin/event-organizer.php"<?= $navActive('admin-events') ?>><span class="icon">🛠️</span> Manage Events</a>
+      <a href="<?= BASE_URL ?>/admin/reports.php"<?= $navActive('admin-reports') ?>><span class="icon">📑</span> Reports</a>
+      <a href="<?= BASE_URL ?>/admin/evaluation-form.php"<?= $navActive('admin-evaluation') ?>><span class="icon">📝</span> Evaluation Form</a>
       <a href="<?= BASE_URL ?>/admin/admin-taxonomy.php"<?= $navActive('admin-taxonomy') ?>><span class="icon">🏷️</span> Categories &amp; Orgs</a>
+      <a href="<?= BASE_URL ?>/admin/school-calendar.php"<?= $navActive('admin-calendar') ?>><span class="icon">🗓️</span> School Calendar</a>
       <a href="<?= BASE_URL ?>/admin/users.php"<?= $navActive('admin-users') ?>><span class="icon">👥</span> Users</a>
     </nav>
   <?php endif; ?>

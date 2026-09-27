@@ -12,7 +12,7 @@ $headerLink = fn(string $key): string => $activePage === $key ? ' class="active"
 ?>
 <header class="site-header">
   <a href="<?= BASE_URL ?>/index.php" class="brand">
-    <span class="brand-icon">📅</span>
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
     <span class="brand-text">
       <span class="campus">CAMPUS</span>
       <span class="hub">EVENT HUB</span>

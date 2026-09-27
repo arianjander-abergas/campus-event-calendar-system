@@ -10,6 +10,7 @@ $calendarEvents = get_calendar_events();
 $notifications = get_my_notifications();     // bell + Announcements panel
 $categories = get_categories();
 $organizations = get_organizations();
+$toEvaluate = get_my_pending_evaluations();  // attended, not evaluated yet
 
 $activeNav = 'dashboard';
 $topbarSearch = true;
@@ -36,6 +37,20 @@ $topbarSearch = true;
       <h1>Welcome, <?= htmlspecialchars(explode(' ', trim($user['full_name']))[0]) ?>!</h1>
       <p>Stay updated with campus events and opportunities.</p>
     </div>
+
+    <?php if ($toEvaluate): ?>
+      <section class="eval-callout" aria-labelledby="evalCalloutTitle">
+        <h2 id="evalCalloutTitle">📝 Please evaluate <?= count($toEvaluate) === 1 ? 'an event' : count($toEvaluate) . ' events' ?> you attended</h2>
+        <div class="eval-callout-list">
+          <?php foreach (array_slice($toEvaluate, 0, 4) as $ev): ?>
+            <a href="evaluate.php?event=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
+              <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(format_event_date($ev['start_date'])) ?></small></span>
+              <strong>Evaluate ›</strong>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      </section>
+    <?php endif; ?>
 
     <div class="section-head">
       <h2>Upcoming events</h2>
@@ -66,14 +81,19 @@ $topbarSearch = true;
           // "Not Available" once the event is cancelled or already over.
           $unavailable = in_array($ev['status'], ['cancelled', 'completed'], true)
               || ($ev['end_date'] ?? $ev['start_date']) < date('Y-m-d');
+          // Attended but not evaluated yet: the row opens the evaluation form.
+          $toEvaluate = $reg['status'] === 'attended' && !has_evaluated($ev['id']);
+          $rowHref = $toEvaluate ? 'evaluate.php?event=' . urlencode($ev['id']) : '../event-details.php?id=' . urlencode($ev['id']);
         ?>
-          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
+          <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>">
             <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
               <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars(event_place($ev)) ?></div>
             </div>
-            <?php if ($reg['status'] === 'attended'): ?>
+            <?php if ($toEvaluate): ?>
+              <span class="mini-badge badge-evaluate">Evaluate</span>
+            <?php elseif ($reg['status'] === 'attended'): ?>
               <span class="mini-badge badge-registered">Attended</span>
             <?php elseif ($ev['status'] === 'cancelled'): ?>
               <span class="mini-badge badge-unavailable">Cancelled</span>
@@ -140,6 +160,17 @@ $topbarSearch = true;
         <option value="">All Categories</option>
         <?php foreach ($categories as $c): ?>
           <option value="<?= htmlspecialchars($c['id']) ?>"><?= htmlspecialchars($c['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="audience" aria-label="Audience">
+        <option value="">Any Audience</option>
+        <option value="students">For Students</option>
+        <option value="faculty">For Faculty</option>
+      </select>
+      <select name="venue_type" aria-label="Venue type">
+        <option value="">Any Venue</option>
+        <?php foreach (VENUE_TYPES as $key => $label): ?>
+          <option value="<?= $key ?>"><?= $label ?></option>
         <?php endforeach; ?>
       </select>
       <button type="submit" class="btn btn-accent">Apply Filters</button>

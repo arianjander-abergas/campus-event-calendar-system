@@ -42,6 +42,10 @@ $going = $event ? get_registration_count($eventId) : 0;
 $myRegistration = $event ? get_my_registration($eventId) : null;
 $reg = $event ? registration_state($event, $myRegistration, $going) : null;
 
+// Attendees evaluate the event once (one standard form for every event).
+$attended = ($myRegistration['status'] ?? '') === 'attended';
+$evaluated = $attended && has_evaluated($eventId);
+
 // Schedule: this event's segments from event_programs, in sort_order.
 $schedule = $event ? get_event_programs($eventId) : [];
 
@@ -166,7 +170,9 @@ if ($event) {
             <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
-          <?php if (!empty($event['is_online']) && !empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
+          <div class="ed-meta-row"><?= ($event['venue_type'] ?? '') === 'online' ? '💻' : '🏫' ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
+          <div class="ed-meta-row">🎓 For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?></div>
+          <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
             <div class="ed-meta-row">🔗 <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
           <?php endif; ?>
           <div class="ed-meta-row">👥 <?= $going ?> going<?= !empty($event['registration_limit']) ? ' · ' . (int) $event['registration_limit'] . ' slots' : '' ?></div>
@@ -199,7 +205,11 @@ if ($event) {
             </form>
           <?php elseif ($reg['state'] === 'registered' || $reg['state'] === 'attended'): ?>
             <div class="ed-reg-actions">
-              <button class="ed-btn" disabled><?= $reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓' ?></button>
+              <?php if ($attended && !$evaluated): ?>
+                <a href="enduser/evaluate.php?event=<?= urlencode($eventId) ?>" class="ed-btn ed-btn-evaluate">Evaluate this event</a>
+              <?php else: ?>
+                <button class="ed-btn" disabled><?= $reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓' ?></button>
+              <?php endif; ?>
               <?php if ($reg['can_cancel']): ?>
                 <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" onsubmit="return confirm('Cancel your registration for this event?');">
                   <input type="hidden" name="action" value="cancel_registration">
@@ -207,12 +217,17 @@ if ($event) {
                 </form>
               <?php endif; ?>
             </div>
+            <?php if ($attended): ?>
+              <p class="ed-eval-note"><?= $evaluated ? 'Evaluation submitted. Thank you for your feedback!' : 'Thanks for attending! Please tell us how the event went.' ?></p>
+            <?php endif; ?>
           <?php endif; ?>
           <?php if ($isAdmin): ?>
             <div class="ed-admin-links">
               <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
               <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Edit schedule</a>
               <a href="admin/event-registrations.php?event=<?= urlencode($eventId) ?>">Registrations</a>
+              <a href="admin/attendance-print.php?event=<?= urlencode($eventId) ?>">Print attendance</a>
+              <a href="admin/event-evaluations.php?event=<?= urlencode($eventId) ?>">Evaluation results</a>
             </div>
           <?php endif; ?>
         </div>

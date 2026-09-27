@@ -3,6 +3,7 @@
  * All events: search + filters (the header / dashboard search boxes, the
  * dashboard Filters panel and every "View All" link land here).
  *   ?q=keyword &category=<id> &organization=<id> &type=seminar
+ *   &audience=students|faculty &venue_type=on_campus|off_campus|online
  *   &when=upcoming|past|all &sort=date|popular &page=2
  *   ?mine=1  -> the logged-in user's registered events
  */
@@ -21,6 +22,8 @@ $filters = [
     'category' => is_uuid($param('category')) ? $param('category') : '',
     'organization' => is_uuid($param('organization')) ? $param('organization') : '',
     'type' => isset(EVENT_TYPES[$param('type')]) ? $param('type') : '',
+    'audience' => in_array($param('audience'), ['students', 'faculty'], true) ? $param('audience') : '',
+    'venue_type' => isset(VENUE_TYPES[$param('venue_type')]) ? $param('venue_type') : '',
     'when' => in_array($param('when'), ['upcoming', 'past', 'all'], true) ? $param('when') : 'upcoming',
     'sort' => $param('sort') === 'popular' ? 'popular' : 'date',
 ];
@@ -38,7 +41,8 @@ if ($mine) {
 
 $categories = get_categories();
 $organizations = get_organizations();
-$isFiltered = $filters['q'] !== '' || $filters['category'] || $filters['organization'] || $filters['type'] || $filters['when'] !== 'upcoming' || $filters['sort'] !== 'date';
+$isFiltered = $filters['q'] !== '' || $filters['category'] || $filters['organization'] || $filters['type']
+    || $filters['audience'] || $filters['venue_type'] || $filters['when'] !== 'upcoming' || $filters['sort'] !== 'date';
 
 // Link to another page of results, keeping the current filters.
 $pageUrl = fn(int $p): string => 'events.php?' . http_build_query(array_filter($filters + ['page' => $p], fn($v) => $v !== '' && $v !== null));
@@ -67,7 +71,7 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
         <?php if ($mine): ?>
           Events you've registered for. Open one to see its schedule or cancel your registration.
         <?php else: ?>
-          Browse campus events — search by keyword, organization, category or type.
+          Browse campus events — search by keyword, organization, category, type, audience or venue.
         <?php endif; ?>
       </p>
     </div>
@@ -97,6 +101,17 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
       <option value="">All event types</option>
       <?php foreach (EVENT_TYPES as $key => $label): ?>
         <option value="<?= $key ?>" <?= $filters['type'] === $key ? 'selected' : '' ?>><?= $label ?></option>
+      <?php endforeach; ?>
+    </select>
+    <select name="audience" aria-label="Audience">
+      <option value="">Any audience</option>
+      <option value="students" <?= $filters['audience'] === 'students' ? 'selected' : '' ?>>For students</option>
+      <option value="faculty" <?= $filters['audience'] === 'faculty' ? 'selected' : '' ?>>For faculty</option>
+    </select>
+    <select name="venue_type" aria-label="Venue type">
+      <option value="">Any venue</option>
+      <?php foreach (VENUE_TYPES as $key => $label): ?>
+        <option value="<?= $key ?>" <?= $filters['venue_type'] === $key ? 'selected' : '' ?>><?= $label ?></option>
       <?php endforeach; ?>
     </select>
     <select name="when" aria-label="When">

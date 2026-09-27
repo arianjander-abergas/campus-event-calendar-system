@@ -367,3 +367,10 @@ a.notif-item:hover { background: #f8fafc; }
 /* Program cards link to their event */
 a.ed-program-card { color: inherit; }
 a.ed-program-card:hover .ed-program-title { color: var(--ed-navy); }
+
+/* ---- Evaluation (attendees evaluate the event once) ---- */
+a.ed-btn { display: inline-block; text-decoration: none; }
+.ed-btn-evaluate { background: #f4622c; font-weight: 600; }
+.ed-btn-evaluate:hover { background: #d94f1e !important; }
+.ed-eval-note { margin: 8px 0 0; font-size: 0.74rem; color: #444; text-align: right; }
+.ed-admin-links { flex-wrap: wrap; }
