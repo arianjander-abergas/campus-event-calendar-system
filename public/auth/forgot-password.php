@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-page">
 
 <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-  <img src="../assets/images/login/logo-mark.svg" alt="" class="login-logo-mark" width="72" height="68">
+  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
   <span class="login-logo-text">
     <span class="campus">CAMPUS</span>
     <span class="hub">EVENT HUB</span>

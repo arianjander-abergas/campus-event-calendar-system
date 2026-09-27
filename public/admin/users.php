@@ -23,7 +23,7 @@ if ($q !== '') {
 $adminCount = count(array_filter($profiles, fn($p) => $p['role'] === 'admin'));
 
 $activeNav = 'admin-users';
-$breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['Users', null]];
+$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en">

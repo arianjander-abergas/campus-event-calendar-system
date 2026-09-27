@@ -42,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $onlineLink = post_param('online_event_link');
     $registrationLimit = post_param('registration_limit');
     $eventType = post_param('event_type', 'other');
+    $audience = post_param('audience', 'students');
+    $venueType = post_param('venue_type', 'on_campus');
+    $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
 
     // Collect everything typed FIRST, so a failed save re-shows the form filled in.
     $fields = [
@@ -49,13 +52,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'category_id' => post_param('category_id'),
         'organization_id' => post_param('organization_id'),
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
+        'audience' => isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students',
+        'venue_type' => $venueType,
         'description' => post_param('description'),
         'start_date' => post_param('start_date'),
         'start_time' => post_param('start_time') ?: null,
         'end_date' => post_param('end_date'),
         'end_time' => post_param('end_time') ?: null,
         'venue' => post_param('venue') ?: null,
-        'is_online' => $onlineLink !== '',
+        'is_online' => $venueType === 'online',
         'online_event_link' => $onlineLink ?: null,
         'address' => post_param('address') ?: null,
         'poster_url' => post_param('poster_url') ?: null,
@@ -82,7 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && $fields['end_time'] <= $fields['start_time']) {
         $errors[] = 'End time must be after the start time.';
     }
-    if (!$fields['venue'] && !$onlineLink) $errors[] = 'Provide a venue or an online event link.';
+    if ($venueType === 'online' && $onlineLink === '') $errors[] = 'Online events need the webinar / meeting link.';
+    if ($venueType !== 'online' && !$fields['venue']) $errors[] = 'On-campus and off-campus events need a venue.';
     if ($onlineLink !== '' && !preg_match('~^https?://~i', $onlineLink)) $errors[] = 'The online event link must start with http:// or https://.';
     if ($registrationLimit !== '' && (int) $registrationLimit < 1) $errors[] = 'Registration limit must be at least 1 (or leave it empty for no limit).';
     if ($fields['registration_deadline'] && $fields['end_date'] !== '' && $fields['registration_deadline'] > $fields['end_date']) {
@@ -142,7 +148,7 @@ $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0,
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 
 $activeNav = 'admin-events';
-$breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
+$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
 if ($editId) $breadcrumbs[] = ['Edit Event', null];
 ?>
 <!DOCTYPE html>
@@ -211,6 +217,13 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
           <?php endforeach; ?>
         </div>
 
+        <span class="admin-label">Audience <span class="req">*</span></span>
+        <div class="admin-radio-row">
+          <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
+            <label class="admin-radio"><input type="radio" name="audience" value="<?= $key ?>" <?= ($f['audience'] ?? 'students') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+          <?php endforeach; ?>
+        </div>
+
         <label class="admin-label" for="description">Description <span class="req">*</span></label>
         <textarea id="description" name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
 
@@ -234,17 +247,24 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
           </div>
         </div>
 
+        <span class="admin-label">Venue Type <span class="req">*</span></span>
+        <div class="admin-radio-row">
+          <?php foreach (VENUE_TYPES as $key => $label): ?>
+            <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($f['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+          <?php endforeach; ?>
+        </div>
+
         <div class="admin-two-col">
           <div>
-            <label class="admin-label" for="venue">Venue</label>
+            <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
             <input type="text" id="venue" name="venue" class="admin-input" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>">
           </div>
           <div>
-            <label class="admin-label" for="online_event_link">Online Event Link</label>
+            <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
             <input type="url" id="online_event_link" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
           </div>
         </div>
-        <p class="admin-hint">Provide a venue, an online link, or both.</p>
+        <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
 
         <label class="admin-label" for="address">Address (if applicable)</label>
         <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
@@ -289,6 +309,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             <h2 class="admin-card-title">More for this event</h2>
             <a href="event-programs.php?event=<?= urlencode($editId) ?>">🗓️ Edit the schedule (programs)</a>
             <a href="event-registrations.php?event=<?= urlencode($editId) ?>">👥 See registrations &amp; attendance</a>
+            <a href="attendance-print.php?event=<?= urlencode($editId) ?>">🖨️ Print the attendance sheet</a>
+            <a href="event-evaluations.php?event=<?= urlencode($editId) ?>">📝 See evaluation results</a>
             <a href="../event-details.php?id=<?= urlencode($editId) ?>">👁️ View the event page</a>
           </div>
         <?php endif; ?>
@@ -328,9 +350,16 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             <tr>
               <td>
                 <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="admin-table-title"><?= htmlspecialchars($ev['title']) ?></a>
-                <div class="admin-table-sub"><?= htmlspecialchars($ev['categories']['name'] ?? '—') ?></div>
+                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([$ev['categories']['name'] ?? '', label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')]))) ?></div>
               </td>
-              <td><?= htmlspecialchars($ev['organizations']['name'] ?? '—') ?></td>
+              <td>
+                <?php if (!empty($ev['organizations']['name'])): ?>
+                  <span class="admin-org-cell">
+                    <?php if (!empty($ev['organizations']['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($ev['organizations']['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                    <?= htmlspecialchars($ev['organizations']['name']) ?>
+                  </span>
+                <?php else: ?>—<?php endif; ?>
+              </td>
               <td><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
               <td><?= (int) ($counts[$ev['id']] ?? 0) ?><?= !empty($ev['registration_limit']) ? ' / ' . (int) $ev['registration_limit'] : '' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span></td>
@@ -338,6 +367,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                 <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Edit</a>
                 <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
                 <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
+                <?php if ($status !== 'draft'): ?><a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a><?php endif; ?>
 
                 <?php if (in_array($status, ['draft', 'published'], true)): ?>
                   <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
@@ -381,6 +411,23 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 
 </div>
 
+<script>
+// Venue type decides which field is required: the venue (on/off-campus) or the link (online).
+(function () {
+  var venue = document.getElementById('venue');
+  var link = document.getElementById('online_event_link');
+  function sync() {
+    var checked = document.querySelector('input[name="venue_type"]:checked');
+    var online = checked && checked.value === 'online';
+    venue.required = !online;
+    link.required = online;
+    document.querySelector('[data-venue-req]').hidden = online;
+    document.querySelector('[data-link-req]').hidden = !online;
+  }
+  document.querySelectorAll('input[name="venue_type"]').forEach(function (r) { r.addEventListener('change', sync); });
+  sync();
+})();
+</script>
 <script src="../assets/js/sidebar.js"></script>
 <?= presence_script_tag() ?>
 </body>

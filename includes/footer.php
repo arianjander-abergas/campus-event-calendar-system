@@ -2,8 +2,11 @@
 <footer class="site-footer">
   <div class="container site-footer-inner">
     <div class="site-footer-brand">
-      <strong>Campus Event Hub</strong>
-      <span>La Consolacion University Philippines</span>
+      <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="" class="site-footer-logo" width="48" height="48">
+      <div>
+        <strong>Campus Event Hub</strong>
+        <span><?= htmlspecialchars(SCHOOL_NAME) ?></span>
+      </div>
     </div>
     <nav class="site-footer-links" aria-label="Footer">
       <a href="<?= BASE_URL ?>/events.php">Events</a>

@@ -122,6 +122,15 @@ button { font-family: inherit; cursor: pointer; }
   color: #fff;
   font-size: 1.1rem;
 }
+/* School logo (config SCHOOL_LOGO) — replaces the old 📅 brand icon. */
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.sidebar .brand-logo { background: #fff; padding: 2px; }
 .brand-text { line-height: 1.05; }
 .brand-text .campus { color: var(--orange); font-size: 1.05rem; display: block; }
 .brand-text .hub { color: var(--navy); font-size: 0.85rem; display: block; }
@@ -385,6 +394,27 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 4px;
 }
 
+/* Organizing organization (logo + name) at the bottom of an event card. */
+.event-org {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-main);
+  min-width: 0;
+}
+.event-org span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-org-logo { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.event-org-initials {
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, var(--blue-accent), var(--navy));
+  color: #fff; font-size: 0.55rem; font-weight: 800;
+}
+
 .upcoming-panel {
   background: var(--card-bg);
   border-radius: var(--radius);
@@ -486,8 +516,10 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
   display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
   padding-top: 26px; padding-bottom: 26px; font-size: 0.85rem;
 }
-.site-footer-brand { display: flex; flex-direction: column; }
+.site-footer-brand { display: flex; align-items: center; gap: 12px; }
+.site-footer-brand > div { display: flex; flex-direction: column; }
 .site-footer-brand strong { color: #fff; font-size: 1rem; }
+.site-footer-logo { width: 48px; height: 48px; object-fit: contain; border-radius: 50%; background: #fff; padding: 2px; flex-shrink: 0; }
 .site-footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
 .site-footer-links a:hover { color: #fff; text-decoration: underline; }
 .site-footer-copy { color: #9fb4de; }
@@ -954,3 +986,17 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   .dash-events-row, .two-col-lists { grid-template-columns: 1fr; }
   .notif-dropdown { right: -60px; width: min(320px, 92vw); }
 }
+
+/* Attended, not yet evaluated (dashboard "Your registered events"). */
+.badge-evaluate { background: var(--orange); }
+.org-dept { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin: -2px 0 8px; }
+
+/* "Please evaluate" reminder on the student dashboard. */
+.eval-callout { background: #fff7f2; border: 1px solid #fbd3bf; border-radius: var(--radius); padding: 14px 18px; margin: 0 0 22px; }
+.eval-callout h2 { margin: 0 0 10px; font-size: 0.95rem; color: #9a3412; }
+.eval-callout-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.eval-callout-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); }
+.eval-callout-item span { font-weight: 700; font-size: 0.82rem; min-width: 0; overflow-wrap: anywhere; }
+.eval-callout-item small { display: block; font-weight: 500; color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; }
+.eval-callout-item strong { color: var(--orange); font-size: 0.8rem; white-space: nowrap; }
+.eval-callout-item:hover { box-shadow: var(--shadow-hover); }

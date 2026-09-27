@@ -23,6 +23,13 @@ define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIs
 // "Today" (events happening today, deadlines, upcoming lists) is the Philippines' date.
 date_default_timezone_set('Asia/Manila');
 
+// ---- School identity --------------------------------------------------------
+// Shown in the header, sidebar, footer, login pages and on every printout.
+const SCHOOL_NAME = 'La Consolacion University Philippines';
+// IMAGE SLOT: school logo | file: public/assets/images/school-logo.png | square, 256×256 or larger
+// Replace the placeholder file with the real logo (keep the file name).
+const SCHOOL_LOGO = 'assets/images/school-logo.png';
+
 // ---- Site base URL ----------------------------------------------------------
 // Web path of the public/ folder, e.g. '/campus-event-calendar-system/public'
 // under XAMPP, or '' if public/ is the web root. Shared files (this config,
@@ -54,7 +61,10 @@ function detect_base_url(): string
 //          course, organization_id -> organizations, avatar_url, phone, created_at, updated_at)
 //          Created automatically by the handle_new_user() trigger on sign-up; only admins
 //          can change `role` (protect_profile_role() trigger).
-// organizations(id, name unique, description, logo_url, created_by, created_at, updated_at)
+// organizations(id, name unique, description, logo_url, department_id -> departments,
+//          created_by, created_at, updated_at)
+// departments(id, name unique, code unique e.g. 'IT', description, created_at, updated_at)
+//          Can't be deleted while an organization uses it (ON DELETE RESTRICT).
 // organization_officers(id, organization_id, profile_id (optional), full_name, position, photo_url,
 //          academic_year e.g. '2026-2027', year_level, course, sort_order, is_active, ...)
 // categories(id, name unique, description, created_by, created_at, updated_at)
@@ -63,19 +73,33 @@ function detect_base_url(): string
 //        venue, is_online, online_event_link, address, poster_url, registration_limit,
 //        registration_deadline, contact_email, contact_number, enable_registration,
 //        is_published (false only for drafts), send_notification,
-//        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at)
+//        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at,
+//        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'])
 //        Categories/organizations can't be deleted while an event uses them (ON DELETE RESTRICT).
+//        trg_events_venue_type keeps venue_type = 'online' exactly when is_online is true.
 // event_programs(id, event_id, title, description, speaker, sort_order, ...)  -- event Schedule
 // event_registrations(id, event_id, user_id, status['registered'|'waitlisted'|'cancelled'|
-//        'attended'|'no_show'], registered_at) unique (event_id, user_id)
+//        'attended'|'no_show'], registered_at, attended_at) unique (event_id, user_id)
 //        check_event_registration() trigger enforces: published, registration enabled,
 //        before the deadline, not ended, not full. Students can only cancel/re-register.
+//        attended_at is stamped by a trigger when an admin marks someone Attended.
+// academic_terms(id, school_year e.g. '2026-2027', semester['1st'|'2nd'|'summer'],
+//        start_date, end_date) -- the school calendar; terms can't overlap.
+// evaluation_questions(id, section, question, question_type['rating'|'text'], is_required,
+//        sort_order, is_active) -- the ONE evaluation form used for every event
+// event_evaluations(id, event_id, user_id, submitted_at) unique (event_id, user_id)
+// event_evaluation_answers(evaluation_id, question_id, rating 1-5, answer_text)
+//        Written only by submit_event_evaluation(), which requires status = 'attended'.
+// event_report (view): one row per non-draft event with category, organization,
+//        department, school_year, semester and registration / attendance / evaluation totals.
 // notifications(id, event_id, user_id, title, message, status['pending'|'sent'|'failed'|'read'],
 //        created_at, sent_at)
 // user_presence(user_id, last_seen_at) -- Active Users heartbeat (only via functions)
 // Storage buckets (public read, admin upload): event-posters, org-logos, officer-photos.
 // Functions: site_stats(), event_registration_counts(), touch_presence(), clear_presence(),
-//        notify_event(event_id, audience 'all'|'registered', title, message), is_admin().
+//        notify_event(event_id, audience 'all'|'registered', title, message), is_admin(),
+//        school_period(date) -> (school_year, semester),
+//        submit_event_evaluation(event_id, answers jsonb).
 
 // =============================================================================
 // HTTP LAYER
@@ -260,6 +284,12 @@ function css_url(string $url): string
     return htmlspecialchars(str_replace(["'", '"', '(', ')', ' ', '\\'], ['%27', '%22', '%28', '%29', '%20', '%5C'], $url));
 }
 
+/** URL of the school logo (header, sidebar, footer, printouts). */
+function school_logo_url(): string
+{
+    return asset_url(SCHOOL_LOGO);
+}
+
 /** Placeholder shown on event cards when an event has no poster. */
 function event_poster_url(?string $posterUrl): string
 {
@@ -310,6 +340,15 @@ function event_when(array $ev): string
 function event_place(array $ev): string
 {
     return trim((string) ($ev['venue'] ?? '')) !== '' ? $ev['venue'] : (!empty($ev['is_online']) ? 'Online' : 'TBA');
+}
+
+/** "On-campus · For Students" — the two categories every event has. */
+function event_categories_line(array $ev): string
+{
+    $parts = [];
+    if (!empty($ev['venue_type'])) $parts[] = label_of(VENUE_TYPES, $ev['venue_type'], '');
+    if (!empty($ev['audience'])) $parts[] = 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'], '');
+    return implode(' · ', array_filter($parts));
 }
 
 /** Shorten text to $width characters with an ellipsis. */
@@ -384,6 +423,21 @@ function is_uuid(?string $value): bool
 }
 
 const EVENT_TYPES = ['academic' => 'Academic', 'seminar' => 'Seminar', 'workshop' => 'Workshop', 'sports' => 'Sports', 'cultural' => 'Cultural', 'other' => 'Other'];
+
+/** Who an event is for (events.audience). */
+const EVENT_AUDIENCES = ['students' => 'Students', 'faculty' => 'Faculty', 'all' => 'Students & Faculty'];
+
+/** Where an event happens (events.venue_type). Online = webinar. */
+const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', 'online' => 'Online (Webinar)'];
+
+/** Semesters of a school year (academic_terms.semester). */
+const SEMESTERS = ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer'];
+
+/** Label for a stored value, e.g. label_of(VENUE_TYPES, 'on_campus') -> 'On-campus'. */
+function label_of(array $labels, ?string $key, string $default = '—'): string
+{
+    return $labels[(string) $key] ?? $default;
+}
 
 // =============================================================================
 // SESSION & AUTH
@@ -752,7 +806,9 @@ function get_upcoming_events(int $limit = 3, ?string $excludeId = null): array
 
 /**
  * Search/browse published events (events.php).
- * $filters: q, category, organization, type, when ('upcoming'|'past'|'all'), sort ('date'|'popular')
+ * $filters: q, category, organization, type, audience ('students'|'faculty'), venue_type,
+ *           when ('upcoming'|'past'|'all'), sort ('date'|'popular')
+ * "For students" also lists events for students & faculty (same for faculty).
  * @return array{events: array, has_more: bool}
  */
 function search_events(array $filters, int $page = 1, int $perPage = 12): array
@@ -774,6 +830,8 @@ function search_events(array $filters, int $page = 1, int $perPage = 12): array
     if (is_uuid($filters['category'] ?? null)) $parts[] = 'category_id=eq.' . $filters['category'];
     if (is_uuid($filters['organization'] ?? null)) $parts[] = 'organization_id=eq.' . $filters['organization'];
     if (isset(EVENT_TYPES[$filters['type'] ?? ''])) $parts[] = 'event_type=eq.' . $filters['type'];
+    if (in_array($filters['audience'] ?? '', ['students', 'faculty'], true)) $parts[] = 'audience=in.(' . $filters['audience'] . ',all)';
+    if (isset(VENUE_TYPES[$filters['venue_type'] ?? ''])) $parts[] = 'venue_type=eq.' . $filters['venue_type'];
 
     // Keyword: title, description, venue — or an organization/category whose name matches.
     $term = trim(preg_replace('/[^\p{L}\p{N}\s\-\'&]/u', ' ', (string) ($filters['q'] ?? '')));
@@ -1111,14 +1169,14 @@ function upload_public_image(string $bucket, array $file, string $folder = ''): 
 /** All events (every status), newest first, for the admin table. */
 function get_all_events_admin(): array
 {
-    return supabase_user_request('events', 'select=*,categories(name),organizations(name),event_programs(count)&order=created_at.desc');
+    return supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url),event_programs(count)&order=created_at.desc');
 }
 
 /** Single event by id (any status), for pre-filling the edit form. */
 function get_event_admin(string $eventId): ?array
 {
     if (!is_uuid($eventId)) return null;
-    $rows = supabase_user_request('events', 'select=*,categories(name),organizations(name)&id=eq.' . urlencode($eventId) . '&limit=1');
+    $rows = supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url,departments(name,code))&id=eq.' . urlencode($eventId) . '&limit=1');
     return $rows[0] ?? null;
 }
 
@@ -1190,7 +1248,7 @@ function get_categories(): array
 
 function get_organizations(): array
 {
-    return supabase_request('organizations', 'select=id,name&order=name.asc');
+    return supabase_request('organizations', 'select=id,name,logo_url,department_id&order=name.asc');
 }
 
 // ---- Event programs (the Schedule) — admin/event-programs.php ---------------
@@ -1249,18 +1307,72 @@ function get_event_registrations_admin(string $eventId): array
 {
     if (!is_uuid($eventId)) return [];
     return supabase_user_request('event_registrations',
-        'select=id,status,registered_at,user_id,profiles(full_name,year_level,course,organizations!profiles_organization_id_fkey(name))&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc');
+        'select=id,status,registered_at,attended_at,user_id,profiles(full_name,year_level,course,organizations!profiles_organization_id_fkey(name))&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc,id.asc');
 }
 
-function set_registration_status_admin(string $registrationId, string $status): array
+/**
+ * Set the status of one or more registrations of an event (Attended /
+ * No-show / Reset). People newly marked Attended get a notification asking
+ * them to evaluate the event.
+ * @param string[] $registrationIds
+ */
+function set_registration_status_admin(array $event, array $registrationIds, string $status): array
 {
     if (!in_array($status, ['registered', 'attended', 'no_show', 'cancelled'], true)) {
         return ['ok' => false, 'message' => 'Invalid status.'];
     }
-    $rows = supabase_user_request('event_registrations', 'id=eq.' . urlencode($registrationId), 'PATCH', ['status' => $status]);
-    return empty($rows)
-        ? ['ok' => false, 'message' => friendly_error('Could not update the registration.')]
-        : ['ok' => true, 'message' => 'Registration updated.'];
+    $ids = array_values(array_filter($registrationIds, 'is_uuid'));
+    if (!$ids) {
+        return ['ok' => false, 'message' => 'Select at least one person first.'];
+    }
+    $idList = 'id=in.(' . implode(',', $ids) . ')&event_id=eq.' . urlencode($event['id']);
+
+    $before = [];
+    if ($status === 'attended') {
+        foreach (supabase_user_request('event_registrations', 'select=id,status&' . $idList) as $r) {
+            $before[$r['id']] = $r['status'];
+        }
+    }
+    $rows = supabase_user_request('event_registrations', $idList, 'PATCH', ['status' => $status]);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => friendly_error('Could not update the registration.')];
+    }
+
+    $message = count($rows) === 1 ? 'Registration updated.' : count($rows) . ' registrations updated.';
+    if ($status === 'attended') {
+        $newlyAttended = array_filter($rows, fn($r) => ($before[$r['id']] ?? '') !== 'attended');
+        $asked = request_evaluations($event, array_column($newlyAttended, 'user_id'));
+        if ($asked > 0) {
+            $message .= ' ' . $asked . ' ' . ($asked === 1 ? 'attendee was' : 'attendees were') . ' asked to evaluate the event.';
+        }
+    }
+    return ['ok' => true, 'message' => $message];
+}
+
+/**
+ * Notify attendees who haven't evaluated an event yet to do so (the
+ * notification opens the event page, which shows "Evaluate this event").
+ * @param string[] $userIds
+ * @return int how many people were notified
+ */
+function request_evaluations(array $event, array $userIds): int
+{
+    $userIds = array_values(array_unique(array_filter($userIds, 'is_uuid')));
+    if (!$userIds) return 0;
+    $done = array_column(supabase_user_request('event_evaluations', 'select=user_id&event_id=eq.' . urlencode($event['id'])), 'user_id');
+    $todo = array_values(array_diff($userIds, $done));
+    if (!$todo) return 0;
+
+    $now = gmdate('c');
+    $rows = supabase_user_request('notifications', '', 'POST', array_map(fn($uid) => [
+        'event_id' => $event['id'],
+        'user_id' => $uid,
+        'title' => 'Please evaluate: ' . $event['title'],
+        'message' => 'Thanks for attending! Open the event and choose "Evaluate this event". It takes about a minute.',
+        'status' => 'sent',
+        'sent_at' => $now,
+    ], $todo));
+    return count($rows);
 }
 
 // =============================================================================
@@ -1317,10 +1429,10 @@ function delete_category_admin(string $categoryId): array
         : ['ok' => true, 'message' => 'Category deleted.'];
 }
 
-/** All organizations with event and officer counts. */
+/** All organizations with their department and event / officer counts. */
 function get_all_organizations_admin(): array
 {
-    return supabase_user_request('organizations', 'select=*,events(count),organization_officers(count)&order=name.asc');
+    return supabase_user_request('organizations', 'select=*,departments(name,code),events(count),organization_officers(count)&order=name.asc');
 }
 
 function get_organization_admin(string $organizationId): ?array
@@ -1415,7 +1527,7 @@ function delete_officer_admin(string $officerId): array
 function get_organizations_directory(): array
 {
     $orgs = supabase_request('organizations',
-        'select=*,organization_officers(*)&organization_officers.is_active=eq.true&organization_officers.order=sort_order.asc,full_name.asc&order=name.asc');
+        'select=*,departments(name,code),organization_officers(*)&organization_officers.is_active=eq.true&organization_officers.order=sort_order.asc,full_name.asc&order=name.asc');
 
     $upcoming = [];
     foreach (get_upcoming_events(200) as $ev) {
@@ -1432,4 +1544,558 @@ function get_organizations_directory(): array
     }
     unset($org);
     return $orgs;
+}
+
+// =============================================================================
+// SHARED ADMIN HELPERS (constraint messages, CSV downloads, number formats)
+// =============================================================================
+
+/**
+ * Friendly message when the last error names one of these database
+ * constraints (e.g. 'academic_terms_no_overlap' => 'Those dates overlap…');
+ * otherwise the usual friendly_error($fallback).
+ */
+function constraint_error(array $messages, string $fallback): string
+{
+    $error = supabase_last_error();
+    foreach ($messages as $constraint => $message) {
+        if (str_contains($error, $constraint)) {
+            return $message;
+        }
+    }
+    return friendly_error($fallback);
+}
+
+/**
+ * Send rows as a CSV download (opens in Excel / Google Sheets) and stop.
+ * Text that starts with = + - @ (e.g. a comment typed as "=HYPERLINK(…)")
+ * gets a leading apostrophe so spreadsheets show it instead of running it.
+ */
+function send_csv(string $filename, array $header, array $rows): void
+{
+    $safe = fn($cell) => is_string($cell) && preg_match('/^[=+\-@\t\r]/', $cell) ? "'" . $cell : $cell;
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF"); // so Excel reads names as UTF-8
+    fputcsv($out, array_map($safe, $header), ',', '"', '');
+    foreach ($rows as $row) {
+        fputcsv($out, array_map($safe, $row), ',', '"', '');
+    }
+    fclose($out);
+    exit;
+}
+
+/** 'Kalinangan Hall' -> 'kalinangan-hall' (file names). */
+function slugify(string $text, string $fallback = 'report'): string
+{
+    return trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($text)), '-') ?: $fallback;
+}
+
+/** 0.8734 -> '87%'; null -> '—'. */
+function format_percent(?float $ratio): string
+{
+    return $ratio === null ? '—' : round($ratio * 100) . '%';
+}
+
+/** 4.5 -> '4.50'; null -> '—'. */
+function format_rating(?float $mean): string
+{
+    return $mean === null ? '—' : number_format($mean, 2);
+}
+
+// =============================================================================
+// DEPARTMENTS (admin/admin-taxonomy.php?tab=departments)
+// =============================================================================
+
+/** Departments for dropdowns and filters (alphabetical). */
+function get_departments(): array
+{
+    return supabase_request('departments', 'select=id,name,code&order=name.asc');
+}
+
+/** "Information Technology (IT)" */
+function department_label(?array $department): string
+{
+    if (empty($department['name'])) return '—';
+    return $department['name'] . (!empty($department['code']) ? ' (' . $department['code'] . ')' : '');
+}
+
+/** All departments with how many organizations belong to each. */
+function get_all_departments_admin(): array
+{
+    return supabase_user_request('departments', 'select=*,organizations(count)&order=name.asc');
+}
+
+function get_department_admin(string $departmentId): ?array
+{
+    if (!is_uuid($departmentId)) return null;
+    $rows = supabase_user_request('departments', 'select=*&id=eq.' . urlencode($departmentId) . '&limit=1');
+    return $rows[0] ?? null;
+}
+
+function save_department_admin(?string $departmentId, array $fields): array
+{
+    $rows = $departmentId
+        ? supabase_user_request('departments', 'id=eq.' . urlencode($departmentId), 'PATCH', $fields)
+        : supabase_user_request('departments', '', 'POST', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => constraint_error([
+            'departments_name_key' => 'Another department already has that name.',
+            'departments_code_key' => 'Another department already uses that code.',
+        ], 'Could not save the department.')];
+    }
+    return ['ok' => true, 'message' => $departmentId ? 'Department saved.' : 'Department created.'];
+}
+
+/** Delete a department — refused while organizations belong to it (the database also refuses). */
+function delete_department_admin(string $departmentId): array
+{
+    $used = count(supabase_user_request('organizations', 'select=id&department_id=eq.' . urlencode($departmentId)));
+    if ($used > 0) {
+        return ['ok' => false, 'message' => "Can't delete this department: $used organization" . ($used === 1 ? ' belongs' : 's belong') . ' to it. Move them to another department first.'];
+    }
+    $rows = supabase_user_request('departments', 'id=eq.' . urlencode($departmentId), 'DELETE');
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not delete this department.')]
+        : ['ok' => true, 'message' => 'Department deleted.'];
+}
+
+// =============================================================================
+// SCHOOL CALENDAR (academic_terms) — admin/school-calendar.php
+// =============================================================================
+// An event is counted in the school year and semester its start date falls
+// in. Admins set each term's dates; a date outside every term uses the
+// default calendar (school year starts in August: 1st sem Aug–Dec, 2nd sem
+// Jan–May, summer Jun–Jul) — the same rule as school_period() in the database.
+
+/** All terms, newest first. */
+function get_academic_terms(): array
+{
+    static $terms = null;
+    if ($terms === null) {
+        $terms = supabase_request('academic_terms', 'select=*&order=start_date.desc');
+    }
+    return $terms;
+}
+
+function get_term_admin(string $termId): ?array
+{
+    if (!is_uuid($termId)) return null;
+    $rows = supabase_user_request('academic_terms', 'select=*&id=eq.' . urlencode($termId) . '&limit=1');
+    return $rows[0] ?? null;
+}
+
+/** Default-calendar dates of a term, e.g. ['2026-08-01', '2026-12-31'] for 2026-2027 1st. */
+function default_term_range(string $schoolYear, string $semester): array
+{
+    $first = (int) substr($schoolYear, 0, 4);
+    return match ($semester) {
+        '1st' => [$first . '-08-01', $first . '-12-31'],
+        '2nd' => [($first + 1) . '-01-01', ($first + 1) . '-05-31'],
+        default => [($first + 1) . '-06-01', ($first + 1) . '-07-31'],
+    };
+}
+
+/**
+ * First and last day of a school year, or of one of its semesters: the
+ * dates set in the school calendar, or the default calendar where a term
+ * isn't set. @return array{0:string, 1:string}
+ */
+function term_range(string $schoolYear, string $semester = ''): array
+{
+    $starts = $ends = [];
+    foreach ($semester !== '' ? [$semester] : array_keys(SEMESTERS) as $sem) {
+        $range = default_term_range($schoolYear, $sem);
+        foreach (get_academic_terms() as $t) {
+            if ($t['school_year'] === $schoolYear && $t['semester'] === $sem) {
+                $range = [$t['start_date'], $t['end_date']];
+            }
+        }
+        $starts[] = $range[0];
+        $ends[] = $range[1];
+    }
+    return [min($starts), max($ends)];
+}
+
+/**
+ * School year and semester of a date (default: today), from the database's
+ * school_period() — the same rule the reports use.
+ * @return array{school_year:string, semester:string}
+ */
+function school_period_of(?string $date = null): array
+{
+    static $cache = [];
+    $date = $date ?: date('Y-m-d');
+    if (!isset($cache[$date])) {
+        $result = supabase_rpc('school_period', ['p_date' => $date]);
+        $row = ($result['ok'] && is_array($result['data'])) ? ($result['data'][0] ?? null) : null;
+        if (!$row) {
+            // Database unreachable: the same default calendar school_period() uses.
+            $y = (int) substr($date, 0, 4);
+            $m = (int) substr($date, 5, 2);
+            $row = [
+                'school_year' => $m >= 8 ? $y . '-' . ($y + 1) : ($y - 1) . '-' . $y,
+                'semester' => $m >= 8 ? '1st' : ($m <= 5 ? '2nd' : 'summer'),
+            ];
+        }
+        $cache[$date] = $row;
+    }
+    return $cache[$date];
+}
+
+/** "SY 2026-2027 · 1st Semester" */
+function period_label(string $schoolYear, string $semester = ''): string
+{
+    return 'SY ' . $schoolYear . ($semester !== '' ? ' · ' . label_of(SEMESTERS, $semester) : '');
+}
+
+function save_term_admin(?string $termId, array $fields): array
+{
+    $rows = $termId
+        ? supabase_user_request('academic_terms', 'id=eq.' . urlencode($termId), 'PATCH', $fields)
+        : supabase_user_request('academic_terms', '', 'POST', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => constraint_error([
+            'academic_terms_no_overlap' => "Those dates overlap another term. Terms can't share a day.",
+            'academic_terms_one_per_semester' => 'That school year already has this semester. Edit it instead.',
+            'academic_terms_school_year_format' => 'School year must be two consecutive years, like 2026-2027.',
+            'academic_terms_dates_check' => "The end date can't be before the start date.",
+        ], 'Could not save the term.')];
+    }
+    return ['ok' => true, 'message' => 'Term saved.'];
+}
+
+function delete_term_admin(string $termId): array
+{
+    $rows = supabase_user_request('academic_terms', 'id=eq.' . urlencode($termId), 'DELETE');
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not delete the term.')]
+        : ['ok' => true, 'message' => 'Term deleted. Its dates now follow the default calendar.'];
+}
+
+// =============================================================================
+// REPORTS — admin/dashboard.php, admin/reports.php (the event_report view)
+// =============================================================================
+
+/**
+ * Rows of the event_report view (one per non-draft event), in date order.
+ * $filters: school_year, semester, department, organization, audience,
+ *           venue_type, from / to (start-date range, 'Y-m-d')
+ */
+function get_event_report(array $filters = []): array
+{
+    $parts = ['select=*', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=1000'];
+    if (preg_match('/^\d{4}-\d{4}$/', $filters['school_year'] ?? '')) $parts[] = 'school_year=eq.' . $filters['school_year'];
+    if (isset(SEMESTERS[$filters['semester'] ?? ''])) $parts[] = 'semester=eq.' . $filters['semester'];
+    if (is_uuid($filters['department'] ?? '')) $parts[] = 'department_id=eq.' . $filters['department'];
+    if (is_uuid($filters['organization'] ?? '')) $parts[] = 'organization_id=eq.' . $filters['organization'];
+    if (isset(EVENT_AUDIENCES[$filters['audience'] ?? ''])) $parts[] = 'audience=eq.' . $filters['audience'];
+    if (isset(VENUE_TYPES[$filters['venue_type'] ?? ''])) $parts[] = 'venue_type=eq.' . $filters['venue_type'];
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['from'] ?? '')) $parts[] = 'start_date=gte.' . $filters['from'];
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $filters['to'] ?? '')) $parts[] = 'start_date=lte.' . $filters['to'];
+    return supabase_user_request('event_report', implode('&', $parts));
+}
+
+/** School years that have events or calendar terms (plus the current one), newest first. */
+function get_report_school_years(): array
+{
+    $years = array_merge(
+        array_column(supabase_user_request('event_report', 'select=school_year'), 'school_year'),
+        array_column(get_academic_terms(), 'school_year'),
+        [school_period_of()['school_year']]
+    );
+    $years = array_values(array_unique(array_filter($years)));
+    rsort($years);
+    return $years;
+}
+
+/** Whether an event (report row) is over — attendance rates only count these. */
+function report_event_ended(array $row): bool
+{
+    return ($row['status'] ?? '') === 'completed' || ($row['end_date'] ?? $row['start_date'] ?? '') < date('Y-m-d');
+}
+
+/**
+ * Totals for a set of event_report rows. Cancelled events are counted on
+ * their own and left out of every other number.
+ * Keys: events, cancelled, on_campus, off_campus, online, for_students,
+ * for_faculty, for_all, registered, attended, no_show, attendance_rate
+ * (ended events only), evaluations, average_rating.
+ */
+function report_totals(array $rows): array
+{
+    $t = ['events' => 0, 'cancelled' => 0, 'registered' => 0, 'attended' => 0, 'no_show' => 0,
+          'ended_registered' => 0, 'ended_attended' => 0, 'evaluations' => 0];
+    foreach (array_keys(VENUE_TYPES) as $key) $t[$key] = 0;
+    foreach (array_keys(EVENT_AUDIENCES) as $key) $t['for_' . $key] = 0;
+    $ratingSum = 0.0;
+    $ratingWeight = 0;
+
+    foreach ($rows as $r) {
+        if (($r['status'] ?? '') === 'cancelled') {
+            $t['cancelled']++;
+            continue;
+        }
+        $t['events']++;
+        if (isset(VENUE_TYPES[$r['venue_type'] ?? ''])) $t[$r['venue_type']]++;
+        if (isset(EVENT_AUDIENCES[$r['audience'] ?? ''])) $t['for_' . $r['audience']]++;
+        $t['registered'] += (int) $r['registered_count'];
+        $t['attended'] += (int) $r['attended_count'];
+        $t['no_show'] += (int) $r['no_show_count'];
+        if (report_event_ended($r)) {
+            $t['ended_registered'] += (int) $r['registered_count'];
+            $t['ended_attended'] += (int) $r['attended_count'];
+        }
+        $t['evaluations'] += (int) $r['evaluation_count'];
+        if ($r['average_rating'] !== null && (int) $r['evaluation_count'] > 0) {
+            $ratingSum += (float) $r['average_rating'] * (int) $r['evaluation_count'];
+            $ratingWeight += (int) $r['evaluation_count'];
+        }
+    }
+    $t['attendance_rate'] = $t['ended_registered'] > 0 ? $t['ended_attended'] / $t['ended_registered'] : null;
+    $t['average_rating'] = $ratingWeight > 0 ? round($ratingSum / $ratingWeight, 2) : null;
+    return $t;
+}
+
+/** Group rows by a key, keeping first-seen order: ['2026-09' => [rows], ...]. */
+function group_rows(array $rows, callable $keyOf): array
+{
+    $groups = [];
+    foreach ($rows as $row) {
+        $groups[$keyOf($row)][] = $row;
+    }
+    return $groups;
+}
+
+/** Monday of the week a date falls in ('Y-m-d'). Weeks run Monday to Sunday. */
+function week_start(string $date): string
+{
+    $d = new DateTimeImmutable($date);
+    return $d->modify('-' . ((int) $d->format('N') - 1) . ' days')->format('Y-m-d');
+}
+
+/** Every month ('Y-m') from $from to $to, inclusive. */
+function month_list(string $from, string $to): array
+{
+    $months = [];
+    $last = substr($to, 0, 7);
+    for ($m = new DateTimeImmutable(substr($from, 0, 7) . '-01'); $m->format('Y-m') <= $last; $m = $m->modify('+1 month')) {
+        $months[] = $m->format('Y-m');
+    }
+    return $months;
+}
+
+/** '2026-09' -> 'September 2026' ($short: 'Sep'). */
+function month_label(string $month, bool $short = false): string
+{
+    $ts = strtotime($month . '-01');
+    return $ts ? date($short ? 'M' : 'F Y', $ts) : $month;
+}
+
+/** 'Sep 21 – 27, 2026' for the week starting on $monday. */
+function week_label(string $monday): string
+{
+    $start = new DateTimeImmutable($monday);
+    $end = $start->modify('+6 days');
+    return $start->format('M j') . ' – ' . ($start->format('M') === $end->format('M') ? $end->format('j') : $end->format('M j')) . ', ' . $end->format('Y');
+}
+
+// =============================================================================
+// EVENT EVALUATION — ONE form for every event
+// (admin/evaluation-form.php, enduser/evaluate.php, admin/event-evaluations.php)
+// =============================================================================
+
+/** The 1-5 rating scale, best first (labels on the form and in the results). */
+const RATING_SCALE = [5 => 'Excellent', 4 => 'Very Satisfactory', 3 => 'Satisfactory', 2 => 'Fair', 1 => 'Poor'];
+
+/**
+ * Verbal interpretation of a mean rating, in equal intervals of 0.80:
+ * 4.21–5.00 Excellent · 3.41–4.20 Very Satisfactory · 2.61–3.40 Satisfactory
+ * · 1.81–2.60 Fair · 1.00–1.80 Poor.
+ */
+function rating_interpretation(?float $mean): string
+{
+    if ($mean === null) return '—';
+    $mean = round($mean, 2);
+    return match (true) {
+        $mean >= 4.21 => 'Excellent',
+        $mean >= 3.41 => 'Very Satisfactory',
+        $mean >= 2.61 => 'Satisfactory',
+        $mean >= 1.81 => 'Fair',
+        default => 'Poor',
+    };
+}
+
+/** The form's questions in order ($includeHidden: hidden ones too, for admins). */
+function get_evaluation_questions(bool $includeHidden = false): array
+{
+    return supabase_request('evaluation_questions',
+        'select=*' . ($includeHidden ? '' : '&is_active=eq.true') . '&order=sort_order.asc,created_at.asc',
+        'GET', null, session_access_token());
+}
+
+function get_evaluation_question_admin(string $questionId): ?array
+{
+    if (!is_uuid($questionId)) return null;
+    $rows = supabase_user_request('evaluation_questions', 'select=*&id=eq.' . urlencode($questionId) . '&limit=1');
+    return $rows[0] ?? null;
+}
+
+/** Add a question (at the end of the form) or save changes to one. */
+function save_question_admin(?string $questionId, array $fields): array
+{
+    if (!$questionId) {
+        $existing = get_evaluation_questions(true);
+        $fields['sort_order'] = $existing ? max(array_column($existing, 'sort_order')) + 1 : 1;
+    }
+    $rows = $questionId
+        ? supabase_user_request('evaluation_questions', 'id=eq.' . urlencode($questionId), 'PATCH', $fields)
+        : supabase_user_request('evaluation_questions', '', 'POST', $fields);
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not save the question.')]
+        : ['ok' => true, 'message' => $questionId ? 'Question saved.' : 'Question added to the form.'];
+}
+
+/** Hide or show a question (hidden questions keep their past answers in the results). */
+function set_question_active_admin(string $questionId, bool $active): array
+{
+    $rows = supabase_user_request('evaluation_questions', 'id=eq.' . urlencode($questionId), 'PATCH', ['is_active' => $active]);
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not update the question.')]
+        : ['ok' => true, 'message' => $active ? 'Question is back on the form.' : 'Question hidden from the form. Past answers stay in the results.'];
+}
+
+/** Delete a question — refused once anyone has answered it (hide it instead). */
+function delete_question_admin(string $questionId): array
+{
+    $rows = supabase_user_request('evaluation_questions', 'id=eq.' . urlencode($questionId), 'DELETE');
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => constraint_error([
+            'event_evaluation_answers_question_id_fkey' => "People have already answered this question, so it can't be deleted. Hide it instead; past results keep it.",
+        ], 'Could not delete the question.')];
+    }
+    return ['ok' => true, 'message' => 'Question deleted.'];
+}
+
+/** Move a question one place up (-1) or down (+1) on the form. */
+function move_question_admin(string $questionId, int $direction): array
+{
+    $questions = get_evaluation_questions(true);
+    $ids = array_column($questions, 'id');
+    $from = array_search($questionId, $ids, true);
+    $to = $from === false ? false : $from + ($direction < 0 ? -1 : 1);
+    if ($from === false || $to < 0 || $to >= count($ids)) {
+        return ['ok' => true, 'message' => ''];
+    }
+    [$ids[$from], $ids[$to]] = [$ids[$to], $ids[$from]];
+    $current = array_column($questions, 'sort_order', 'id');
+    foreach ($ids as $i => $id) {
+        if ((int) $current[$id] !== $i + 1) {
+            supabase_user_request('evaluation_questions', 'id=eq.' . urlencode($id), 'PATCH', ['sort_order' => $i + 1]);
+        }
+    }
+    return ['ok' => true, 'message' => ''];
+}
+
+/**
+ * Submit the logged-in user's evaluation of an event (all answers at once).
+ * The database checks that they attended and haven't evaluated yet.
+ * @param array $answers [question id => '1'..'5' | written answer]
+ */
+function submit_evaluation(string $eventId, array $answers): array
+{
+    $result = supabase_rpc('submit_event_evaluation', ['p_event_id' => $eventId, 'p_answers' => (object) $answers], true);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => friendly_error('Your evaluation could not be submitted. Please try again.')];
+    }
+    return ['ok' => true, 'message' => 'Thank you! Your evaluation was submitted.'];
+}
+
+/** Ids of the events the logged-in user has evaluated. */
+function get_my_evaluated_event_ids(): array
+{
+    static $ids = null;
+    if ($ids === null) {
+        $user = current_user();
+        $ids = $user
+            ? array_column(supabase_user_request('event_evaluations', 'select=event_id&user_id=eq.' . urlencode($user['id'])), 'event_id')
+            : [];
+    }
+    return $ids;
+}
+
+function has_evaluated(string $eventId): bool
+{
+    return in_array($eventId, get_my_evaluated_event_ids(), true);
+}
+
+/** Events the logged-in user attended but hasn't evaluated yet, most recent first (dashboard reminder). */
+function get_my_pending_evaluations(): array
+{
+    $user = current_user();
+    if (!$user) return [];
+    $rows = supabase_user_request('event_registrations',
+        'select=attended_at,events(id,title,start_date,end_date,poster_url)&user_id=eq.' . urlencode($user['id'])
+        . '&status=eq.attended&order=attended_at.desc.nullslast');
+    $done = get_my_evaluated_event_ids();
+    return array_values(array_filter(array_column($rows, 'events'), fn($ev) => $ev && !in_array($ev['id'], $done, true)));
+}
+
+/** Every evaluation of an event with its answers (admins). Names aren't included: results are anonymous. */
+function get_event_evaluations_admin(string $eventId): array
+{
+    if (!is_uuid($eventId)) return [];
+    return supabase_user_request('event_evaluations',
+        'select=id,submitted_at,event_evaluation_answers(question_id,rating,answer_text)&event_id=eq.' . urlencode($eventId) . '&order=submitted_at.asc');
+}
+
+/**
+ * Per-question results of an event's evaluations.
+ * Each question gets: count, mean, interpretation, distribution [5 => n, ..., 1 => n]
+ * and, for written questions, answers (text list).
+ * @return array{questions: array, overall_mean: ?float, responses: int}
+ */
+function summarize_evaluations(array $questions, array $evaluations): array
+{
+    $byQuestion = [];
+    foreach ($evaluations as $ev) {
+        foreach ($ev['event_evaluation_answers'] ?? [] as $a) {
+            $byQuestion[$a['question_id']][] = $a;
+        }
+    }
+
+    $out = [];
+    $allRatings = [];
+    foreach ($questions as $q) {
+        $answers = $byQuestion[$q['id']] ?? [];
+        if (!$answers && empty($q['is_active'])) {
+            continue; // hidden and never answered for this event
+        }
+        $item = $q + ['count' => 0, 'mean' => null, 'interpretation' => '—', 'distribution' => array_fill_keys(array_keys(RATING_SCALE), 0), 'answers' => []];
+        if ($q['question_type'] === 'rating') {
+            foreach ($answers as $a) {
+                if ($a['rating'] === null) continue;
+                $item['distribution'][(int) $a['rating']]++;
+                $allRatings[] = (int) $a['rating'];
+                $item['count']++;
+            }
+            if ($item['count'] > 0) {
+                $sum = 0;
+                foreach ($item['distribution'] as $rating => $n) $sum += $rating * $n;
+                $item['mean'] = round($sum / $item['count'], 2);
+                $item['interpretation'] = rating_interpretation($item['mean']);
+            }
+        } else {
+            $item['answers'] = array_values(array_filter(array_map(fn($a) => trim((string) $a['answer_text']), $answers), fn($t) => $t !== ''));
+            $item['count'] = count($item['answers']);
+        }
+        $out[] = $item;
+    }
+
+    return [
+        'questions' => $out,
+        'overall_mean' => $allRatings ? round(array_sum($allRatings) / count($allRatings), 2) : null,
+        'responses' => count($evaluations),
+    ];
 }

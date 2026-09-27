@@ -41,7 +41,7 @@ $notices = [
     'admin'  => 'Log in with your admin account to open the admin pages.',
 ];
 $notice = $notices[get_param('notice')] ?? null;
-$adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/admin/event-organizer.php');
+$adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode(BASE_URL . '/admin/dashboard.php');
 $flashes = render_flashes();
 ?>
 <!DOCTYPE html>
@@ -59,8 +59,8 @@ $flashes = render_flashes();
 <body class="login-page">
 
 <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-  <!-- IMAGE SLOT 1: Logo mark, left of "CAMPUS EVENT HUB" | file: assets/images/login/logo-mark.svg | 72×68 -->
-  <img src="../assets/images/login/logo-mark.svg" alt="" class="login-logo-mark" width="72" height="68">
+  <!-- IMAGE SLOT 1: School logo, left of "CAMPUS EVENT HUB" | file: assets/images/school-logo.png (config SCHOOL_LOGO) -->
+  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
   <span class="login-logo-text">
     <span class="campus">CAMPUS</span>
     <span class="hub">EVENT HUB</span>

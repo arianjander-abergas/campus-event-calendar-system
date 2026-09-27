@@ -4,7 +4,7 @@
 
    IMAGE SLOTS (placeholders to replace — keep the same file names,
    or change the matching <img src> in auth/login.php):
-     SLOT 1  Logo mark ............ images/login/logo-mark.svg   72×68
+     SLOT 1  School logo ........... images/school-logo.png (config SCHOOL_LOGO) 72×68
      SLOT 2  Close (✕) button ..... images/login/icon-close.svg  26×26
      SLOT 3  Email field icon ..... images/login/icon-email.svg  28×28
      SLOT 4  Eye (pw hidden) ...... images/login/icon-eye-off.svg 28×28

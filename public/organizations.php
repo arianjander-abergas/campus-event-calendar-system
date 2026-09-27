@@ -50,6 +50,9 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
         <?php endif; ?>
         <div>
           <h2><?= htmlspecialchars($org['name']) ?></h2>
+          <?php if (!empty($org['departments']['name'])): ?>
+            <div class="org-dept">Department: <?= htmlspecialchars(department_label($org['departments'])) ?></div>
+          <?php endif; ?>
           <?php if (!empty($org['description'])): ?>
             <p><?= nl2br(htmlspecialchars($org['description'])) ?></p>
           <?php endif; ?>
