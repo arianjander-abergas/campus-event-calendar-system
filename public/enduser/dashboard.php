@@ -2,19 +2,18 @@
 require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
-$events = supabase_request('events');
-// There is no `announcements` table in Supabase — the real table is
-// `notifications` (event_id/user_id nullable, title, message, status,
-// created_at). Pull the most recent ones for this panel.
-$announcements = supabase_request('notifications', 'select=*&order=created_at.desc&limit=6');
 
-// Small helper to pull initials for the avatar bubble
-function initials(string $name): string {
-    $parts = explode(' ', trim($name));
-    $out = '';
-    foreach (array_slice($parts, 0, 2) as $p) { $out .= substr($p, 0, 1); }
-    return strtoupper($out) ?: 'U';
-}
+$events = get_upcoming_events(9);            // carousel: today's events first, 3 per page
+$myRegistrations = get_my_registrations(5);
+$trending = get_trending_events();
+$calendarEvents = get_calendar_events();
+$notifications = get_my_notifications();     // bell + Announcements panel
+$categories = get_categories();
+$organizations = get_organizations();
+$toEvaluate = get_my_pending_evaluations();  // attended, not evaluated yet
+
+$activeNav = 'dashboard';
+$topbarSearch = true;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,135 +25,106 @@ function initials(string $name): string {
 </head>
 <body>
 
-<div class="dashboard-shell sidebar-pinned">
+<div class="dashboard-shell">
 
-  <!-- Sidebar
-   -->
   <?php include __DIR__ . '/../../includes/nav.php'; ?>
+  <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
-  <!-- Top bar -->
-  <header class="dash-topbar">
-    <div class="search-box">
-      <span>🔍</span>
-      <input type="text" placeholder="Search for events, organizations, or keywords">
-    </div>
-    <div class="topbar-right">
-      <div class="bell">🔔<span class="dot">2</span></div>
-      <div class="user-chip">
-        <div class="avatar"><?= htmlspecialchars(initials($user['full_name'])) ?></div>
-        <div>
-          <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
-          <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
-        </div>
-        <a href="../auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main content -->
   <main class="dash-main">
+    <?= render_flashes() ?>
+
     <div class="dash-greeting">
-      <h1>Welcome, <?= htmlspecialchars(explode(' ', $user['full_name'])[0]) ?> !</h1>
-      <p>stay updated with campus and opportunities</p>
+      <h1>Welcome, <?= htmlspecialchars(explode(' ', trim($user['full_name']))[0]) ?>!</h1>
+      <p>Stay updated with campus events and opportunities.</p>
     </div>
+
+    <?php if ($toEvaluate): ?>
+      <section class="eval-callout" aria-labelledby="evalCalloutTitle">
+        <h2 id="evalCalloutTitle"><?= icon('evaluation', 20) ?> Please evaluate <?= count($toEvaluate) === 1 ? 'an event' : count($toEvaluate) . ' events' ?> you attended</h2>
+        <div class="eval-callout-list">
+          <?php foreach (array_slice($toEvaluate, 0, 4) as $ev): ?>
+            <a href="evaluate.php?event=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
+              <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(format_event_date($ev['start_date'])) ?></small></span>
+              <strong>Evaluate ›</strong>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      </section>
+    <?php endif; ?>
 
     <div class="section-head">
       <h2>Upcoming events</h2>
-      <a href="#" class="view-all">View All</a>
+      <a href="../events.php" class="view-all">View All</a>
     </div>
-    <div class="dash-events-row">
-      <?php foreach (array_slice($events, 0, 3) as $ev):
-        // categories comes from a joined table, so it may be null/missing
-        $categoryName = $ev['categories']['name'] ?? 'Event';
-      ?>
-        <article class="event-card" data-event-id="<?= htmlspecialchars((string)$ev['id']) ?>">
-          <div class="event-thumb" style="background-image:url('<?= htmlspecialchars($ev['poster_url']) ?>');">
-            <span class="event-tag <?= $categoryName === 'Event' ? 'tag-event' : 'tag-seminar' ?>">
-              <?= htmlspecialchars($categoryName) ?>
-            </span>
-          </div>
-          <div class="event-body">
-            <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-            <div class="event-meta">📅 <?= htmlspecialchars($ev['start_date']) ?></div>
-            <div class="event-meta">📍 <?= htmlspecialchars($ev['venue']) ?></div>
-            <!-- attendee_count no longer lives on the events row; it needs a
-                 separate count query (e.g. registrations count per event_id).
-                 Until that's wired up we just omit the "going" line. -->
-          </div>
-        </article>
+    <div class="dash-events-row" data-carousel="#upcomingDots" data-per-page="3">
+      <?php if (empty($events)): ?>
+        <p class="events-empty">No upcoming events yet.</p>
+      <?php endif; ?>
+      <?php foreach ($events as $ev): ?>
+        <?php include __DIR__ . '/../../includes/event-card.php'; ?>
       <?php endforeach; ?>
     </div>
-    <div class="carousel-dots">
-      <span class="active"></span><span></span><span></span>
-    </div>
+    <div class="carousel-dots" id="upcomingDots"></div>
 
     <div class="two-col-lists">
       <div class="list-card" id="registered-events">
         <div class="section-head">
-          <h2>Your registered Events</h2>
-          <a href="#" class="view-all">View All</a>
+          <h2>Your registered events</h2>
+          <a href="../events.php?mine=1" class="view-all">View All</a>
         </div>
 
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-pace.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">JPSSITE PACE LEVEL UP v.6.2</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-badge badge-registered">Registered</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-osh.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">OSH Training or SIES-ACpEs</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-badge badge-unavailable">Not Available</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">GEN Z Night 2026</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
-          </div>
-          <span class="mini-badge badge-registered">Registered</span>
-        </div>
+        <?php if (empty($myRegistrations)): ?>
+          <p class="mini-meta">You haven't registered for any events yet. <a href="../events.php">Find one</a>.</p>
+        <?php endif; ?>
+        <?php foreach ($myRegistrations as $reg):
+          $ev = $reg['events'];
+          // "Not Available" once the event is cancelled or already over.
+          $unavailable = in_array($ev['status'], ['cancelled', 'completed'], true)
+              || ($ev['end_date'] ?? $ev['start_date']) < date('Y-m-d');
+          // Attended but not evaluated yet: the row opens the evaluation form.
+          $toEvaluate = $reg['status'] === 'attended' && !has_evaluated($ev['id']);
+          $rowHref = $toEvaluate ? 'evaluate.php?event=' . urlencode($ev['id']) : '../event-details.php?id=' . urlencode($ev['id']);
+        ?>
+          <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>">
+            <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+            <div class="mini-info">
+              <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
+            </div>
+            <?php if ($toEvaluate): ?>
+              <span class="mini-badge badge-evaluate">Evaluate</span>
+            <?php elseif ($reg['status'] === 'attended'): ?>
+              <span class="mini-badge badge-registered">Attended</span>
+            <?php elseif ($ev['status'] === 'cancelled'): ?>
+              <span class="mini-badge badge-unavailable">Cancelled</span>
+            <?php elseif ($unavailable): ?>
+              <span class="mini-badge badge-muted">Ended</span>
+            <?php else: ?>
+              <span class="mini-badge badge-registered">Registered</span>
+            <?php endif; ?>
+          </a>
+        <?php endforeach; ?>
       </div>
 
       <div class="list-card" id="trending-events">
         <div class="section-head">
-          <h2>Trending Events</h2>
-          <a href="#" class="view-all">View All</a>
+          <h2>Trending events</h2>
+          <a href="../events.php?sort=popular" class="view-all">View All</a>
         </div>
 
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-liveband.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">JPSSITE Live Band Upsite</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-tawag.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">Tawag ng JPSSite</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 AVR 1, CITE Building</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
-
-        <div class="mini-row">
-          <div class="mini-thumb" style="background-image:url('../assets/images/event-genz.jpg');"></div>
-          <div class="mini-info">
-            <div class="mini-title">GEN Z Night 2026</div>
-            <div class="mini-meta">📅 Month 00 0000 &nbsp; 📍 KALINANGAN Auditorium</div>
-          </div>
-          <span class="mini-going">👥 000 going</span>
-        </div>
+        <?php if (empty($trending)): ?>
+          <p class="mini-meta">No upcoming events yet.</p>
+        <?php endif; ?>
+        <?php foreach ($trending as $ev): ?>
+          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+            <div class="mini-info">
+              <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
+            </div>
+            <span class="mini-going"><?= icon('people', 13) ?> <?= (int) $ev['going'] ?> going</span>
+          </a>
+        <?php endforeach; ?>
       </div>
     </div>
   </main>
@@ -162,49 +132,73 @@ function initials(string $name): string {
   <!-- Right rail -->
   <aside class="right-rail">
     <div class="rail-card" id="dashboard-calendar-card">
+      <div class="cal-head">
         <span>Calendar</span>
-        <span>May 2026</span>
-        <span style="display:flex; gap:4px;"><button>‹</button><button>›</button></span>
+        <span id="calendar-month"></span>
+        <span class="cal-nav"><button type="button" id="calPrev" aria-label="Previous month">‹</button><button type="button" id="calNext" aria-label="Next month">›</button></span>
       </div>
-      <div class="cal-grid" id="calendar-grid">
-        <!-- filled by js/main.js -->
+      <div class="cal-grid" id="calendar-grid" data-event-url="../event-details.php?id=">
+        <!-- filled by assets/js/main.js -->
       </div>
     </div>
 
-    <div class="rail-card filters-card">
+    <form class="rail-card filters-card" action="../events.php" method="get">
       <h3>Filters</h3>
-      <select><option>All Event Types</option></select>
-      <select><option>All Organizations</option></select>
-      <select><option>All Colleges</option></select>
-      <button class="btn btn-accent">Apply Filters</button>
-    </div>
+      <select name="type" aria-label="Event type">
+        <option value="">All Event Types</option>
+        <?php foreach (EVENT_TYPES as $key => $label): ?>
+          <option value="<?= $key ?>"><?= $label ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="organization" aria-label="Organization">
+        <option value="">All Organizations</option>
+        <?php foreach ($organizations as $o): ?>
+          <option value="<?= htmlspecialchars($o['id']) ?>"><?= htmlspecialchars($o['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="category" aria-label="Category">
+        <option value="">All Categories</option>
+        <?php foreach ($categories as $c): ?>
+          <option value="<?= htmlspecialchars($c['id']) ?>"><?= htmlspecialchars($c['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="audience" aria-label="Audience">
+        <option value="">Any Audience</option>
+        <option value="students">For Students</option>
+        <option value="faculty">For Faculty</option>
+      </select>
+      <select name="venue_type" aria-label="Venue type">
+        <option value="">Any Venue</option>
+        <?php foreach (VENUE_TYPES as $key => $label): ?>
+          <option value="<?= $key ?>"><?= $label ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit" class="btn btn-accent">Apply Filters</button>
+    </form>
 
     <div class="rail-card">
       <h3>Announcements</h3>
-      <?php if (empty($announcements)): ?>
-        <p style="font-size:0.8rem; color:var(--text-muted);">No announcements yet.</p>
+      <?php if (empty($notifications)): ?>
+        <p class="rail-empty">No announcements yet.</p>
       <?php endif; ?>
-      <?php foreach ($announcements as $a):
-        $type = $a['type'] ?? 'info'; // notifications has no 'type' column; default the icon
-      ?>
-        <div class="announcement-item">
-          <span class="ann-icon <?= htmlspecialchars($type) ?>">
-            <?= $type === 'alert' ? '⚠️' : ($type === 'reminder' ? '📄' : '📣') ?>
-          </span>
+      <?php foreach (array_slice($notifications, 0, 5) as $n): ?>
+        <?php $annHref = !empty($n['event_id']) ? '../event-details.php?id=' . urlencode($n['event_id']) : null; ?>
+        <<?= $annHref ? 'a href="' . htmlspecialchars($annHref) . '"' : 'div' ?> class="announcement-item<?= ($n['status'] ?? '') !== 'read' ? ' unread' : '' ?>">
+          <span class="ann-icon info" aria-hidden="true"><?= icon('megaphone', 18) ?></span>
           <div>
-            <div class="ann-title"><?= htmlspecialchars($a['title']) ?></div>
-            <div class="ann-date"><?= htmlspecialchars($a['created_at']) ?></div>
+            <div class="ann-title"><?= htmlspecialchars($n['title']) ?></div>
+            <div class="ann-date"><?= htmlspecialchars(format_event_date($n['created_at'])) ?></div>
           </div>
-        </div>
+        </<?= $annHref ? 'a' : 'div' ?>>
       <?php endforeach; ?>
     </div>
   </aside>
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="../assets/js/supabase-client.js"></script>
 <script src="../assets/js/sidebar.js"></script>
+<script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>
 <script src="../assets/js/main.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

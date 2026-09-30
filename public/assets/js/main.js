@@ -1,114 +1,126 @@
 /**
- * Campus Event Hub — front-end interactions.
- * Uses the `db` placeholder client from supabase-client.js wherever it
- * would eventually talk to Supabase.
+ * Campus Event Hub — home page + dashboard behaviour:
+ * the dashboard calendar, the "Upcoming events" carousel and the live
+ * home-page stats. Each part does nothing on pages that don't have it.
  */
-
-// This file lives in public/assets/js/, so "../../" is the public/ folder.
-// Used to build page links that work from both index.php and enduser/dashboard.php.
-const SITE_ROOT = new URL("../../", document.currentScript.src).href;
-
 document.addEventListener("DOMContentLoaded", () => {
   buildCalendar();
-  wireEventCardClicks();
-  wireSidebarToggle();
+  wireCarousel();
+  wireLiveStats();
 });
 
-/* ---------------- Sidebar: collapsed by default, expands on press ---------------- */
-function wireSidebarToggle() {
-  const shell = document.querySelector(".dashboard-shell");
-  const toggleBtn = document.getElementById("sidebarToggle");
-  if (!shell || !toggleBtn) {
-    // Not necessarily an error — some pages may not use the dashboard
-    // shell — but flag it during development in case markup drifted.
-    console.warn(
-      "[sidebar] .dashboard-shell or #sidebarToggle not found; sidebar toggle is inactive on this page."
-    );
-    return;
-  }
-
-  const STORAGE_KEY = "sidebarExpanded";
-
-  const setExpanded = (expanded) => {
-    shell.classList.toggle("sidebar-expanded", expanded);
-    toggleBtn.setAttribute("aria-expanded", String(expanded));
-    try {
-      localStorage.setItem(STORAGE_KEY, expanded ? "1" : "0");
-    } catch (e) {
-      /* localStorage unavailable (e.g. private browsing) — state just won't persist */
-    }
-  };
-
-  // Remembers the user's last choice; defaults to collapsed (icon rail only).
-  let initiallyExpanded = false;
-  try {
-    initiallyExpanded = localStorage.getItem(STORAGE_KEY) === "1";
-  } catch (e) {
-    /* ignore */
-  }
-  setExpanded(initiallyExpanded);
-
-  toggleBtn.addEventListener("click", () => {
-    const isExpanded = shell.classList.contains("sidebar-expanded");
-    setExpanded(!isExpanded);
-    // Collapsing the sidebar should also close any open submenu inside it.
-    if (isExpanded) closeEventSubmenu();
-  });
-
-  // Exposed so the Event dropdown (sidebar.js) can force-expand the sidebar when needed.
-  window.__expandSidebar = () => setExpanded(true);
-}
-
-/* ---------------- Calendar (right rail on the dashboard) ---------------- */
+/* ---------------- Calendar (dashboard right rail) ---------------- */
+// Real current month; ‹ › change month. Days with a published event
+// (window.CALENDAR_EVENTS from enduser/dashboard.php) get a dot; hovering
+// lists the titles and clicking opens the event.
 function buildCalendar() {
   const grid = document.getElementById("calendar-grid");
-  if (!grid) return; // not on the dashboard page
+  if (!grid) return;
 
-  const dows = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const label = document.getElementById("calendar-month");
+  const events = window.CALENDAR_EVENTS || [];
+  const eventUrl = grid.dataset.eventUrl || "";
+  const today = new Date();
+  let year = today.getFullYear();
+  let month = today.getMonth(); // 0-11
 
-  // Matches the screenshot: May 2026, starting on a Sunday, with a few
-  // marker dots on scattered days. Replace with real event dates once
-  // events are pulled from Supabase (see db.getEvents()).
-  const weeks = [
-    [28, 29, 30, 1, 2, 3, 4],
-    [5, 6, 7, 8, 9, 10, 11],
-    [12, 13, 14, 15, 16, 17, 18],
-    [19, 20, 21, 22, 23, 24, 25],
-    [26, 27, 28, 29, 30, 31, 1],
-  ];
-  const mutedDays = new Set([28, 29, 30, 31, 1]); // days belonging to adjacent months
-  const markers = {
-    "3-4": "marker-blue",
-    "3-5": "marker-purple",
-    "4-1": "marker-orange",
-    "4-2": "marker-red",
-    "4-3": "marker-purple",
-  };
+  const pad = (n) => String(n).padStart(2, "0");
+  const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+  const eventsOn = (date) => events.filter((e) => e.start <= date && date <= (e.end || e.start));
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
-  let html = "";
-  dows.forEach((d) => (html += `<div class="dow">${d}</div>`));
+  function render() {
+    if (label) {
+      label.textContent = new Date(year, month, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+    }
+    let html = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => `<div class="dow">${d}</div>`).join("");
 
-  weeks.forEach((week, wi) => {
-    week.forEach((day, di) => {
-      const isMuted =
-        (wi === 0 && day > 20) || (wi === weeks.length - 1 && day < 20);
-      const markerClass = markers[`${wi}-${di}`];
-      html += `<div class="day${isMuted ? " muted" : ""}">${day}${
-        markerClass ? `<span class="marker ${markerClass}"></span>` : ""
-      }</div>`;
-    });
-  });
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrev = new Date(year, month, 0).getDate();
+    const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+    const todayIso = iso(today.getFullYear(), today.getMonth(), today.getDate());
 
-  grid.innerHTML = html;
+    for (let i = 0; i < totalCells; i++) {
+      const day = i - firstDow + 1;
+      if (day < 1 || day > daysInMonth) {
+        html += `<div class="day muted">${day < 1 ? daysInPrev + day : day - daysInMonth}</div>`;
+        continue;
+      }
+      const date = iso(year, month, day);
+      const onDay = eventsOn(date);
+      const cls = `day${date === todayIso ? " today" : ""}${onDay.length ? " has-event" : ""}`;
+      html += onDay.length
+        ? `<a class="${cls}" href="${esc(eventUrl + encodeURIComponent(onDay[0].id))}" title="${esc(onDay.map((e) => e.title).join("\n"))}">${day}<span class="marker marker-blue"></span></a>`
+        : `<div class="${cls}">${day}</div>`;
+    }
+    grid.innerHTML = html;
+  }
+
+  function step(delta) {
+    month += delta;
+    if (month < 0) { month = 11; year--; }
+    if (month > 11) { month = 0; year++; }
+    render();
+  }
+  document.getElementById("calPrev")?.addEventListener("click", () => step(-1));
+  document.getElementById("calNext")?.addEventListener("click", () => step(1));
+  render();
 }
 
-/* ---------------- Event card clicks -> Event Details page ---------------- */
-function wireEventCardClicks() {
-  document.querySelectorAll(".event-card[data-event-id]").forEach((card) => {
-    card.style.cursor = "pointer";
-    card.addEventListener("click", () => {
-      const eventId = card.dataset.eventId;
-      window.location.href = `${SITE_ROOT}event-details.php?id=${encodeURIComponent(eventId)}`;
-    });
+/* ---------------- Carousel (dashboard "Upcoming events") ---------------- */
+// [data-carousel] shows data-per-page cards at a time; the dots in the
+// element named by data-carousel switch pages. No dots when one page fits all.
+function wireCarousel() {
+  document.querySelectorAll("[data-carousel]").forEach((track) => {
+    const cards = Array.from(track.children).filter((el) => el.classList.contains("event-card"));
+    const perPage = Number(track.dataset.perPage) || 3;
+    const pages = Math.ceil(cards.length / perPage);
+    const dots = document.querySelector(track.dataset.carousel);
+    if (!dots) return;
+    if (pages <= 1) {
+      dots.hidden = true;
+      return;
+    }
+
+    function show(page) {
+      cards.forEach((card, i) => { card.hidden = Math.floor(i / perPage) !== page; });
+      dots.querySelectorAll("button").forEach((b, i) => {
+        b.classList.toggle("active", i === page);
+        b.setAttribute("aria-current", i === page ? "true" : "false");
+      });
+    }
+
+    dots.innerHTML = "";
+    for (let p = 0; p < pages; p++) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", `Show events ${p * perPage + 1}–${Math.min((p + 1) * perPage, cards.length)}`);
+      b.addEventListener("click", () => show(p));
+      dots.appendChild(b);
+    }
+    show(0);
   });
+}
+
+/* ---------------- Home page stats: refresh live every 30s ---------------- */
+// Numbers come from api/stats.php (the site_stats() database function);
+// Active Users goes up/down as logged-in people open or close the site.
+function wireLiveStats() {
+  const block = document.querySelector("[data-stats-url]");
+  if (!block) return;
+
+  async function refresh() {
+    try {
+      const res = await fetch(block.dataset.statsUrl, { cache: "no-store" });
+      if (!res.ok) return;
+      const stats = await res.json();
+      block.querySelectorAll("[data-stat]").forEach((el) => {
+        if (stats[el.dataset.stat] !== undefined) el.textContent = stats[el.dataset.stat];
+      });
+    } catch (e) {
+      /* offline — keep the last numbers */
+    }
+  }
+  setInterval(refresh, 30000);
 }

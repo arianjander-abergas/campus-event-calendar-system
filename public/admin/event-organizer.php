@@ -1,399 +1,405 @@
 <?php
+/** Admin: create / edit / publish / cancel / delete events. */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin(); // redirects non-admins to dashboard.php
+$user = require_admin(); // non-admins are sent to the dashboard
 
 $categories = get_categories();
 $organizations = get_organizations();
 
-$editId = $_GET['edit'] ?? null;
-$editEvent = $editId ? get_event_admin($editId) : null;
-
+$editId = get_param('edit');
+$editEvent = is_uuid($editId) ? get_event_admin($editId) : null;
+if ($editId !== '' && !$editEvent) {
+    flash('error', "That event doesn't exist anymore.");
+    header('Location: event-organizer.php');
+    exit;
+}
 $errors = [];
-$flashCreated = isset($_GET['created']);
-$flashUpdated = isset($_GET['updated']);
-$flashDeleted = isset($_GET['deleted']);
-$flashStatusUpdated = isset($_GET['status_updated']);
-$flashError = isset($_GET['error']);
 
-// ---- Handle delete ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete') {
-    delete_event_admin($_POST['id'] ?? '');
-    header('Location: event-organizer.php?deleted=1');
+// ---- Delete ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete') {
+    $result = delete_event_admin(post_param('id'));
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    header('Location: event-organizer.php');
     exit;
 }
 
-// ---- Handle status-only changes (Cancel / Mark Completed / Reopen / Unpublish) ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_status') {
-    $result = set_event_status_admin($_POST['id'] ?? '', $_POST['status'] ?? '');
-    header('Location: event-organizer.php?' . ($result['ok'] ? 'status_updated=1' : 'error=1'));
+// ---- Status-only changes (Cancel / Mark Completed / Reopen as Draft) ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_status') {
+    $result = set_event_status_admin(post_param('id'), post_param('status'));
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    header('Location: event-organizer.php');
     exit;
 }
 
-// ---- Handle create / update (PRG pattern) ----
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save') {
-    $title = trim($_POST['title'] ?? '');
-    $categoryId = trim($_POST['category_id'] ?? '');
-    $organizationId = trim($_POST['organization_id'] ?? '');
-    $eventType = trim($_POST['event_type'] ?? 'other');
-    $description = trim($_POST['description'] ?? '');
-    $startDate = trim($_POST['start_date'] ?? '');
-    $startTime = trim($_POST['start_time'] ?? '');
-    $endDate = trim($_POST['end_date'] ?? '');
-    $endTime = trim($_POST['end_time'] ?? '');
-    $venue = trim($_POST['venue'] ?? '');
-    $onlineLink = trim($_POST['online_event_link'] ?? '');
-    $address = trim($_POST['address'] ?? '');
-    $posterUrl = trim($_POST['poster_url'] ?? '');
-    $registrationLimit = trim($_POST['registration_limit'] ?? '');
-    $registrationDeadline = trim($_POST['registration_deadline'] ?? '');
-    $contactEmail = trim($_POST['contact_email'] ?? '');
-    $contactNumber = trim($_POST['contact_number'] ?? '');
-    $enableRegistration = isset($_POST['enable_registration']);
+// ---- Create / update ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
+    $existingId = post_param('id');
+    $previous = is_uuid($existingId) ? get_event_admin($existingId) : null;
+    $intent = post_param('intent') === 'publish' ? 'publish' : 'draft';
     $sendNotification = isset($_POST['send_notification']);
-    $intent = $_POST['intent'] ?? 'draft'; // 'draft' or 'publish' — which button was clicked
-    $existingId = $_POST['id'] ?? null;
 
-    if ($title === '') $errors[] = 'Event title is required.';
-    if ($categoryId === '') $errors[] = 'Category is required.';
-    if ($organizationId === '') $errors[] = 'Organization is required.';
-    if ($description === '') $errors[] = 'Description is required.';
-    if (strlen($description) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
-    if ($startDate === '') $errors[] = 'Start date is required.';
-    if ($endDate === '') $errors[] = 'End date is required.';
-    if ($venue === '' && $onlineLink === '') $errors[] = 'Provide a venue or an online event link.';
+    $onlineLink = post_param('online_event_link');
+    $registrationLimit = post_param('registration_limit');
+    $eventType = post_param('event_type', 'other');
+    $audience = post_param('audience', 'students');
+    $venueType = post_param('venue_type', 'on_campus');
+    $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
 
-    if (empty($errors)) {
-        $fields = [
-            'title' => $title,
-            'category_id' => $categoryId,
-            'organization_id' => $organizationId,
-            'event_type' => $eventType,
-            'description' => $description,
-            'start_date' => $startDate,
-            'start_time' => $startTime !== '' ? $startTime : null,
-            'end_date' => $endDate,
-            'end_time' => $endTime !== '' ? $endTime : null,
-            'venue' => $venue !== '' ? $venue : null,
-            'is_online' => $onlineLink !== '',
-            'online_event_link' => $onlineLink !== '' ? $onlineLink : null,
-            'address' => $address !== '' ? $address : null,
-            'poster_url' => $posterUrl !== '' ? $posterUrl : null,
-            'registration_limit' => $registrationLimit !== '' ? (int)$registrationLimit : null,
-            'registration_deadline' => $registrationDeadline !== '' ? $registrationDeadline : null,
-            'contact_email' => $contactEmail !== '' ? $contactEmail : null,
-            'contact_number' => $contactNumber !== '' ? $contactNumber : null,
-            'enable_registration' => $enableRegistration,
-            'send_notification' => $sendNotification,
-            'is_published' => $intent === 'publish',
-            'status' => $intent === 'publish' ? 'published' : 'draft',
-        ];
+    // Collect everything typed FIRST, so a failed save re-shows the form filled in.
+    $fields = [
+        'title' => post_param('title'),
+        'category_id' => post_param('category_id'),
+        'organization_id' => post_param('organization_id'),
+        'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
+        'audience' => isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students',
+        'venue_type' => $venueType,
+        'description' => post_param('description'),
+        'start_date' => post_param('start_date'),
+        'start_time' => post_param('start_time') ?: null,
+        'end_date' => post_param('end_date'),
+        'end_time' => post_param('end_time') ?: null,
+        'venue' => post_param('venue') ?: null,
+        'is_online' => $venueType === 'online',
+        'online_event_link' => $onlineLink ?: null,
+        'address' => post_param('address') ?: null,
+        'poster_url' => post_param('poster_url') ?: null,
+        'registration_limit' => $registrationLimit !== '' ? (int) $registrationLimit : null,
+        'registration_deadline' => post_param('registration_deadline') ?: null,
+        'contact_email' => post_param('contact_email') ?: null,
+        'contact_number' => post_param('contact_number') ?: null,
+        'enable_registration' => isset($_POST['enable_registration']),
+        'send_notification' => $sendNotification,
+        'is_published' => $intent === 'publish',
+        'status' => $intent === 'publish' ? 'published' : 'draft',
+    ];
 
-        if ($existingId) {
-            $result = update_event_admin($existingId, $fields);
-            if ($result['ok']) {
-                header('Location: event-organizer.php?updated=1');
-                exit;
-            }
-        } else {
-            $result = create_event_admin($fields);
-            if ($result['ok']) {
-                header('Location: event-organizer.php?created=1');
-                exit;
-            }
+    if ($fields['title'] === '') $errors[] = 'Event title is required.';
+    if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors[] = 'Please choose a category.';
+    if (!in_array($fields['organization_id'], array_column($organizations, 'id'), true)) $errors[] = 'Please choose an organization.';
+    if ($fields['description'] === '') $errors[] = 'Description is required.';
+    if (mb_strlen($fields['description']) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
+    if ($fields['start_date'] === '') $errors[] = 'Start date is required.';
+    if ($fields['end_date'] === '') $errors[] = 'End date is required.';
+    if ($fields['start_date'] !== '' && $fields['end_date'] !== '' && $fields['end_date'] < $fields['start_date']) {
+        $errors[] = "End date can't be before the start date.";
+    }
+    if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && $fields['end_time'] <= $fields['start_time']) {
+        $errors[] = 'End time must be after the start time.';
+    }
+    if ($venueType === 'online' && $onlineLink === '') $errors[] = 'Online events need the webinar / meeting link.';
+    if ($venueType !== 'online' && !$fields['venue']) $errors[] = 'On-campus and off-campus events need a venue.';
+    if ($onlineLink !== '' && !preg_match('~^https?://~i', $onlineLink)) $errors[] = 'The online event link must start with http:// or https://.';
+    if ($registrationLimit !== '' && (int) $registrationLimit < 1) $errors[] = 'Registration limit must be at least 1 (or leave it empty for no limit).';
+    if ($fields['registration_deadline'] && $fields['end_date'] !== '' && $fields['registration_deadline'] > $fields['end_date']) {
+        $errors[] = 'The registration deadline must be on or before the end date.';
+    }
+    if ($fields['contact_email'] && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Contact email is not a valid email address.';
+
+    // Poster: an uploaded image wins over a pasted URL.
+    if (!$errors) {
+        $upload = upload_public_image('event-posters', $_FILES['poster_file'] ?? [], date('Y'));
+        if ($upload['ok']) {
+            $fields['poster_url'] = $upload['url'];
+        } elseif (!empty($upload['message'])) {
+            $errors[] = $upload['message'];
         }
-        $errors[] = $result['message'] ?? 'Something went wrong saving the event.';
     }
 
-    // Fall through to re-render the form with entered values + errors.
-    $editEvent = $fields ?? [];
-    $editEvent['id'] = $existingId;
-    $editId = $existingId;
+    if (!$errors) {
+        $result = $previous ? update_event_admin($previous['id'], $fields) : create_event_admin($fields);
+        if ($result['ok']) {
+            $eventId = $previous['id'] ?? $result['event']['id'];
+            $message = $previous ? 'Event updated.' : 'Event created.';
+
+            // "Send Notification to Users": a newly published event goes to
+            // everyone; changes to an already-published one go to registrants.
+            if ($fields['status'] === 'published' && $sendNotification) {
+                $wasPublished = ($previous['status'] ?? '') === 'published';
+                $where = event_when($fields) . ' · ' . event_place($fields);
+                $sent = $wasPublished
+                    ? notify_event($eventId, 'registered', 'Event updated: ' . $fields['title'], 'Details changed — ' . $where . '. Check the event page for the latest info.')
+                    : notify_event($eventId, 'all', 'New event: ' . $fields['title'], $where);
+                if ($sent >= 0) {
+                    $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
+                } else {
+                    $message .= ' (Notifications could not be sent.)';
+                }
+            }
+            flash('success', $message);
+            header('Location: event-organizer.php');
+            exit;
+        }
+        $errors[] = $result['message'];
+    }
+
+    // Fall through: re-show the form with what was typed + the errors.
+    $editEvent = $fields + ['id' => $previous['id'] ?? null];
+    $editId = $previous['id'] ?? '';
 }
 
 $events = get_all_events_admin();
+$counts = get_registration_counts();
 
-function initials(string $name): string {
-    $parts = explode(' ', trim($name));
-    $out = '';
-    foreach (array_slice($parts, 0, 2) as $p) { $out .= substr($p, 0, 1); }
-    return strtoupper($out) ?: 'U';
-}
-
-// Values to pre-fill the form with (either an event being edited, or a
-// failed submission being redisplayed).
+// Values to pre-fill the form with (event being edited, or a failed submission).
 $f = $editEvent ?? [];
-$val = fn(string $key, $default = '') => htmlspecialchars((string)($f[$key] ?? $default));
+$val = fn(string $key, $default = '') => htmlspecialchars((string) ($f[$key] ?? $default));
+$time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0, 5)); // "13:30:00" -> "13:30"
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
-$eventTypeChecked = fn(string $type) => (($f['event_type'] ?? '') === $type) ? 'checked' : '';
+
+$activeNav = 'admin-events';
+$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
+if ($editId) $breadcrumbs[] = ['Edit Event', null];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= $editId ? 'Edit Event' : 'Add New Event' ?> — Campus Event Hub</title>
+<title><?= $editId ? 'Edit Event' : 'Manage Events' ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css">
 <link rel="stylesheet" href="../assets/css/admin.css">
 </head>
 <body>
 
-<div class="dashboard-shell sidebar-pinned">
+<div class="dashboard-shell no-rail">
 
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-top">
-      <a href="../index.php" class="brand">
-        <span class="brand-icon">📅</span>
-        <span class="brand-text">
-          <span class="campus">CAMPUS</span>
-          <span class="hub">EVENT HUB</span>
-        </span>
-      </a>
-      <button class="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
-    </div>
+  <?php include __DIR__ . '/../../includes/nav.php'; ?>
+  <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
-    <nav class="side-nav">
-      <a href="../index.php"><span class="icon">🏠</span> Home</a>
-      <a href="../enduser/dashboard.php"><span class="icon">🗂️</span> Dashboard</a>
-      <div class="side-nav-item has-submenu">
-        <button type="button" class="submenu-toggle" id="eventDropdownBtn" aria-expanded="false" aria-controls="eventSubmenu">
-          <span class="icon">🎟️</span>
-          <span class="nav-label">Event</span>
-          <span class="chevron" aria-hidden="true">⌄</span>
-        </button>
-        <div class="event-submenu" id="eventSubmenu" hidden>
-          <a href="../event-details.php" class="calendar-submenu-link">
-            <span class="icon">📅</span> Calendar
-          </a>
-        </div>
-      </div>
-    </nav>
-
-    <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
-      <a href="event-organizer.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#fff; background:var(--orange);">
-        <span class="icon">🛠️</span> Admin View
-      </a>
-      <a href="admin-taxonomy.php" style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; font-weight:600; font-size:0.9rem; color:#cdd8ef; background:rgba(255,255,255,0.08);">
-        <span class="icon">🏷️</span> Categories &amp; Orgs
-      </a>
-    </div>
-  </aside>
-
-  <!-- Top bar -->
-  <header class="dash-topbar">
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-      <a href="../enduser/dashboard.php">Dashboard</a>
-      <span class="crumb-sep">›</span>
-      <span>Events</span>
-      <span class="crumb-sep">›</span>
-      <span class="crumb-current"><?= $editId ? 'Edit Event' : 'Add New Event' ?></span>
-    </nav>
-    <div class="topbar-right">
-      <div class="user-chip">
-        <div class="avatar"><?= htmlspecialchars(initials($user['full_name'])) ?></div>
-        <div>
-          <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
-          <div class="user-role"><?= htmlspecialchars(role_display($user['role'])) ?></div>
-        </div>
-        <a href="../auth/logout.php" style="margin-left:8px; font-size:0.78rem; color:var(--text-muted);">Log out</a>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main content -->
   <main class="dash-main">
-    <h1 style="margin:0 0 18px; font-size:1.4rem;"><?= $editId ? 'Edit Event' : 'Create New Event' ?></h1>
+    <h1 class="page-title"><?= $editId ? 'Edit Event' : 'Create New Event' ?></h1>
 
-    <?php if ($flashCreated): ?><div class="auth-success">Event created.</div><?php endif; ?>
-    <?php if ($flashUpdated): ?><div class="auth-success">Event updated.</div><?php endif; ?>
-    <?php if ($flashDeleted): ?><div class="auth-success">Event deleted.</div><?php endif; ?>
-    <?php if ($flashStatusUpdated): ?><div class="auth-success">Event status updated.</div><?php endif; ?>
-    <?php if ($flashError): ?><div class="auth-alert">Something went wrong. Please try again.</div><?php endif; ?>
-    <?php foreach ($errors as $err): ?><div class="auth-alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
+    <?= render_flashes() ?>
+    <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
-    <form method="POST" action="event-organizer.php" class="admin-form">
+    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" enctype="multipart/form-data">
       <input type="hidden" name="action" value="save">
-      <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars((string)$editId) ?>"><?php endif; ?>
+      <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
       <div class="admin-card">
         <h2 class="admin-card-title">Event Details</h2>
 
-        <label class="admin-label">Event Title <span class="req">*</span></label>
-        <input type="text" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
+        <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
+        <input type="text" id="title" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
 
         <div class="admin-two-col">
           <div>
-            <label class="admin-label">Category <span class="req">*</span></label>
-            <select name="category_id" class="admin-input" required>
+            <label class="admin-label" for="category_id">Category <span class="req">*</span></label>
+            <select id="category_id" name="category_id" class="admin-input" required>
               <option value="">Select a category</option>
               <?php foreach ($categories as $c): ?>
                 <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
               <?php endforeach; ?>
             </select>
             <?php if (empty($categories)): ?>
-              <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> before publishing.</p>
+              <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> first.</p>
             <?php endif; ?>
           </div>
           <div>
-            <label class="admin-label">Organization <span class="req">*</span></label>
-            <select name="organization_id" class="admin-input" required>
+            <label class="admin-label" for="organization_id">Organization <span class="req">*</span></label>
+            <select id="organization_id" name="organization_id" class="admin-input" required>
               <option value="">Select an organization</option>
               <?php foreach ($organizations as $o): ?>
                 <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
               <?php endforeach; ?>
             </select>
             <?php if (empty($organizations)): ?>
-              <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php">add one</a> before publishing.</p>
+              <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
             <?php endif; ?>
           </div>
         </div>
 
-        <label class="admin-label">Event Type</label>
+        <span class="admin-label">Event Type</span>
         <div class="admin-radio-row">
-          <?php foreach (['academic' => 'Academic', 'seminar' => 'Seminar', 'workshop' => 'Workshop', 'sports' => 'Sports', 'cultural' => 'Cultural', 'other' => 'Other'] as $val_key => $label): ?>
-            <label class="admin-radio"><input type="radio" name="event_type" value="<?= $val_key ?>" <?= $eventTypeChecked($val_key) ?: ($val_key === 'other' && empty($f['event_type']) ? 'checked' : '') ?>> <?= $label ?></label>
+          <?php foreach (EVENT_TYPES as $typeKey => $label): ?>
+            <label class="admin-radio"><input type="radio" name="event_type" value="<?= $typeKey ?>" <?= ($f['event_type'] ?? 'other') === $typeKey ? 'checked' : '' ?>> <?= $label ?></label>
           <?php endforeach; ?>
         </div>
 
-        <label class="admin-label">Description <span class="req">*</span></label>
-        <textarea name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
+        <span class="admin-label">Audience <span class="req">*</span></span>
+        <div class="admin-radio-row">
+          <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
+            <label class="admin-radio"><input type="radio" name="audience" value="<?= $key ?>" <?= ($f['audience'] ?? 'students') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+          <?php endforeach; ?>
+        </div>
+
+        <label class="admin-label" for="description">Description <span class="req">*</span></label>
+        <textarea id="description" name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
 
         <div class="admin-section-label">Date, Time &amp; Venue</div>
         <div class="admin-four-col">
           <div>
-            <label class="admin-label">Start Date <span class="req">*</span></label>
-            <input type="date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" required>
+            <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
+            <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" required>
           </div>
           <div>
-            <label class="admin-label">Start Time</label>
-            <input type="time" name="start_time" class="admin-input" value="<?= $val('start_time') ?>">
+            <label class="admin-label" for="start_time">Start Time</label>
+            <input type="time" id="start_time" name="start_time" class="admin-input" value="<?= $time('start_time') ?>">
           </div>
           <div>
-            <label class="admin-label">End Date <span class="req">*</span></label>
-            <input type="date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" required>
+            <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
+            <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" required>
           </div>
           <div>
-            <label class="admin-label">End Time</label>
-            <input type="time" name="end_time" class="admin-input" value="<?= $val('end_time') ?>">
+            <label class="admin-label" for="end_time">End Time</label>
+            <input type="time" id="end_time" name="end_time" class="admin-input" value="<?= $time('end_time') ?>">
           </div>
+        </div>
+
+        <span class="admin-label">Venue Type <span class="req">*</span></span>
+        <div class="admin-radio-row">
+          <?php foreach (VENUE_TYPES as $key => $label): ?>
+            <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($f['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+          <?php endforeach; ?>
         </div>
 
         <div class="admin-two-col">
           <div>
-            <label class="admin-label">Venue</label>
-            <input type="text" name="venue" class="admin-input" placeholder="Enter venue" value="<?= $val('venue') ?>">
+            <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
+            <input type="text" id="venue" name="venue" class="admin-input" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>">
           </div>
           <div>
-            <label class="admin-label">Online Event Link</label>
-            <input type="text" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
+            <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
+            <input type="url" id="online_event_link" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
           </div>
         </div>
-        <p class="admin-hint">Provide a venue, an online link, or both.</p>
+        <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
 
-        <label class="admin-label">Address (if applicable)</label>
-        <input type="text" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
+        <label class="admin-label" for="address">Address (if applicable)</label>
+        <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
 
         <div class="admin-checkbox-row">
           <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
           <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
         </div>
+        <p class="admin-hint">With "Send Notification" on: publishing a new event notifies every user; saving changes to a published event notifies the people registered for it.</p>
       </div>
 
       <div class="admin-side-cards">
         <div class="admin-card">
           <h2 class="admin-card-title">Event Poster</h2>
-          <label class="admin-label">Poster Image URL</label>
-          <input type="text" name="poster_url" class="admin-input" placeholder="assets/your-poster.jpg or https://…" value="<?= $val('poster_url') ?>">
-          <p class="admin-hint">Direct file upload isn't wired up yet — paste a URL or a path under <code>assets/</code> for now.</p>
+          <?php if (!empty($f['poster_url'])): ?>
+            <img src="<?= htmlspecialchars(asset_url($f['poster_url'])) ?>" alt="Current poster" class="admin-image-preview">
+          <?php endif; ?>
+          <label class="admin-label" for="poster_file">Upload an image</label>
+          <input type="file" id="poster_file" name="poster_file" class="admin-input" accept="image/jpeg,image/png,image/webp,image/gif">
+          <p class="admin-hint">JPG, PNG, WEBP or GIF, up to 5 MB. Replaces the current poster.</p>
+          <label class="admin-label" for="poster_url">…or paste an image URL</label>
+          <input type="text" id="poster_url" name="poster_url" class="admin-input" placeholder="https://…" value="<?= $val('poster_url') ?>">
         </div>
 
         <div class="admin-card">
-          <h2 class="admin-card-title">Additional Details</h2>
-          <label class="admin-label">Registration Limit</label>
-          <input type="number" min="1" name="registration_limit" class="admin-input" placeholder="Enter limit (e.g., 100)" value="<?= $val('registration_limit') ?>">
+          <h2 class="admin-card-title">Registration &amp; Contact</h2>
+          <label class="admin-label" for="registration_limit">Registration Limit</label>
+          <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>">
 
-          <label class="admin-label">Registration Deadline</label>
-          <input type="date" name="registration_deadline" class="admin-input" value="<?= $val('registration_deadline') ?>">
+          <label class="admin-label" for="registration_deadline">Registration Deadline</label>
+          <input type="date" id="registration_deadline" name="registration_deadline" class="admin-input" value="<?= $val('registration_deadline') ?>">
 
-          <label class="admin-label">Contact Email</label>
-          <input type="email" name="contact_email" class="admin-input" placeholder="Enter email" value="<?= $val('contact_email') ?>">
+          <label class="admin-label" for="contact_email">Contact Email</label>
+          <input type="email" id="contact_email" name="contact_email" class="admin-input" placeholder="Enter email" value="<?= $val('contact_email') ?>">
 
-          <label class="admin-label">Contact Number</label>
-          <input type="text" name="contact_number" class="admin-input" placeholder="Enter no." value="<?= $val('contact_number') ?>">
+          <label class="admin-label" for="contact_number">Contact Number</label>
+          <input type="text" id="contact_number" name="contact_number" class="admin-input" placeholder="Enter no." value="<?= $val('contact_number') ?>">
         </div>
+
+        <?php if ($editId): ?>
+          <div class="admin-card admin-card-links">
+            <h2 class="admin-card-title">More for this event</h2>
+            <a href="event-programs.php?event=<?= urlencode($editId) ?>"><?= icon('schedule', 16) ?> Edit the schedule (programs)</a>
+            <a href="event-registrations.php?event=<?= urlencode($editId) ?>"><?= icon('people', 16) ?> See registrations &amp; attendance</a>
+            <a href="attendance-print.php?event=<?= urlencode($editId) ?>"><?= icon('print', 16) ?> Print the attendance sheet</a>
+            <a href="event-evaluations.php?event=<?= urlencode($editId) ?>"><?= icon('evaluation', 16) ?> See evaluation results</a>
+            <a href="../event-details.php?id=<?= urlencode($editId) ?>"><?= icon('view', 16) ?> View the event page</a>
+          </div>
+        <?php endif; ?>
       </div>
 
       <div class="admin-actions">
         <a href="event-organizer.php" class="btn btn-outline">Cancel</a>
-        <button type="submit" name="intent" value="draft" class="btn" style="background:#e5e7eb; color:var(--text-main);">Save Draft</button>
-        <button type="submit" name="intent" value="publish" class="btn btn-primary"><?= $editId ? 'Save & Publish' : 'Publish Event' ?></button>
+        <button type="submit" name="intent" value="draft" class="btn btn-muted">Save Draft</button>
+        <button type="submit" name="intent" value="publish" class="btn btn-primary"><?= $editId ? 'Save &amp; Publish' : 'Publish Event' ?></button>
       </div>
     </form>
 
     <!-- Manage existing events -->
-    <div class="section-head" style="margin-top:36px;">
-      <h2>All Events</h2>
+    <div class="section-head section-head-spaced">
+      <h2>All Events (<?= count($events) ?>)</h2>
     </div>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
           <tr>
             <th>Title</th>
-            <th>Category</th>
             <th>Organization</th>
-            <th>Start Date</th>
+            <th>Date</th>
+            <th>Going</th>
             <th>Status</th>
-            <th></th>
+            <th><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($events)): ?>
-            <tr><td colspan="6" style="color:var(--text-muted); text-align:center; padding:24px;">No events yet — create your first one above.</td></tr>
+            <tr><td colspan="6" class="admin-table-empty">No events yet — create your first one above.</td></tr>
           <?php endif; ?>
           <?php foreach ($events as $ev):
             $status = $ev['status'] ?? 'draft';
+            $programCount = (int) ($ev['event_programs'][0]['count'] ?? 0);
           ?>
             <tr>
-              <td><?= htmlspecialchars($ev['title']) ?></td>
-              <td><?= htmlspecialchars($ev['categories']['name'] ?? '—') ?></td>
-              <td><?= htmlspecialchars($ev['organizations']['name'] ?? '—') ?></td>
-              <td><?= htmlspecialchars($ev['start_date'] ?? '—') ?></td>
+              <td>
+                <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="admin-table-title"><?= htmlspecialchars($ev['title']) ?></a>
+                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([$ev['categories']['name'] ?? '', label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')]))) ?></div>
+              </td>
+              <td>
+                <?php if (!empty($ev['organizations']['name'])): ?>
+                  <span class="admin-org-cell">
+                    <?php if (!empty($ev['organizations']['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($ev['organizations']['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                    <?= htmlspecialchars($ev['organizations']['name']) ?>
+                  </span>
+                <?php else: ?>—<?php endif; ?>
+              </td>
+              <td><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
+              <td><?= (int) ($counts[$ev['id']] ?? 0) ?><?= !empty($ev['registration_limit']) ? ' / ' . (int) $ev['registration_limit'] : '' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span></td>
               <td class="admin-row-actions">
-                <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-outline" style="padding:6px 14px; border-radius:6px; font-size:0.78rem;">Edit</a>
+                <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Edit</a>
+                <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
+                <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
+                <?php if ($status !== 'draft'): ?><a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a><?php endif; ?>
 
                 <?php if (in_array($status, ['draft', 'published'], true)): ?>
-                  <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Registered users won\'t be automatically notified.');" style="display:inline;">
+                  <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
                     <input type="hidden" name="action" value="set_status">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                     <input type="hidden" name="status" value="cancelled">
-                    <button type="submit" style="padding:6px 14px; border-radius:6px; font-size:0.78rem; border:1.5px solid var(--red); color:var(--red); background:transparent;">Cancel</button>
+                    <button type="submit" class="btn-sm btn-sm-danger">Cancel</button>
                   </form>
                 <?php endif; ?>
 
                 <?php if ($status === 'published'): ?>
-                  <form method="POST" action="event-organizer.php" style="display:inline;">
+                  <form method="POST" action="event-organizer.php">
                     <input type="hidden" name="action" value="set_status">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                     <input type="hidden" name="status" value="completed">
-                    <button type="submit" style="padding:6px 14px; border-radius:6px; font-size:0.78rem; border:1.5px solid var(--blue-accent); color:var(--blue-accent); background:transparent;">Mark Completed</button>
+                    <button type="submit" class="btn-sm btn-sm-accent">Mark Completed</button>
                   </form>
                 <?php endif; ?>
 
-                <?php if ($status === 'cancelled'): ?>
-                  <form method="POST" action="event-organizer.php" style="display:inline;">
+                <?php if (in_array($status, ['cancelled', 'completed'], true)): ?>
+                  <form method="POST" action="event-organizer.php">
                     <input type="hidden" name="action" value="set_status">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                     <input type="hidden" name="status" value="draft">
-                    <button type="submit" style="padding:6px 14px; border-radius:6px; font-size:0.78rem; border:1.5px solid var(--text-muted); color:var(--text-muted); background:transparent;">Reopen as Draft</button>
+                    <button type="submit" class="btn-sm">Reopen as Draft</button>
                   </form>
                 <?php endif; ?>
 
-                <form method="POST" action="event-organizer.php" onsubmit="return confirm('Delete this event? This cannot be undone.');" style="display:inline;">
+                <form method="POST" action="event-organizer.php" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
                   <input type="hidden" name="action" value="delete">
                   <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
-                  <button type="submit" style="padding:6px 14px; border-radius:6px; font-size:0.78rem; border:1.5px solid var(--red); color:var(--red); background:transparent;">Delete</button>
+                  <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
                 </form>
               </td>
             </tr>
@@ -405,6 +411,24 @@ $eventTypeChecked = fn(string $type) => (($f['event_type'] ?? '') === $type) ? '
 
 </div>
 
+<script>
+// Venue type decides which field is required: the venue (on/off-campus) or the link (online).
+(function () {
+  var venue = document.getElementById('venue');
+  var link = document.getElementById('online_event_link');
+  function sync() {
+    var checked = document.querySelector('input[name="venue_type"]:checked');
+    var online = checked && checked.value === 'online';
+    venue.required = !online;
+    link.required = online;
+    document.querySelector('[data-venue-req]').hidden = online;
+    document.querySelector('[data-link-req]').hidden = !online;
+  }
+  document.querySelectorAll('input[name="venue_type"]').forEach(function (r) { r.addEventListener('change', sync); });
+  sync();
+})();
+</script>
 <script src="../assets/js/sidebar.js"></script>
+<?= presence_script_tag() ?>
 </body>
 </html>

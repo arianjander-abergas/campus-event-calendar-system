@@ -1,0 +1,75 @@
+<?php
+require_once __DIR__ . '/../../config/supabase.php';
+
+$error = null;
+$success = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = post_param('email');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please enter the email address you signed up with.';
+    } else {
+        $result = supabase_auth_recover($email);
+        if ($result['ok']) {
+            $success = $result['message'];
+        } else {
+            $error = $result['message'];
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forgot Password — Campus Event Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="../assets/css/auth.css">
+</head>
+<body class="login-page">
+
+<a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
+  <span class="login-logo-text">
+    <span class="campus">CAMPUS</span>
+    <span class="hub">EVENT HUB</span>
+  </span>
+</a>
+
+<main class="login-card">
+  <a href="login.php" class="login-close" aria-label="Back to login">
+    <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
+  </a>
+
+  <h1>Reset your password</h1>
+
+  <?php if ($error): ?>
+    <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
+  <?php endif; ?>
+
+  <?php if ($success): ?>
+    <div class="login-notice"><?= htmlspecialchars($success) ?></div>
+    <p class="login-help">The link opens a page where you can choose a new password.</p>
+  <?php else: ?>
+    <p class="login-help">Enter your email and we'll send you a link to choose a new password.</p>
+    <form method="POST" class="login-form">
+      <label for="email">Email Address</label>
+      <div class="login-field">
+        <span class="login-field-icon" aria-hidden="true">
+          <img src="../assets/images/login/icon-email.svg" alt="" width="28" height="28">
+        </span>
+        <input type="email" id="email" name="email" required autocomplete="email"
+               placeholder="name@email.lcup.edu.ph" value="<?= htmlspecialchars(post_param('email')) ?>">
+      </div>
+      <button type="submit" class="login-btn login-submit">Send reset link</button>
+    </form>
+  <?php endif; ?>
+</main>
+
+<p class="login-signup">Remembered it? <a href="login.php">Back to login</a></p>
+
+</body>
+</html>

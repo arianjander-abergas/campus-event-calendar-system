@@ -1,0 +1,95 @@
+/* ============================================================
+   Campus Event Hub — printable pages (admin/attendance-print.php)
+   A4 portrait. On screen the page shows as a sheet of paper with a
+   toolbar above it; the toolbar is left out when printing.
+   ============================================================ */
+
+:root {
+  --ink: #111827;
+  --muted: #4b5563;
+  --rule: #9ca3af;
+  --navy: #0e2a5e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #e5e7eb;
+  color: var(--ink);
+  font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  font-size: 12px;
+}
+a { color: inherit; }
+
+/* ---- Toolbar (screen only) ---- */
+.print-toolbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  padding: 12px 20px; background: var(--navy); color: #fff; font-size: 13px;
+}
+.tb-back { color: #cdd8ef; text-decoration: none; font-weight: 600; }
+.tb-back:hover { color: #fff; }
+.tb-modes { display: flex; gap: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 3px; }
+.tb-modes a { padding: 6px 12px; border-radius: 6px; color: #cdd8ef; text-decoration: none; font-weight: 600; }
+.tb-modes a.active { background: #fff; color: var(--navy); }
+.tb-blank { display: flex; align-items: center; gap: 8px; margin: 0; }
+.tb-blank input { width: 56px; padding: 4px 6px; border-radius: 6px; border: none; font: inherit; }
+.tb-blank button { padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; font: inherit; cursor: pointer; }
+.tb-print {
+  margin-left: auto; padding: 8px 22px; border: none; border-radius: 999px;
+  background: #f4622c; color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+}
+.tb-print:hover { background: #d94f1e; }
+
+/* ---- The sheet ---- */
+.sheet {
+  width: 210mm; min-height: 297mm; margin: 20px auto; padding: 14mm 14mm 12mm;
+  background: #fff; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+.sheet-head {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 10px; margin-bottom: 12px; border-bottom: 2px solid var(--ink);
+}
+.sheet-logo { width: 70px; height: 70px; object-fit: contain; flex-shrink: 0; }
+.sheet-head-text { flex: 1; text-align: center; line-height: 1.35; }
+.sheet-head-text span { display: block; font-size: 12px; color: var(--muted); }
+.sheet-school { display: block; font-size: 16px; text-transform: uppercase; letter-spacing: 0.03em; }
+.sheet-head-text h1 { margin: 6px 0 0; font-size: 17px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.sheet-details { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin: 0 0 12px; }
+.sheet-details div { display: flex; gap: 6px; }
+.sheet-details dt { font-weight: 700; white-space: nowrap; }
+.sheet-details dt::after { content: ":"; }
+.sheet-details dd { margin: 0; }
+
+.sheet-table { width: 100%; border-collapse: collapse; }
+.sheet-table th, .sheet-table td { border: 1px solid var(--rule); padding: 6px 7px; text-align: left; vertical-align: middle; }
+.sheet-table th { background: #f1f3f6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+.sheet-table tbody tr { height: 30px; }
+.sheet-table .col-no { width: 34px; text-align: center; }
+.sheet-table .col-time { width: 70px; text-align: center; white-space: nowrap; }
+.sheet-table .col-sign { width: 130px; }
+.sheet-empty { text-align: center !important; color: var(--muted); padding: 18px !important; }
+
+.sheet-summary { margin: 12px 0 0; font-size: 12.5px; }
+.sheet-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 50px; break-inside: avoid; }
+.sheet-signatures div { border-top: 1px solid var(--ink); padding-top: 4px; text-align: center; }
+.sheet-signatures strong { display: block; }
+.sheet-signatures span { display: block; font-size: 11px; color: var(--muted); }
+.sheet-foot { margin: 24px 0 0; font-size: 10px; color: var(--muted); text-align: right; }
+
+@media (max-width: 860px) {
+  .sheet { width: auto; min-height: 0; margin: 12px; padding: 16px; overflow-x: auto; }
+  .sheet-details { grid-template-columns: 1fr; }
+  .sheet-table { font-size: 11px; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff; }
+  .print-toolbar { display: none; }
+  .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .sheet-table thead { display: table-header-group; } /* repeat the header on every page */
+  .sheet-table tr { break-inside: avoid; }
+}
