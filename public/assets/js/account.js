@@ -3,8 +3,8 @@
  * (includes/account-fields.php):
  *  - Student / Faculty: the student-only fields show (and are required) for students.
  *  - Department: the Organization list shows only that department's organizations.
- *  - Irregular: opens the pop-up to tick the year levels of the student's
- *    subjects (the highest year level is always ticked; higher ones can't be).
+ *  - Irregular: opens the pop-up to pick the year levels of the student's
+ *    subjects (the highest year level is always picked; higher ones can't be).
  * The server checks everything again (validate_account_fields()).
  */
 document.addEventListener("DOMContentLoaded", () => {
@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const irregular = form.querySelector('input[name="student_type"]:checked')?.value === "irregular";
     summary.hidden = !irregular;
     const levels = chosenLevels();
-    summaryText.textContent = confirmed && levels.length ? "Irregular · subjects in " + describe(levels) : "Irregular · tick your year levels";
+    summaryText.textContent = confirmed && levels.length ? "Irregular · subjects in " + describe(levels) : "Irregular · pick your year levels";
   }
   function open() {
     if (!year?.value) {
@@ -114,7 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
   modal.querySelector("[data-irregular-confirm]").addEventListener("click", () => {
     const levels = chosenLevels();
     let message = "";
-    if (levels.length < 2) message = "Tick at least one year level besides your highest year level. If all your subjects are in one year level, you're a regular student.";
+    if (levels.length < 2) message = "Pick at least one year level besides your highest year level. If all your subjects are in one year level, you're a regular student.";
     else if (!ack.checked) message = "Please confirm that these are the year levels of your enrolled subjects.";
     if (message) {
       error.textContent = message;
