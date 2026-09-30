@@ -40,7 +40,7 @@ $topbarSearch = true;
 
     <?php if ($toEvaluate): ?>
       <section class="eval-callout" aria-labelledby="evalCalloutTitle">
-        <h2 id="evalCalloutTitle">📝 Please evaluate <?= count($toEvaluate) === 1 ? 'an event' : count($toEvaluate) . ' events' ?> you attended</h2>
+        <h2 id="evalCalloutTitle"><?= icon('evaluation', 20) ?> Please evaluate <?= count($toEvaluate) === 1 ? 'an event' : count($toEvaluate) . ' events' ?> you attended</h2>
         <div class="eval-callout-list">
           <?php foreach (array_slice($toEvaluate, 0, 4) as $ev): ?>
             <a href="evaluate.php?event=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
@@ -89,7 +89,7 @@ $topbarSearch = true;
             <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-              <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars(event_place($ev)) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
             </div>
             <?php if ($toEvaluate): ?>
               <span class="mini-badge badge-evaluate">Evaluate</span>
@@ -120,9 +120,9 @@ $topbarSearch = true;
             <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-              <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars(event_place($ev)) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
             </div>
-            <span class="mini-going">👥 <?= (int) $ev['going'] ?> going</span>
+            <span class="mini-going"><?= icon('people', 13) ?> <?= (int) $ev['going'] ?> going</span>
           </a>
         <?php endforeach; ?>
       </div>
@@ -184,7 +184,7 @@ $topbarSearch = true;
       <?php foreach (array_slice($notifications, 0, 5) as $n): ?>
         <?php $annHref = !empty($n['event_id']) ? '../event-details.php?id=' . urlencode($n['event_id']) : null; ?>
         <<?= $annHref ? 'a href="' . htmlspecialchars($annHref) . '"' : 'div' ?> class="announcement-item<?= ($n['status'] ?? '') !== 'read' ? ' unread' : '' ?>">
-          <span class="ann-icon info" aria-hidden="true">📣</span>
+          <span class="ann-icon info" aria-hidden="true"><?= icon('megaphone', 18) ?></span>
           <div>
             <div class="ann-title"><?= htmlspecialchars($n['title']) ?></div>
             <div class="ann-date"><?= htmlspecialchars(format_event_date($n['created_at'])) ?></div>

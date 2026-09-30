@@ -31,7 +31,7 @@ $headerLink = fn(string $key): string => $activePage === $key ? ' class="active"
 
   <div class="header-right">
     <form class="search-box" action="<?= BASE_URL ?>/events.php" method="get" role="search">
-      <span aria-hidden="true">🔍</span>
+      <?= icon('search', 16) ?>
       <input type="search" name="q" value="<?= htmlspecialchars(get_param('q')) ?>" placeholder="Search for events, organizations, or keywords" aria-label="Search events">
     </form>
     <?php if ($headerUser): ?>

@@ -22,16 +22,16 @@ $cardOrg = $ev['organizations'] ?? null;
   </div>
   <div class="event-body">
     <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-    <div class="event-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?><?= !empty($ev['start_time']) ? ' · ' . htmlspecialchars(format_event_time($ev['start_time'])) : '' ?></div>
+    <div class="event-meta"><?= icon('calendar', 14) ?> <?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?><?= !empty($ev['start_time']) ? ' · ' . htmlspecialchars(format_event_time($ev['start_time'])) : '' ?></div>
     <?php if ($cardOnline): ?>
-      <div class="event-meta">💻 Online (Webinar)</div>
+      <div class="event-meta"><?= icon('online', 14) ?> Online (Webinar)</div>
     <?php else: ?>
-      <div class="event-meta">📍 <?= htmlspecialchars(event_place($ev)) ?><?= !empty($ev['venue_type']) ? ' · ' . htmlspecialchars(label_of(VENUE_TYPES, $ev['venue_type'], '')) : '' ?></div>
+      <div class="event-meta"><?= icon('location', 14) ?> <?= htmlspecialchars(event_place($ev)) ?><?= !empty($ev['venue_type']) ? ' · ' . htmlspecialchars(label_of(VENUE_TYPES, $ev['venue_type'], '')) : '' ?></div>
     <?php endif; ?>
     <?php if (!empty($ev['audience'])): ?>
-      <div class="event-meta">🎓 For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'], '')) ?></div>
+      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'], '')) ?></div>
     <?php endif; ?>
-    <div class="event-meta">👥 <?= get_registration_count((string) $ev['id']) ?> going</div>
+    <div class="event-meta"><?= icon('people', 14) ?> <?= get_registration_count((string) $ev['id']) ?> going</div>
     <?php if (!empty($cardOrg['name'])): ?>
       <div class="event-org">
         <?php if (!empty($cardOrg['logo_url'])): ?>

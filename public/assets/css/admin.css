@@ -34,7 +34,7 @@
 .admin-card-title { font-size: 1rem; margin: 0 0 16px; }
 .admin-card-links { display: flex; flex-direction: column; gap: 10px; }
 .admin-card-links .admin-card-title { margin-bottom: 4px; }
-.admin-card-links a { color: var(--blue-accent); font-weight: 600; font-size: 0.88rem; }
+.admin-card-links a { display: flex; align-items: center; gap: 8px; color: var(--blue-accent); font-weight: 600; font-size: 0.88rem; }
 .admin-card-links a:hover { text-decoration: underline; }
 
 .admin-label {

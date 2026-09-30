@@ -170,14 +170,14 @@ if ($event) {
             <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
-          <div class="ed-meta-row"><?= ($event['venue_type'] ?? '') === 'online' ? '💻' : '🏫' ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
-          <div class="ed-meta-row">🎓 For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?></div>
+          <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
+          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?></div>
           <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
-            <div class="ed-meta-row">🔗 <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
+            <div class="ed-meta-row"><?= icon('link', 12) ?> <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
           <?php endif; ?>
-          <div class="ed-meta-row">👥 <?= $going ?> going<?= !empty($event['registration_limit']) ? ' · ' . (int) $event['registration_limit'] . ' slots' : '' ?></div>
+          <div class="ed-meta-row"><?= icon('people', 12) ?> <?= $going ?> going<?= !empty($event['registration_limit']) ? ' · ' . (int) $event['registration_limit'] . ' slots' : '' ?></div>
           <?php if (!empty($event['contact_email']) || !empty($event['contact_number'])): ?>
-            <div class="ed-meta-row">✉️ <?= htmlspecialchars(implode(' · ', array_filter([$event['contact_email'] ?? '', $event['contact_number'] ?? '']))) ?></div>
+            <div class="ed-meta-row"><?= icon('email', 12) ?> <?= htmlspecialchars(implode(' · ', array_filter([$event['contact_email'] ?? '', $event['contact_number'] ?? '']))) ?></div>
           <?php endif; ?>
         </div>
 

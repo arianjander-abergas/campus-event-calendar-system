@@ -29,7 +29,7 @@ $organizations = get_organizations();
     <a href="events.php" class="btn btn-primary">EXPLORE EVENTS</a>
   </div>
   <div class="hero-badge">
-    <span class="circle">📣</span>
+    <span class="circle"><?= icon('megaphone', 22) ?></span>
     STAY UPDATED
   </div>
 </section>
@@ -39,28 +39,28 @@ $organizations = get_organizations();
 
   <section class="feature-strip">
     <div class="feature-item">
-      <span class="feature-icon">📅</span>
+      <span class="feature-icon"><?= icon('calendar', 22) ?></span>
       <div>
         <div class="feature-title">All Campus Events</div>
         <div class="feature-sub">Find academic, innovative and more.</div>
       </div>
     </div>
     <div class="feature-item">
-      <span class="feature-icon">👥</span>
+      <span class="feature-icon"><?= icon('people', 22) ?></span>
       <div>
         <div class="feature-title">Easy Participation</div>
         <div class="feature-sub">Register in just a few clicks.</div>
       </div>
     </div>
     <div class="feature-item">
-      <span class="feature-icon">🔔</span>
+      <span class="feature-icon"><?= icon('bell', 22) ?></span>
       <div>
         <div class="feature-title">Stay Updated</div>
         <div class="feature-sub">Get notified about new and changed events.</div>
       </div>
     </div>
     <div class="feature-item">
-      <span class="feature-icon">🎓</span>
+      <span class="feature-icon"><?= icon('certificate', 22) ?></span>
       <div>
         <div class="feature-title">Earn Certificates</div>
         <div class="feature-sub">Get recognized for your participation.</div>
@@ -121,10 +121,10 @@ $organizations = get_organizations();
       </div>
     </div>
     <ul class="about-points">
-      <li><span>🔎</span><div><strong>Discover</strong>Search events by keyword, organization, category or type.</div></li>
-      <li><span>📝</span><div><strong>Register</strong>Save your seat before the deadline — capacity is tracked live.</div></li>
-      <li><span>🔔</span><div><strong>Stay informed</strong>Get notified about new events, updates and cancellations.</div></li>
-      <li><span>🏛️</span><div><strong>Meet the organizers</strong>See each organization's officers and upcoming events.</div></li>
+      <li><span><?= icon('search', 24) ?></span><div><strong>Discover</strong>Search events by keyword, organization, category or type.</div></li>
+      <li><span><?= icon('register', 24) ?></span><div><strong>Register</strong>Save your seat before the deadline — capacity is tracked live.</div></li>
+      <li><span><?= icon('bell', 24) ?></span><div><strong>Stay informed</strong>Get notified about new events, updates and cancellations.</div></li>
+      <li><span><?= icon('organizations', 24) ?></span><div><strong>Meet the organizers</strong>See each organization's officers and upcoming events.</div></li>
     </ul>
   </section>
 

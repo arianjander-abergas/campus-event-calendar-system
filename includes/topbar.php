@@ -13,7 +13,7 @@ $unreadCount = unread_count($notifications);
 <header class="dash-topbar">
   <?php if (!empty($topbarSearch)): ?>
     <form class="search-box" action="<?= BASE_URL ?>/events.php" method="get" role="search">
-      <span aria-hidden="true">🔍</span>
+      <?= icon('search', 16) ?>
       <input type="search" name="q" placeholder="Search for events, organizations, or keywords" aria-label="Search events">
     </form>
   <?php else: ?>
@@ -32,7 +32,7 @@ $unreadCount = unread_count($notifications);
   <div class="topbar-right">
     <div class="notif" data-notifications>
       <button class="bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
-        🔔<span class="dot" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
+        <?= icon('bell', 20) ?><span class="dot" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
       </button>
       <div class="notif-dropdown" data-notif-dropdown hidden>
         <div class="notif-head">Notifications</div>
@@ -47,7 +47,7 @@ $unreadCount = unread_count($notifications);
           <span class="user-name"><?= htmlspecialchars($topUser['full_name'] ?? '') ?></span>
           <span class="user-role"><?= htmlspecialchars(role_display($topUser['role'] ?? 'user')) ?></span>
         </span>
-        <span class="user-caret" aria-hidden="true">▾</span>
+        <span class="user-caret" aria-hidden="true"><?= icon('chevron-down', 12) ?></span>
       </summary>
       <div class="user-dropdown">
         <a href="<?= BASE_URL ?>/enduser/profile.php">My Profile</a>
