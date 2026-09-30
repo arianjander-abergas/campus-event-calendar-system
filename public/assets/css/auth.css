@@ -4,7 +4,7 @@
 
    IMAGE SLOTS (placeholders to replace — keep the same file names,
    or change the matching <img src> in auth/login.php):
-     SLOT 1  Logo mark ............ images/login/logo-mark.svg   72×68
+     SLOT 1  School logo ........... images/school-logo.png (config SCHOOL_LOGO) 72×68
      SLOT 2  Close (✕) button ..... images/login/icon-close.svg  26×26
      SLOT 3  Email field icon ..... images/login/icon-email.svg  28×28
      SLOT 4  Eye (pw hidden) ...... images/login/icon-eye-off.svg 28×28
@@ -206,7 +206,40 @@ button.login-field-icon { cursor: pointer; }
 }
 .login-signup a { color: var(--login-link); font-weight: 600; }
 
+/* Messages from the previous page (e.g. "Your password was changed."). */
+.login-card .flash { margin: -18px 0 16px 12px; border-radius: 6px; }
+.login-notice a, .login-alert a { color: inherit; font-weight: 700; text-decoration: underline; }
+.login-help { margin: -14px 0 18px 12px; font-size: 0.85rem; color: #555; line-height: 1.5; }
+.login-help a { color: var(--login-link); font-weight: 600; }
+
+/* Plain inputs / selects (sign-up, new password) in the same grey style. */
+.login-input {
+  width: 100%;
+  height: 40px;
+  margin-bottom: 18px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--login-field);
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: #222;
+  outline: none;
+}
+.login-input::placeholder { color: #8a8a8a; }
+.login-input:focus { box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.45); }
+.login-optional { font-size: 0.8rem; color: #888; }
+
+/* ---- Sign-up ---- */
+.register-card { max-width: 620px; }
+.register-card h1 { margin-bottom: 28px; }
+.register-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.register-full { grid-column: 1 / -1; }
+.register-form label { font-size: 0.95rem; margin-bottom: 8px; }
+.register-form .login-submit { margin-top: 6px; }
+
 @media (max-width: 520px) {
+  .register-grid { grid-template-columns: 1fr; }
   .login-card { padding: 24px 20px 32px; }
   .login-form { padding-left: 0; }
   .login-socials { gap: 14px; }
