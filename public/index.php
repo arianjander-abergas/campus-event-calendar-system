@@ -1,11 +1,13 @@
 <?php
 require_once __DIR__ . '/../config/supabase.php';
 
-$activePage = 'home';
 $events = get_upcoming_events(8);          // today's events first, then the next dates
 $stats = get_site_stats();                 // refreshed every 30s by main.js wireLiveStats()
 $todayEvents = get_events_today();
 $organizations = get_organizations();
+
+$activeNav = 'home';
+$topbarSearch = true;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -17,8 +19,12 @@ $organizations = get_organizations();
 </head>
 <body>
 
-<?php include __DIR__ . '/../includes/header.php'; ?>
+<div class="dashboard-shell no-rail">
 
+<?php include __DIR__ . '/../includes/nav.php'; ?>
+<?php include __DIR__ . '/../includes/topbar.php'; ?>
+
+<main class="dash-main public-main">
 <section class="hero">
   <div class="hero-bg" style="background-image:url('assets/images/campus-hero.jpg');"></div>
   <div class="hero-overlay"></div>
@@ -142,7 +148,11 @@ $organizations = get_organizations();
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+</main>
 
+</div>
+
+<script src="assets/js/sidebar.js"></script>
 <script src="assets/js/main.js"></script>
 <?= presence_script_tag() ?>
 </body>

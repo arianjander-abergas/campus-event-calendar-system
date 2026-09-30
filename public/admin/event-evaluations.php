@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin: evaluation results of one event — responses, the mean of every
+ * Admins and the event's moderators: evaluation results of one event — responses, the mean of every
  * rating question with its verbal interpretation, how the ratings were
  * spread, and the written answers. Anonymous (no names). Print-ready and
  * downloadable as CSV (one row per response).
@@ -8,15 +8,8 @@
 require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../includes/charts.php';
 
-$user = require_admin();
-
 $eventId = get_param('event');
-$event = is_uuid($eventId) ? get_event_admin($eventId) : null;
-if (!$event) {
-    flash('error', "That event doesn't exist anymore.");
-    header('Location: event-organizer.php');
-    exit;
-}
+[$user, $event] = require_event_manager($eventId); // admins, or moderators of the event's organization
 $back = 'event-evaluations.php?event=' . urlencode($eventId);
 
 $registrations = get_event_registrations_admin($eventId);
@@ -58,7 +51,7 @@ if (get_param('export') === 'csv') {
 }
 
 $org = $event['organizations'] ?? null;
-$activeNav = 'admin-events';
+$activeNav = 'manage-events';
 $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Evaluation Results', null]];
 ?>
 <!DOCTYPE html>

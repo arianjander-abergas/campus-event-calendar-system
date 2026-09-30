@@ -99,7 +99,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
       Once someone has answered a question it can't be deleted, only hidden, so past results stay complete.</p>
 
     <div class="admin-split">
-      <form method="POST" action="evaluation-form.php<?= $isEditing ? '?edit=' . urlencode($f['id']) : '' ?>" class="admin-card">
+      <form method="POST" action="evaluation-form.php<?= $isEditing ? '?edit=' . urlencode($f['id']) : '' ?>" class="admin-card" data-autoreset>
         <input type="hidden" name="action" value="save_question">
         <?php if ($isEditing): ?><input type="hidden" name="id" value="<?= $val('id') ?>"><?php endif; ?>
         <h2 class="admin-card-title"><?= $isEditing ? 'Edit Question' : 'Add Question' ?></h2>
@@ -194,6 +194,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

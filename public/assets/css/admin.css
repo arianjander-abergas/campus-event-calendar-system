@@ -430,3 +430,55 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 /* Bulk attendance bar (admin/event-registrations.php) */
 .bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 12px; font-size: 0.82rem; font-weight: 600; }
 .admin-table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+
+/* ============================================================
+   Panel suggestions: roles, account fields, schedule clashes, import
+   ============================================================ */
+.admin-hint-block { margin: -8px 0 12px; }
+.profile-year { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; }
+.admin-card .acct-type legend { font-size: 0.8rem; font-weight: 700; margin-bottom: 6px; }
+
+/* Manage Events: other events on the chosen dates / clashes */
+.schedule-hint { margin-top: 12px; padding: 10px 14px; border-radius: 10px; background: #f8f9fb; border: 1px solid var(--border); font-size: 0.8rem; }
+.schedule-hint p { margin: 0 0 4px; }
+.schedule-hint ul { margin: 4px 0 0; padding-left: 18px; list-style: disc; color: #374151; line-height: 1.5; }
+.schedule-clash { color: #b42318; }
+.schedule-others { font-weight: 700; color: var(--navy); }
+.schedule-ok { color: #166534; font-weight: 600; }
+
+/* Users & Roles */
+.users-filter { flex-wrap: wrap; }
+.users-filter select.admin-input { width: auto; }
+.roles-panel summary { cursor: pointer; font-size: 0.9rem; }
+.roles-panel[open] summary { margin-bottom: 12px; }
+.roles-table td:not(:first-child), .roles-table th:not(:first-child) { text-align: center; white-space: nowrap; }
+.perm-yes { color: #166534; font-weight: 800; }
+.perm-no { color: #9ca3af; }
+.perm-some { font-size: 0.74rem; font-weight: 700; color: #1a4f9c; background: #eaf2fd; padding: 2px 8px; border-radius: 999px; }
+.role-admin { background: #e0e7ff; color: #3730a3; }
+.role-moderator { background: #fff1e8; color: #9a3412; }
+.role-user { background: #f3f4f6; color: #4b5563; }
+.role-form { flex-wrap: nowrap; }
+.role-select { width: auto; padding: 6px 8px; font-size: 0.78rem; }
+.inline-edit { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inline-edit .admin-input { width: 130px; padding: 6px 8px; font-size: 0.8rem; }
+
+/* Import & Verify */
+.import-top { margin-bottom: 4px; }
+.import-help h2 { font-size: 1rem; margin: 0 0 10px; }
+.import-help ul { margin: 0; padding-left: 18px; list-style: disc; font-size: 0.84rem; line-height: 1.6; color: #374151; }
+.import-results .kpi-value { font-size: 1.6rem; }
+.import-ok { color: #166534 !important; }
+.import-warn { color: #b45309 !important; }
+.import-bad { color: #b42318 !important; }
+.import-action { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 16px; }
+.import-action form { margin: 0; }
+.import-group { border-top: 1px solid var(--border); padding: 12px 0; }
+.import-group summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; color: var(--navy); }
+.import-group[open] summary { margin-bottom: 10px; }
+.import-count { display: inline-block; min-width: 24px; padding: 1px 8px; margin-left: 6px; border-radius: 999px; background: #eef2f7; font-size: 0.74rem; text-align: center; }
+.import-none { padding: 4px 0; }
+/* Labels at the top of a grid cell still need their gap (admin forms). */
+.acct-grid .admin-label, .acct-grid .acct-label, [data-year-levels] .admin-label { margin-top: 14px; }
+.admin-card .acct-type { margin-top: 14px; }
+.admin-card .acct-status { margin-bottom: 0; }

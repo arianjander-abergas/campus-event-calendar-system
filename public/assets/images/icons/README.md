@@ -20,19 +20,19 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `dashboard.svg` | DSH | Dashboard | Sidebar |
 | `ticket.svg` | TKT | Events group | Sidebar ("Events" dropdown) |
 | `chevron-down.svg` | CHV | Dropdown arrow | Sidebar "Events" dropdown, user menu in the top bar |
-| `list.svg` | LST | All events | Sidebar |
+| `list.svg` | LST | Next event | Sidebar "Next Event" |
 | `check.svg` | CHK | My events | Sidebar |
-| `calendar.svg` | CAL | Date / calendar | Sidebar "Next Event", event cards, dashboard lists, organizations page, evaluation page, home "All Campus Events" |
+| `calendar.svg` | CAL | Date / calendar | Sidebar "Event Calendar", event cards, dashboard lists, organizations page, evaluation page, home "All Campus Events" |
 | `organizations.svg` | ORG | Organizations | Sidebar, home About section |
-| `profile.svg` | PRF | My profile | Sidebar |
+| `profile.svg` | PRF | My profile | Sidebar ("My Profile", or "Log in" when logged out) |
 | `chart.svg` | CHT | Admin dashboard | Sidebar (admin) |
-| `tools.svg` | TLS | Manage events | Sidebar (admin) |
+| `tools.svg` | TLS | Manage events | Sidebar (admin + moderator) |
 | `reports.svg` | RPT | Reports | Sidebar (admin) |
 | `evaluation.svg` | EVL | Evaluation | Sidebar (admin), dashboard "Please evaluate" box, Manage Events side links |
 | `tag.svg` | TAG | Categories | Sidebar (admin) |
 | `schedule.svg` | SCH | School calendar / schedule | Sidebar (admin), Manage Events "Edit the schedule" |
-| `people.svg` | PPL | People / going / users | Sidebar (admin Users), event cards "N going", event details, dashboard trending, home "Easy Participation", Manage Events |
-| `search.svg` | SRC | Search | Header and top-bar search boxes, home About "Discover" |
+| `people.svg` | PPL | People / going / users | Sidebar (admin "Users & Roles", moderator "Our Officers"), event cards "N going", event details, dashboard trending, home "Easy Participation", Manage Events |
+| `search.svg` | SRC | Search | Top-bar search box, home About "Discover" |
 | `bell.svg` | BEL | Notifications | Top-bar bell, home "Stay Updated" + About |
 | `location.svg` | LOC | Venue | Event cards, dashboard lists, organizations page, evaluation page |
 | `online.svg` | ONL | Online event | Event cards, event details |
@@ -44,6 +44,7 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `megaphone.svg` | MEG | Announcements | Home hero "Stay Updated" badge, dashboard Announcements |
 | `print.svg` | PRT | Print | Manage Events "Print the attendance sheet" |
 | `view.svg` | VEW | View page | Manage Events "View the event page" |
-| `register.svg` | REG | Register | Home About "Register" |
+| `register.svg` | REG | Register | Home About "Register", sidebar "Sign up" (logged out) |
+| `import.svg` | IMP | Import & Verify (Excel upload) | Sidebar (admin + moderator) |
 
 The login page (`../login/`) and the event details page (`../event-details/`) have their own numbered image slots — see the `IMAGE SLOT` comments in those pages.

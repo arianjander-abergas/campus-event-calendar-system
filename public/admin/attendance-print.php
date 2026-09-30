@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin: printable attendance for one event (A4).
+ * Admins and the event's moderators: printable attendance for one event (A4).
  *   ?mode=sheet  (default) attendance sheet to sign at the event: everyone
  *                registered, a blank signature column and extra rows for walk-ins
  *   ?mode=report attendance report after the event: attendees with their
@@ -8,15 +8,8 @@
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
-
 $eventId = get_param('event');
-$event = is_uuid($eventId) ? get_event_admin($eventId) : null;
-if (!$event) {
-    flash('error', "That event doesn't exist anymore.");
-    header('Location: event-organizer.php');
-    exit;
-}
+[$user, $event] = require_event_manager($eventId); // admins, or moderators of the event's organization
 
 $mode = get_param('mode') === 'report' ? 'report' : 'sheet';
 $blankRows = $mode === 'sheet' ? max(0, min(40, (int) (get_param('blank') !== '' ? get_param('blank') : 5))) : 0;

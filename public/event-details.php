@@ -56,14 +56,17 @@ $programCards = get_upcoming_events(3, $eventId ?: null);
 $notifications = get_my_notifications();
 $unreadCount = unread_count($notifications);
 
-$isAdmin = ($user['role'] ?? '') === 'admin';
+// Admins, and moderators of the event's organization, get the management links.
+$canManage = $event && can_manage_event($event, $user);
+$openTo = $event ? year_levels_label($event['year_levels'] ?? []) : '';
 
 // Banner for events that aren't simply "published and upcoming".
 $banner = null;
 if ($event) {
     if ($event['status'] === 'cancelled') $banner = ['error', 'This event was cancelled.'];
-    elseif ($event['status'] === 'draft') $banner = ['info', 'Draft — only admins can see this event until it is published.'];
-    elseif ($event['status'] === 'completed' || ($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
+    elseif ($event['status'] === 'draft') $banner = ['info', "Draft — only admins and its organization's moderators can see this event until it is published."];
+    elseif ($event['status'] === 'completed') $banner = ['info', 'Completed — this event has ended.'];
+    elseif (($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
 }
 ?>
 <!DOCTYPE html>
@@ -113,7 +116,7 @@ if ($event) {
           <img src="<?= $img ?>avatar.svg" alt="" class="ed-avatar" width="50" height="50">
           <span class="ed-user-text">
             <span class="ed-user-name"><?= htmlspecialchars($user['full_name']) ?></span>
-            <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'])) ?></span>
+            <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></span>
           </span>
           <!-- IMAGE SLOT 11: User menu arrow | file: assets/images/event-details/icon-chevron-down.svg | 18×18 -->
           <img src="<?= $img ?>icon-chevron-down.svg" alt="" class="ed-user-chevron" width="18" height="18">
@@ -171,7 +174,7 @@ if ($event) {
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
           <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
-          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?></div>
+          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?><?= $openTo !== '' && ($event['audience'] ?? '') !== 'faculty' ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
           <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
             <div class="ed-meta-row"><?= icon('link', 12) ?> <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
           <?php endif; ?>
@@ -208,7 +211,7 @@ if ($event) {
               <?php if ($attended && !$evaluated): ?>
                 <a href="enduser/evaluate.php?event=<?= urlencode($eventId) ?>" class="ed-btn ed-btn-evaluate">Evaluate this event</a>
               <?php else: ?>
-                <button class="ed-btn" disabled><?= $reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓' ?></button>
+                <button class="ed-btn" disabled><?= $evaluated ? 'Completed ✓' : ($reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓') ?></button>
               <?php endif; ?>
               <?php if ($reg['can_cancel']): ?>
                 <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" onsubmit="return confirm('Cancel your registration for this event?');">
@@ -218,10 +221,10 @@ if ($event) {
               <?php endif; ?>
             </div>
             <?php if ($attended): ?>
-              <p class="ed-eval-note"><?= $evaluated ? 'Evaluation submitted. Thank you for your feedback!' : 'Thanks for attending! Please tell us how the event went.' ?></p>
+              <p class="ed-eval-note"><?= $evaluated ? 'Completed: you attended and your evaluation was submitted. Thank you for your feedback!' : 'Thanks for attending! Please tell us how the event went.' ?></p>
             <?php endif; ?>
           <?php endif; ?>
-          <?php if ($isAdmin): ?>
+          <?php if ($canManage): ?>
             <div class="ed-admin-links">
               <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
               <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Edit schedule</a>
@@ -262,7 +265,7 @@ if ($event) {
       <h2 class="ed-schedule-title">Schedule</h2>
 
       <?php if (empty($schedule)): ?>
-        <p class="ed-empty">No schedule posted yet.<?php if ($isAdmin && $event): ?> <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Add one</a>.<?php endif; ?></p>
+        <p class="ed-empty">No schedule posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Add one</a>.<?php endif; ?></p>
       <?php else: ?>
       <!-- event_programs rows in sort_order; speaker shown on the right -->
       <div class="ed-schedule-head">Event Program</div>
