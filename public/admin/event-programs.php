@@ -1,16 +1,9 @@
 <?php
-/** Admin: an event's schedule (event_programs) — add, edit, reorder, delete. */
+/** Admins and the event's moderators: an event's schedule (event_programs) — add, edit, reorder, delete. */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
-
 $eventId = get_param('event');
-$event = is_uuid($eventId) ? get_event_admin($eventId) : null;
-if (!$event) {
-    flash('error', "That event doesn't exist anymore.");
-    header('Location: event-organizer.php');
-    exit;
-}
+[$user, $event] = require_event_manager($eventId); // admins, or moderators of the event's organization
 $back = 'event-programs.php?event=' . urlencode($eventId);
 $errors = [];
 
@@ -59,7 +52,7 @@ if ($errors) {
 }
 $val = fn(string $key) => htmlspecialchars((string) ($editing[$key] ?? ''));
 
-$activeNav = 'admin-events';
+$activeNav = 'manage-events';
 $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Schedule', null]];
 ?>
 <!DOCTYPE html>
@@ -91,7 +84,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
     <div class="admin-split">
-      <form method="POST" action="<?= htmlspecialchars($back) ?>" class="admin-card">
+      <form method="POST" action="<?= htmlspecialchars($back) ?>" class="admin-card" data-autoreset>
         <input type="hidden" name="action" value="save">
         <?php if (!empty($editing['id'])): ?><input type="hidden" name="id" value="<?= $val('id') ?>"><?php endif; ?>
         <h2 class="admin-card-title"><?= !empty($editing['id']) ? 'Edit program' : 'Add a program' ?></h2>
@@ -153,6 +146,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

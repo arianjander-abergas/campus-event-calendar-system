@@ -1,24 +1,37 @@
 <?php
-/** Admin: create / edit / publish / cancel / delete events. */
+/**
+ * Manage Events: create / edit / publish / cancel events.
+ * Admins manage every event (and can delete); moderators manage their own
+ * organization's events. Events are refused if they duplicate another event
+ * (same title, same date) or double-book a venue; they're marked Completed
+ * automatically once they end.
+ */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin(); // non-admins are sent to the dashboard
+$user = require_staff(); // admins + moderators; everyone else goes to the dashboard
+$isAdmin = ($user['role'] ?? '') === 'admin';
 
 $categories = get_categories();
-$organizations = get_organizations();
+$organizations = get_event_organizations_for($user);
 
 $editId = get_param('edit');
 $editEvent = is_uuid($editId) ? get_event_admin($editId) : null;
-if ($editId !== '' && !$editEvent) {
-    flash('error', "That event doesn't exist anymore.");
+if ($editId !== '' && (!$editEvent || !can_manage_event($editEvent, $user))) {
+    flash('error', $editEvent ? "Moderators can only edit their own organization's events." : "That event doesn't exist anymore.");
     header('Location: event-organizer.php');
     exit;
 }
 $errors = [];
 
-// ---- Delete ----
+// The event a status / delete button acts on, if this user may manage it.
+$target = function (string $id) use ($user): ?array {
+    $ev = is_uuid($id) ? get_event_admin($id) : null;
+    return $ev && can_manage_event($ev, $user) ? $ev : null;
+};
+
+// ---- Delete (admins only; moderators cancel instead) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete') {
-    $result = delete_event_admin(post_param('id'));
+    $result = $target(post_param('id')) ? delete_event_admin(post_param('id')) : ['ok' => false, 'message' => "You can't delete that event."];
     flash($result['ok'] ? 'success' : 'error', $result['message']);
     header('Location: event-organizer.php');
     exit;
@@ -26,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete') 
 
 // ---- Status-only changes (Cancel / Mark Completed / Reopen as Draft) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_status') {
-    $result = set_event_status_admin(post_param('id'), post_param('status'));
+    $result = $target(post_param('id')) ? set_event_status_admin(post_param('id'), post_param('status')) : ['ok' => false, 'message' => "You can't change that event."];
     flash($result['ok'] ? 'success' : 'error', $result['message']);
     header('Location: event-organizer.php');
     exit;
@@ -35,7 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_statu
 // ---- Create / update ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $existingId = post_param('id');
-    $previous = is_uuid($existingId) ? get_event_admin($existingId) : null;
+    $previous = is_uuid($existingId) ? $target($existingId) : null;
+    if ($existingId !== '' && !$previous) {
+        flash('error', "You can't edit that event.");
+        header('Location: event-organizer.php');
+        exit;
+    }
     $intent = post_param('intent') === 'publish' ? 'publish' : 'draft';
     $sendNotification = isset($_POST['send_notification']);
 
@@ -43,16 +61,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $registrationLimit = post_param('registration_limit');
     $eventType = post_param('event_type', 'other');
     $audience = post_param('audience', 'students');
+    $audience = isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students';
     $venueType = post_param('venue_type', 'on_campus');
     $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
+    // Year levels that may register (none or all ticked = every year level; not used for faculty-only events).
+    $yearLevels = $audience === 'faculty' ? [] : parse_year_levels($_POST['year_levels'] ?? []);
+    if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
 
     // Collect everything typed FIRST, so a failed save re-shows the form filled in.
     $fields = [
         'title' => post_param('title'),
         'category_id' => post_param('category_id'),
-        'organization_id' => post_param('organization_id'),
+        'organization_id' => $isAdmin ? post_param('organization_id') : (string) $user['organization_id'],
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
-        'audience' => isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students',
+        'audience' => $audience,
+        'year_levels' => $yearLevels ?: null,
         'venue_type' => $venueType,
         'description' => post_param('description'),
         'start_date' => post_param('start_date'),
@@ -96,6 +119,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     }
     if ($fields['contact_email'] && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Contact email is not a valid email address.';
 
+    // No duplicates: the same title on the same date, or a venue booked twice at once.
+    // (The database refuses these too, even for events this user can't see.)
+    if (!$errors) {
+        $clash = find_schedule_conflicts($fields, $previous['id'] ?? null);
+        if ($clash['duplicate']) {
+            $errors[] = '"' . $clash['duplicate']['title'] . '" is already scheduled on ' . format_event_date($clash['duplicate']['start_date']) . '. Change the title or the date — the same event can\'t be entered twice.';
+        }
+        if ($clash['venue_conflict']) {
+            $c = $clash['venue_conflict'];
+            $errors[] = $fields['venue'] . ' is already booked for "' . $c['title'] . '" (' . event_when($c) . '). Choose another venue, date or time.';
+        }
+    }
+
     // Poster: an uploaded image wins over a pasted URL.
     if (!$errors) {
         $upload = upload_public_image('event-posters', $_FILES['poster_file'] ?? [], date('Y'));
@@ -110,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         $result = $previous ? update_event_admin($previous['id'], $fields) : create_event_admin($fields);
         if ($result['ok']) {
             $eventId = $previous['id'] ?? $result['event']['id'];
-            $message = $previous ? 'Event updated.' : 'Event created.';
+            $message = $previous ? 'Event updated.' : ($intent === 'publish' ? 'Event published.' : 'Draft saved.');
 
             // "Send Notification to Users": a newly published event goes to
             // everyone; changes to an already-published one go to registrants.
@@ -126,6 +162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
                     $message .= ' (Notifications could not be sent.)';
                 }
             }
+            // An event that's already over is marked Completed right away.
+            if ($fields['status'] === 'published') {
+                auto_complete_events(true);
+            }
+            // Published / saved: back to a clean form.
             flash('success', $message);
             header('Location: event-organizer.php');
             exit;
@@ -133,9 +174,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         $errors[] = $result['message'];
     }
 
-    // Fall through: re-show the form with what was typed + the errors.
-    $editEvent = $fields + ['id' => $previous['id'] ?? null];
-    $editId = $previous['id'] ?? '';
+    // Show the form again with what was typed + the errors — once. The
+    // redirect means refreshing the page doesn't post it again; refreshing
+    // or leaving and coming back shows a clean form.
+    if (!empty($_FILES['poster_file']['name'])) {
+        $errors[] = 'Choose the poster image again (files can\'t be kept after an error).';
+    }
+    remember_form('event', $fields + ['id' => $previous['id'] ?? null], $errors);
+    header('Location: event-organizer.php' . ($previous ? '?edit=' . urlencode($previous['id']) : '') . '#event-form');
+    exit;
+}
+
+// A form with errors from the save just above (shown once).
+$state = recall_form('event');
+if ($state && ($state['values']['id'] ?? '') === ($editEvent['id'] ?? '')) {
+    $editEvent = $state['values'];
+    $errors = $state['errors'];
 }
 
 $events = get_all_events_admin();
@@ -143,12 +197,15 @@ $counts = get_registration_counts();
 
 // Values to pre-fill the form with (event being edited, or a failed submission).
 $f = $editEvent ?? [];
+if (!$isAdmin) $f['organization_id'] = $user['organization_id'];
 $val = fn(string $key, $default = '') => htmlspecialchars((string) ($f[$key] ?? $default));
 $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0, 5)); // "13:30:00" -> "13:30"
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
+$formLevels = parse_year_levels($f['year_levels'] ?? []);
 
-$activeNav = 'admin-events';
-$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
+$myOrgName = $organizations[0]['name'] ?? '';
+$activeNav = 'manage-events';
+$breadcrumbs = [$isAdmin ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
 if ($editId) $breadcrumbs[] = ['Edit Event', null];
 ?>
 <!DOCTYPE html>
@@ -169,11 +226,14 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 
   <main class="dash-main">
     <h1 class="page-title"><?= $editId ? 'Edit Event' : 'Create New Event' ?></h1>
+    <?php if (!$isAdmin): ?>
+      <p class="admin-note">You're a <strong>moderator</strong> for <strong><?= htmlspecialchars($myOrgName) ?></strong>: you can create, publish, edit and cancel its events, and manage their schedules, registrations and attendance. Only admins can delete events.</p>
+    <?php endif; ?>
 
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
-    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" enctype="multipart/form-data">
+    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset>
       <input type="hidden" name="action" value="save">
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
@@ -198,6 +258,11 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
           </div>
           <div>
             <label class="admin-label" for="organization_id">Organization <span class="req">*</span></label>
+            <?php if (!$isAdmin): ?>
+              <input type="hidden" name="organization_id" value="<?= htmlspecialchars((string) $user['organization_id']) ?>">
+              <input type="text" id="organization_id" class="admin-input" value="<?= htmlspecialchars($myOrgName) ?>" readonly>
+              <p class="admin-hint">Moderators create events for their own organization.</p>
+            <?php else: ?>
             <select id="organization_id" name="organization_id" class="admin-input" required>
               <option value="">Select an organization</option>
               <?php foreach ($organizations as $o): ?>
@@ -206,6 +271,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             </select>
             <?php if (empty($organizations)): ?>
               <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
+            <?php endif; ?>
             <?php endif; ?>
           </div>
         </div>
@@ -222,6 +288,16 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
           <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
             <label class="admin-radio"><input type="radio" name="audience" value="<?= $key ?>" <?= ($f['audience'] ?? 'students') === $key ? 'checked' : '' ?>> <?= $label ?></label>
           <?php endforeach; ?>
+        </div>
+
+        <div data-year-levels>
+          <span class="admin-label">Open to Year Levels</span>
+          <div class="admin-radio-row">
+            <?php foreach (YEAR_LEVELS as $y => $label): ?>
+              <label class="admin-radio"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
+            <?php endforeach; ?>
+          </div>
+          <p class="admin-hint">Leave all unticked to open the event to every year level. Students outside these year levels can't register; irregular students can if any of their subjects' year levels is ticked.</p>
         </div>
 
         <label class="admin-label" for="description">Description <span class="req">*</span></label>
@@ -246,6 +322,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             <input type="time" id="end_time" name="end_time" class="admin-input" value="<?= $time('end_time') ?>">
           </div>
         </div>
+        <!-- Other events on these dates, and clashes (filled by the script below) -->
+        <div class="schedule-hint" data-schedule-hint hidden></div>
 
         <span class="admin-label">Venue Type <span class="req">*</span></span>
         <div class="admin-radio-row">
@@ -325,8 +403,9 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 
     <!-- Manage existing events -->
     <div class="section-head section-head-spaced">
-      <h2>All Events (<?= count($events) ?>)</h2>
+      <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= count($events) ?>)</h2>
     </div>
+    <p class="admin-hint admin-hint-block">Published events become <strong>Completed</strong> automatically once they end. Use Mark Completed to close one early.</p>
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
@@ -396,11 +475,13 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                   </form>
                 <?php endif; ?>
 
+                <?php if ($isAdmin): ?>
                 <form method="POST" action="event-organizer.php" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
                   <input type="hidden" name="action" value="delete">
                   <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                   <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
                 </form>
+                <?php endif; ?>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -412,11 +493,13 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 </div>
 
 <script>
-// Venue type decides which field is required: the venue (on/off-campus) or the link (online).
 (function () {
+  var form = document.getElementById('event-form');
+
+  // Venue type decides which field is required: the venue (on/off-campus) or the link (online).
   var venue = document.getElementById('venue');
   var link = document.getElementById('online_event_link');
-  function sync() {
+  function syncVenue() {
     var checked = document.querySelector('input[name="venue_type"]:checked');
     var online = checked && checked.value === 'online';
     venue.required = !online;
@@ -424,11 +507,55 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
     document.querySelector('[data-venue-req]').hidden = online;
     document.querySelector('[data-link-req]').hidden = !online;
   }
-  document.querySelectorAll('input[name="venue_type"]').forEach(function (r) { r.addEventListener('change', sync); });
-  sync();
+
+  // Year levels only apply to events students can join.
+  var levels = document.querySelector('[data-year-levels]');
+  function syncAudience() {
+    var checked = document.querySelector('input[name="audience"]:checked');
+    levels.hidden = checked && checked.value === 'faculty';
+  }
+
+  // Other events on the chosen dates, and whether this one would clash
+  // (same title on the same date, or the same venue at the same time).
+  var hint = document.querySelector('[data-schedule-hint]');
+  var timer = null;
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function checkSchedule() {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var data = new FormData(form);
+      if (!data.get('start_date')) { hint.hidden = true; return; }
+      var params = new URLSearchParams();
+      ['title', 'start_date', 'end_date', 'start_time', 'end_time', 'venue', 'venue_type', 'id'].forEach(function (k) { params.set(k, data.get(k) || ''); });
+      fetch('../api/schedule-check.php?' + params.toString(), { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (res) {
+          if (!res) { hint.hidden = true; return; }
+          var html = '';
+          if (res.duplicate) html += '<p class="schedule-clash"><strong>Duplicate:</strong> "' + esc(res.duplicate.title) + '" is already on ' + esc(res.duplicate.when) + '. Change the title or the date.</p>';
+          if (res.venue_conflict) html += '<p class="schedule-clash"><strong>Venue taken:</strong> ' + esc(res.venue_conflict.place) + ' is booked for "' + esc(res.venue_conflict.title) + '" (' + esc(res.venue_conflict.when) + ').</p>';
+          if (res.same_dates.length) {
+            html += '<p class="schedule-others">' + res.same_dates.length + ' other event' + (res.same_dates.length === 1 ? '' : 's') + ' on these dates:</p><ul>'
+              + res.same_dates.slice(0, 6).map(function (e) { return '<li><strong>' + esc(e.title) + '</strong> · ' + esc(e.when) + ' · ' + esc(e.place) + (e.status === 'draft' ? ' (draft)' : '') + '</li>'; }).join('') + '</ul>';
+          } else if (!html) {
+            html = '<p class="schedule-ok">No other events on these dates.</p>';
+          }
+          hint.innerHTML = html;
+          hint.hidden = false;
+        })
+        .catch(function () { hint.hidden = true; });
+    }, 350);
+  }
+
+  form.addEventListener('change', function () { syncVenue(); syncAudience(); checkSchedule(); });
+  ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
+  syncVenue();
+  syncAudience();
+  checkSchedule();
 })();
 </script>
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

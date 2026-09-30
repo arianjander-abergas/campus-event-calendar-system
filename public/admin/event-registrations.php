@@ -1,21 +1,14 @@
 <?php
 /**
- * Admin: who registered for an event, attendance (one by one or several at
+ * Admins and the event's moderators: who registered for an event, attendance (one by one or several at
  * once), a CSV export, and links to the printable attendance sheet and the
  * evaluation results. Marking someone Attended records the time and asks
  * them to evaluate the event.
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
-
 $eventId = get_param('event');
-$event = is_uuid($eventId) ? get_event_admin($eventId) : null;
-if (!$event) {
-    flash('error', "That event doesn't exist anymore.");
-    header('Location: event-organizer.php');
-    exit;
-}
+[$user, $event] = require_event_manager($eventId); // admins, or moderators of the event's organization
 $back = 'event-registrations.php?event=' . urlencode($eventId);
 
 // ---- Attendance: one row (id) or the ticked rows (ids[]) ----
@@ -29,26 +22,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_statu
 
 $registrations = get_event_registrations_admin($eventId);
 $statusLabels = ['registered' => 'Registered', 'attended' => 'Attended', 'no_show' => 'No-show', 'cancelled' => 'Cancelled', 'waitlisted' => 'Waitlisted'];
-$yearLabel = fn($y) => $y ? $y . (['', 'st', 'nd', 'rd'][$y] ?? 'th') . ' Year' : '';
+$evaluators = get_event_evaluator_ids($eventId);
+// Attended + evaluated = the person's participation is Completed.
+$evaluationLabel = fn(array $r): string => $r['status'] !== 'attended' ? '' : (in_array($r['user_id'], $evaluators, true) ? 'Completed' : 'Pending');
 
 // ---- CSV export (opens in Excel / Google Sheets) ----
 if (get_param('export') === 'csv') {
     send_csv('registrations-' . slugify($event['title'], 'event') . '.csv',
-        ['Name', 'Year Level', 'Course', 'Organization', 'Status', 'Registered At', 'Time In'],
+        ['Name', 'School ID', 'Year Level', 'Course', 'Organization', 'Status', 'Registered At', 'Time In', 'Evaluation'],
         array_map(fn($r) => [
             $r['profiles']['full_name'] ?? '',
-            $yearLabel($r['profiles']['year_level'] ?? null),
+            $r['profiles']['school_ids']['school_id'] ?? '',
+            student_year_line($r['profiles'] ?? []),
             $r['profiles']['course'] ?? '',
             $r['profiles']['organizations']['name'] ?? '',
             $statusLabels[$r['status']] ?? $r['status'],
             date('Y-m-d H:i', strtotime($r['registered_at'])),
             !empty($r['attended_at']) ? date('Y-m-d H:i', strtotime($r['attended_at'])) : '',
+            $evaluationLabel($r),
         ], $registrations));
 }
 
 $totals = array_count_values(array_column($registrations, 'status'));
-$evaluationCount = count(supabase_user_request('event_evaluations', 'select=id&event_id=eq.' . urlencode($eventId)));
-$activeNav = 'admin-events';
+$evaluationCount = count($evaluators);
+$activeNav = 'manage-events';
 $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
 ?>
 <!DOCTYPE html>
@@ -74,6 +71,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
         <p class="page-sub"><?= htmlspecialchars($event['title']) ?> · <?= htmlspecialchars(event_when($event)) ?></p>
       </div>
       <div class="page-head-actions">
+        <a href="import.php?type=attendance&amp;event=<?= urlencode($eventId) ?>" class="btn btn-outline">Import attendance (Excel)</a>
         <a href="attendance-print.php?event=<?= urlencode($eventId) ?>" class="btn btn-outline">Print attendance</a>
         <a href="event-evaluations.php?event=<?= urlencode($eventId) ?>" class="btn btn-outline">Evaluation results</a>
         <?php if ($registrations): ?>
@@ -109,22 +107,24 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
         <thead>
           <tr>
             <th><?php if ($registrations): ?><input type="checkbox" aria-label="Tick everyone" data-check-all><?php endif; ?></th>
-            <th>Name</th><th>Year &amp; Course</th><th>Organization</th><th>Registered</th><th>Time in</th><th>Status</th><th><span class="visually-hidden">Actions</span></th>
+            <th>Name</th><th>School ID</th><th>Year &amp; Course</th><th>Organization</th><th>Registered</th><th>Time in</th><th>Status</th><th>Evaluation</th><th><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($registrations)): ?>
-            <tr><td colspan="8" class="admin-table-empty">No one has registered yet.</td></tr>
+            <tr><td colspan="10" class="admin-table-empty">No one has registered yet.</td></tr>
           <?php endif; ?>
           <?php foreach ($registrations as $r): ?>
             <tr>
               <td><input type="checkbox" name="ids[]" value="<?= htmlspecialchars($r['id']) ?>" form="bulkForm" aria-label="Tick <?= htmlspecialchars($r['profiles']['full_name'] ?? 'this person') ?>"></td>
-              <td><strong><?= htmlspecialchars($r['profiles']['full_name'] ?? 'Unknown') ?></strong></td>
-              <td><?= htmlspecialchars(trim($yearLabel($r['profiles']['year_level'] ?? null) . ' ' . ($r['profiles']['course'] ?? ''))) ?: '—' ?></td>
+              <td><strong><?= htmlspecialchars($r['profiles']['full_name'] ?? 'Unknown') ?></strong><?= ($r['profiles']['account_type'] ?? '') === 'faculty' ? ' <span class="admin-table-sub">Faculty</span>' : '' ?></td>
+              <td class="nowrap"><?php $sid = $r['profiles']['school_ids'] ?? null; ?><?= !empty($sid['school_id']) ? htmlspecialchars($sid['school_id']) . (!empty($sid['verified_at']) ? ' <span class="verify-badge is-verified" title="Verified with the registrar list">✓</span>' : '') : '—' ?></td>
+              <td><?= htmlspecialchars(trim(student_year_line($r['profiles'] ?? []) . ' ' . ($r['profiles']['course'] ?? ''))) ?: '—' ?></td>
               <td><?= htmlspecialchars($r['profiles']['organizations']['name'] ?? '—') ?></td>
               <td class="nowrap"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($r['registered_at']))) ?></td>
               <td class="nowrap"><?= !empty($r['attended_at']) ? htmlspecialchars(date('M j, g:i A', strtotime($r['attended_at']))) : '—' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($r['status']) ?>"><?= htmlspecialchars($statusLabels[$r['status']] ?? $r['status']) ?></span></td>
+              <td><?php $evl = $evaluationLabel($r); ?><?= $evl === '' ? '—' : '<span class="admin-status admin-status-' . ($evl === 'Completed' ? 'completed' : 'draft') . '">' . $evl . '</span>' ?></td>
               <td class="admin-row-actions">
                 <form method="POST" action="<?= htmlspecialchars($back) ?>">
                   <input type="hidden" name="action" value="set_status">

@@ -57,10 +57,17 @@ function detect_base_url(): string
 }
 
 // ---- Database shape (Thesis Supabase project) --------------------------------
-// profiles(id -> auth.users.id, full_name, role user_role['admin'|'user'], year_level int2 (1-5),
-//          course, organization_id -> organizations, avatar_url, phone, created_at, updated_at)
+// profiles(id -> auth.users.id, full_name, role user_role['admin'|'moderator'|'user'],
+//          account_type['student'|'faculty'], department_id -> departments,
+//          organization_id -> organizations, year_level int2 (1-5, the student's HIGHEST year level),
+//          course, student_type['regular'|'irregular'], irregular_year_levels int2[] (every year
+//          level an irregular student has subjects in), avatar_url, phone, created_at, updated_at)
 //          Created automatically by the handle_new_user() trigger on sign-up; only admins
-//          can change `role` (protect_profile_role() trigger).
+//          can change `role` (protect_profile_role() trigger), moderators can't change their
+//          organization, and the student/faculty choice is fixed once made.
+// school_ids(user_id -> profiles, school_id unique e.g. '2023-00123', verified_at, verified_by)
+//          Kept apart from profiles (which everyone can read): visible to the student, admins,
+//          and moderators whose events the student joined.
 // organizations(id, name unique, description, logo_url, department_id -> departments,
 //          created_by, created_at, updated_at)
 // departments(id, name unique, code unique e.g. 'IT', description, created_at, updated_at)
@@ -74,9 +81,13 @@ function detect_base_url(): string
 //        registration_deadline, contact_email, contact_number, enable_registration,
 //        is_published (false only for drafts), send_notification,
 //        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at,
-//        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'])
+//        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'],
+//        year_levels int2[] (student year levels that may register; empty = all))
 //        Categories/organizations can't be deleted while an event uses them (ON DELETE RESTRICT).
 //        trg_events_venue_type keeps venue_type = 'online' exactly when is_online is true.
+//        trg_events_schedule_rules refuses the same title on the same date (DUPLICATE_EVENT) and
+//        two events at one venue at the same time (VENUE_CONFLICT).
+//        complete_ended_events() marks published events 'completed' once they end.
 // event_programs(id, event_id, title, description, speaker, sort_order, ...)  -- event Schedule
 // event_registrations(id, event_id, user_id, status['registered'|'waitlisted'|'cancelled'|
 //        'attended'|'no_show'], registered_at, attended_at) unique (event_id, user_id)
@@ -98,8 +109,14 @@ function detect_base_url(): string
 // Storage buckets (public read, admin upload): event-posters, org-logos, officer-photos.
 // Functions: site_stats(), event_registration_counts(), touch_presence(), clear_presence(),
 //        notify_event(event_id, audience 'all'|'registered', title, message), is_admin(),
+//        is_moderator(), can_manage_event(org id), can_manage_event_id(event id),
 //        school_period(date) -> (school_year, semester),
-//        submit_event_evaluation(event_id, answers jsonb).
+//        submit_event_evaluation(event_id, answers jsonb), school_id_taken(text),
+//        complete_ended_events().
+// Roles: admin = everything. moderator = the events of their own organization (create, edit,
+//        publish, cancel — not delete), their schedules, registrations, attendance, printouts,
+//        evaluation results and attendance imports, plus their organization's officers.
+//        user = student or faculty.
 
 // =============================================================================
 // HTTP LAYER
@@ -109,14 +126,14 @@ function detect_base_url(): string
  * Raw cURL request. $body: array/object -> JSON, string -> sent as-is (file uploads).
  * @return array{ok:bool, status:int, data:mixed, raw:string}
  */
-function supabase_http(string $method, string $url, array $headers, $body = null): array
+function supabase_http(string $method, string $url, array $headers, $body = null, int $timeout = 20): array
 {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_TIMEOUT => 20,
+        CURLOPT_TIMEOUT => $timeout,
     ]);
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($body) ? $body : json_encode($body));
@@ -246,6 +263,9 @@ function friendly_error(string $fallback): string
     }
     if (stripos($error, 'Only an admin') === 0 || stripos($error, 'Only admins') === 0) {
         return $error;
+    }
+    if (str_contains($error, 'school_ids_school_id_key')) {
+        return 'That School ID is already registered to another account.';
     }
     if (str_contains($error, 'duplicate key')) {
         return 'That name is already taken.';
@@ -459,6 +479,117 @@ function label_of(array $labels, ?string $key, string $default = '—'): string
     return $labels[(string) $key] ?? $default;
 }
 
+/** Kinds of account (profiles.account_type) and of student (profiles.student_type). */
+const ACCOUNT_TYPES = ['student' => 'Student', 'faculty' => 'Faculty'];
+const STUDENT_TYPES = ['regular' => 'Regular', 'irregular' => 'Irregular'];
+
+/** Student year levels (profiles.year_level = the HIGHEST one; events.year_levels). */
+const YEAR_LEVELS = [1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'];
+
+/** Roles (profiles.role). 'user' shows as Student or Faculty (see role_display()). */
+const ROLES = ['user' => 'Student / Faculty', 'moderator' => 'Moderator', 'admin' => 'Admin'];
+
+/** 3 -> '3rd' */
+function ordinal(int $n): string
+{
+    return $n . (in_array($n % 100, [11, 12, 13], true) ? 'th' : (['th', 'st', 'nd', 'rd'][$n % 10] ?? 'th'));
+}
+
+/** 3 -> '3rd Year'; null -> ''. */
+function year_label($level): string
+{
+    return YEAR_LEVELS[(int) $level] ?? '';
+}
+
+/**
+ * Year levels as text: [1,2] -> '1st & 2nd year', [2,3,4] -> '2nd, 3rd & 4th year';
+ * [] -> '' (every year level).
+ */
+function year_levels_label(?array $levels): string
+{
+    $levels = array_values(array_unique(array_map('intval', $levels ?? [])));
+    sort($levels);
+    if (!$levels || $levels === array_keys(YEAR_LEVELS)) return '';
+    $words = array_map('ordinal', $levels);
+    $last = array_pop($words);
+    return ($words ? implode(', ', $words) . ' & ' : '') . $last . ' year';
+}
+
+/**
+ * Year levels from a form: '2' / ['1','3'] -> [1, 3] (only 1-5, sorted, no repeats).
+ * @return int[]
+ */
+function parse_year_levels($value): array
+{
+    $levels = [];
+    foreach ((array) $value as $v) {
+        if (is_string($v) || is_int($v)) {
+            $n = (int) $v;
+            if (isset(YEAR_LEVELS[$n]) && (string) $n === trim((string) $v)) $levels[$n] = $n;
+        }
+    }
+    ksort($levels);
+    return array_values($levels);
+}
+
+/**
+ * How the student's year level is shown: '3rd Year' or
+ * '3rd Year · Irregular (2nd & 3rd year subjects)'.
+ */
+function student_year_line(array $profile): string
+{
+    $line = year_label($profile['year_level'] ?? null);
+    if ($line !== '' && ($profile['student_type'] ?? '') === 'irregular') {
+        $subjects = year_levels_label($profile['irregular_year_levels'] ?? []);
+        $line .= ' · Irregular' . ($subjects !== '' ? ' (' . $subjects . ' subjects)' : '');
+    }
+    return $line;
+}
+
+// ---- School ID ---------------------------------------------------------------
+// Stored uppercase without spaces. Letters, digits and dashes, 4-20 characters,
+// with at least 4 digits (e.g. 2023-00123). Change SCHOOL_ID_EXAMPLE (and the
+// check in valid_school_id()) to the registrar's exact format when known.
+const SCHOOL_ID_EXAMPLE = '2023-00123';
+
+function normalize_school_id(?string $value): string
+{
+    return strtoupper(preg_replace('/\s+/', '', (string) $value));
+}
+
+function valid_school_id(string $normalized): bool
+{
+    return (bool) preg_match('/^[A-Z0-9][A-Z0-9-]{3,19}$/', $normalized)
+        && preg_match_all('/\d/', $normalized) >= 4;
+}
+
+/** Whether another account already uses this school ID (the database answers without saying whose). */
+function school_id_taken(string $normalized): bool
+{
+    $result = supabase_rpc('school_id_taken', ['p_school_id' => $normalized]);
+    return $result['ok'] && $result['data'] === true;
+}
+
+// ---- Forms: keep typed values across ONE redirect ---------------------------
+// A form with errors is redirected back to itself (so refreshing the page
+// doesn't post it again) and shows what was typed once. Refreshing or coming
+// back later shows a clean form.
+
+function remember_form(string $key, array $values, array $errors): void
+{
+    session_start_once();
+    $_SESSION['form_state'][$key] = ['values' => $values, 'errors' => $errors];
+}
+
+/** @return array{values: array, errors: array}|null (and forgets it) */
+function recall_form(string $key): ?array
+{
+    session_start_once();
+    $state = $_SESSION['form_state'][$key] ?? null;
+    unset($_SESSION['form_state'][$key]);
+    return is_array($state) ? $state : null;
+}
+
 // =============================================================================
 // SESSION & AUTH
 // =============================================================================
@@ -532,11 +663,12 @@ function auth_error_message(array $result, string $fallback): string
 }
 
 /**
- * Create an account. The profile row (with year level / course /
- * organization) is created by the database's handle_new_user() trigger from
- * the metadata sent here.
+ * Create an account. The profile row (account type, department,
+ * organization, year level, course, regular/irregular) and the school ID
+ * are created by the database's handle_new_user() trigger from the
+ * metadata sent here.
  *
- * @param array $profile ['year_level' => 1-5|null, 'course' => ?string, 'organization_id' => ?uuid]
+ * @param array $profile the 'fields' of validate_account_fields() + 'school_id'
  * @return array{ok:bool, message:string, needsEmailConfirmation?:bool}
  */
 function supabase_auth_signup(string $email, string $password, string $fullName, array $profile = []): array
@@ -549,10 +681,15 @@ function supabase_auth_signup(string $email, string $password, string $fullName,
         'password' => $password,
         'data' => array_filter([
             'full_name' => $fullName,
+            'account_type' => $profile['account_type'] ?? null,
+            'department_id' => $profile['department_id'] ?? null,
+            'organization_id' => $profile['organization_id'] ?? null,
+            'school_id' => $profile['school_id'] ?? null,
             'year_level' => $profile['year_level'] ?? null,
             'course' => $profile['course'] ?? null,
-            'organization_id' => $profile['organization_id'] ?? null,
-        ], fn($v) => $v !== null && $v !== ''),
+            'student_type' => $profile['student_type'] ?? null,
+            'irregular_year_levels' => $profile['irregular_year_levels'] ?? null,
+        ], fn($v) => $v !== null && $v !== '' && $v !== []),
     ]);
 
     if (!$result['ok']) {
@@ -682,21 +819,30 @@ function start_user_session(array $authUser, string $accessToken, ?string $refre
     reload_session_profile();
 }
 
-/** Re-read name / role / student details from `profiles` into the session. */
+/** Profile columns kept in the session (see current_user()). */
+const SESSION_PROFILE_SELECT = 'full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)';
+
+/** Re-read name / role / account details from `profiles` into the session. */
 function reload_session_profile(): void
 {
     if (empty($_SESSION['user']['id'])) return;
-    $rows = supabase_request('profiles', 'select=full_name,role,year_level,course,organization_id&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, $_SESSION['access_token'] ?? null);
+    $rows = supabase_request('profiles', 'select=' . SESSION_PROFILE_SELECT . '&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, $_SESSION['access_token'] ?? null);
     if (!empty($rows[0])) {
-        $_SESSION['user'] = array_merge($_SESSION['user'], $rows[0]);
+        $row = $rows[0];
+        $row['school_id'] = $row['school_ids']['school_id'] ?? null;
+        $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
+        unset($row['school_ids']);
+        $_SESSION['user'] = array_merge($_SESSION['user'], $row);
     }
     $_SESSION['user_checked_at'] = time();
 }
 
 /**
- * The logged-in user (id, email, full_name, role, year_level, course,
- * organization_id), or null. The role is re-checked every 5 minutes so an
- * admin change takes effect without logging out.
+ * The logged-in user (id, email, full_name, role, account_type,
+ * department_id, organization_id, year_level, course, student_type,
+ * irregular_year_levels, school_id, school_id_verified), or null. The role
+ * is re-checked every 5 minutes so an admin change takes effect without
+ * logging out.
  */
 function current_user(): ?array
 {
@@ -713,18 +859,71 @@ function is_admin_user(): bool
     return (current_user()['role'] ?? '') === 'admin';
 }
 
-/** 'admin' -> 'Admin', 'user' -> 'Student' (the database keeps the enum value). */
-function role_display(string $role): string
+function is_moderator_user(): bool
 {
-    return $role === 'admin' ? 'Admin' : 'Student';
+    return (current_user()['role'] ?? '') === 'moderator';
 }
 
-/** Send logged-out visitors to the login page, then back here afterwards. */
+/** Admins and moderators (the people who run events). */
+function is_staff_user(): bool
+{
+    return is_admin_user() || is_moderator_user();
+}
+
+/**
+ * 'admin' -> 'Admin', 'moderator' -> 'Moderator', 'user' -> 'Student' or
+ * 'Faculty' (the database keeps the enum value).
+ */
+function role_display(string $role, ?string $accountType = null): string
+{
+    return match ($role) {
+        'admin' => 'Admin',
+        'moderator' => 'Moderator',
+        default => $accountType === 'faculty' ? 'Faculty' : 'Student',
+    };
+}
+
+/**
+ * What still has to be filled in before an account can use the site.
+ * Everyone except admins needs an account type, department and
+ * organization; students also need their school ID, course, highest year
+ * level and whether they're regular or irregular (irregular: their year
+ * levels). Accounts from Google sign-in or from before these fields existed
+ * are sent to My Profile to complete them.
+ * @return string[] labels of the missing fields ([] = complete)
+ */
+function profile_missing_fields(array $user): array
+{
+    if (($user['role'] ?? '') === 'admin') return [];
+    $missing = [];
+    if (!isset(ACCOUNT_TYPES[$user['account_type'] ?? ''])) $missing[] = 'Student or faculty';
+    if (empty($user['department_id'])) $missing[] = 'Department';
+    if (empty($user['organization_id'])) $missing[] = 'Organization';
+    if (($user['account_type'] ?? '') === 'student') {
+        if (empty($user['school_id'])) $missing[] = 'School ID';
+        if (empty($user['course'])) $missing[] = 'Course';
+        if (empty($user['year_level'])) $missing[] = 'Highest year level';
+        if (!isset(STUDENT_TYPES[$user['student_type'] ?? ''])) $missing[] = 'Regular or irregular';
+        elseif ($user['student_type'] === 'irregular' && empty($user['irregular_year_levels'])) $missing[] = 'Year levels of your subjects';
+    }
+    return $missing;
+}
+
+/**
+ * Send logged-out visitors to the login page, then back here afterwards.
+ * Accounts with missing required details go to My Profile first
+ * (profile_missing_fields()).
+ */
 function require_login(): array
 {
     $user = current_user();
     if (!$user) {
         header('Location: ' . BASE_URL . '/auth/login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? BASE_URL . '/enduser/dashboard.php'));
+        exit;
+    }
+    if (profile_missing_fields($user) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'profile.php') {
+        // My Profile lists what's missing.
+        header('Location: ' . BASE_URL . '/enduser/profile.php?complete=1');
         exit;
     }
     return $user;
@@ -742,16 +941,161 @@ function require_admin(): array
     return $user;
 }
 
+/** Admins and moderators (moderators need an organization, which is their scope). */
+function require_staff(): array
+{
+    $user = require_login();
+    $role = $user['role'] ?? 'user';
+    if ($role !== 'admin' && ($role !== 'moderator' || empty($user['organization_id']))) {
+        flash('error', $role === 'moderator' ? 'Your moderator account has no organization yet. Ask an admin to set it.' : 'That page is for admins and moderators only.');
+        header('Location: ' . BASE_URL . '/enduser/dashboard.php');
+        exit;
+    }
+    return $user;
+}
+
+/**
+ * Whether the user may manage this event: admins every event, moderators
+ * the events of their own organization (the database checks the same with
+ * can_manage_event()).
+ */
+function can_manage_event(?array $event, ?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    if (!$event || !$user) return false;
+    if (($user['role'] ?? '') === 'admin') return true;
+    return ($user['role'] ?? '') === 'moderator'
+        && !empty($user['organization_id'])
+        && ($event['organization_id'] ?? null) === $user['organization_id'];
+}
+
+/**
+ * For the pages of one event (schedule, registrations, printouts,
+ * evaluations): the event, if the logged-in admin / moderator may manage it.
+ * Anyone else is sent back to Manage Events.
+ * @return array{0: array, 1: array} [$user, $event]
+ */
+function require_event_manager(string $eventId): array
+{
+    $user = require_staff();
+    $event = is_uuid($eventId) ? get_event_admin($eventId) : null;
+    if (!$event || !can_manage_event($event, $user)) {
+        flash('error', $event ? 'Moderators can only manage their own organization\'s events.' : "That event doesn't exist anymore.");
+        header('Location: ' . BASE_URL . '/admin/event-organizer.php');
+        exit;
+    }
+    return [$user, $event];
+}
+
 // =============================================================================
 // PROFILES
 // =============================================================================
 
-/** Update the logged-in user's own details (never the role — the database blocks that). */
-function update_my_profile(array $fields): array
+/**
+ * Check the account details of the sign-up / My Profile form.
+ * Required for everyone: student or faculty, department, organization (one
+ * of that department's). Students also: school ID (valid, not used by
+ * another account), course, highest year level, regular or irregular, and
+ * for irregular students the year levels of their subjects (which must
+ * include the highest one).
+ *
+ * @param array  $in  raw form values (post_param strings; irregular_year_levels may be an array)
+ * @param ?string $ownSchoolId the account's current school ID (it isn't "taken" by itself)
+ * @return array{fields: array, school_id: ?string, errors: string[]}
+ *         fields = profile columns to save
+ */
+function validate_account_fields(array $in, array $departments, array $organizations, ?string $ownSchoolId = null): array
+{
+    $errors = [];
+    $type = (string) ($in['account_type'] ?? '');
+    $departmentId = (string) ($in['department_id'] ?? '');
+    $organizationId = (string) ($in['organization_id'] ?? '');
+    $orgsById = array_column($organizations, null, 'id');
+
+    if (!isset(ACCOUNT_TYPES[$type])) $errors[] = 'Please choose whether you are a student or faculty.';
+    if (!in_array($departmentId, array_column($departments, 'id'), true)) $errors[] = 'Please choose your department.';
+    if (!isset($orgsById[$organizationId])) {
+        $errors[] = 'Please choose your organization.';
+    } elseif ($departmentId !== '' && !empty($orgsById[$organizationId]['department_id']) && $orgsById[$organizationId]['department_id'] !== $departmentId) {
+        $errors[] = 'That organization belongs to another department. Choose one of your department\'s organizations.';
+    }
+
+    $fields = [
+        'account_type' => $type ?: null,
+        'department_id' => $departmentId ?: null,
+        'organization_id' => $organizationId ?: null,
+        'year_level' => null,
+        'course' => null,
+        'student_type' => null,
+        'irregular_year_levels' => null,
+    ];
+    $schoolId = null;
+
+    if ($type === 'student') {
+        $schoolId = normalize_school_id($in['school_id'] ?? '');
+        $yearLevel = parse_year_levels($in['year_level'] ?? '')[0] ?? null;
+        $studentType = (string) ($in['student_type'] ?? '');
+        $course = trim((string) ($in['course'] ?? ''));
+
+        if ($schoolId === '') {
+            $errors[] = 'Your School ID is required.';
+        } elseif (!valid_school_id($schoolId)) {
+            $errors[] = 'Please enter a valid School ID (letters, numbers and dashes, like ' . SCHOOL_ID_EXAMPLE . ').';
+        } elseif ($schoolId !== normalize_school_id($ownSchoolId) && school_id_taken($schoolId)) {
+            $errors[] = 'That School ID is already registered to another account. If it\'s yours, contact an admin.';
+        }
+        if ($course === '') $errors[] = 'Your course is required.';
+        if (mb_strlen($course) > 60) $errors[] = 'Course must be 60 characters or fewer.';
+        if (!$yearLevel) $errors[] = 'Please choose your highest year level.';
+        if (!isset(STUDENT_TYPES[$studentType])) $errors[] = 'Please choose whether you are a regular or irregular student.';
+
+        $fields['year_level'] = $yearLevel;
+        $fields['course'] = $course !== '' ? $course : null;
+        $fields['student_type'] = $studentType ?: null;
+
+        if ($studentType === 'irregular') {
+            $levels = parse_year_levels($in['irregular_year_levels'] ?? []);
+            if ($yearLevel) {
+                $levels = parse_year_levels(array_merge($levels, [$yearLevel]));
+            }
+            if (count($levels) < 2) {
+                $errors[] = 'Irregular students: tick every year level you have subjects in (at least one besides your highest year level).';
+            } elseif ($yearLevel && max($levels) > $yearLevel) {
+                $errors[] = 'Your highest year level must be the highest of the year levels you ticked.';
+            }
+            $fields['irregular_year_levels'] = $levels;
+        }
+    }
+    return ['fields' => $fields, 'school_id' => $schoolId, 'errors' => $errors];
+}
+
+/**
+ * Update the logged-in user's own details (never the role — the database
+ * blocks that). $schoolId (students): saved in school_ids — added if
+ * missing, or corrected while it isn't verified yet.
+ */
+function update_my_profile(array $fields, ?string $schoolId = null): array
 {
     $user = current_user();
     if (!$user) return ['ok' => false, 'message' => 'Please log in again.'];
-    $allowed = array_intersect_key($fields, array_flip(['full_name', 'year_level', 'course', 'organization_id']));
+
+    if ($schoolId !== null && $schoolId !== ($user['school_id'] ?? null)) {
+        if (!empty($user['school_id_verified'])) {
+            return ['ok' => false, 'message' => 'Your School ID is already verified. Ask an admin if it needs to change.'];
+        }
+        $rows = !empty($user['school_id'])
+            ? supabase_user_request('school_ids', 'user_id=eq.' . urlencode($user['id']), 'PATCH', ['school_id' => $schoolId])
+            : supabase_user_request('school_ids', '', 'POST', ['user_id' => $user['id'], 'school_id' => $schoolId]);
+        if (empty($rows)) {
+            return ['ok' => false, 'message' => friendly_error('Could not save your School ID. Please try again.')];
+        }
+    }
+
+    $allowed = array_intersect_key($fields, array_flip(['full_name', 'account_type', 'department_id', 'organization_id', 'year_level', 'course', 'student_type', 'irregular_year_levels']));
+    // Moderators' organization is their scope: only an admin changes it (the database refuses too).
+    if (($user['role'] ?? '') === 'moderator') {
+        unset($allowed['organization_id']);
+    }
     $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not save your profile. Please try again.')];
@@ -760,25 +1104,83 @@ function update_my_profile(array $fields): array
     return ['ok' => true, 'message' => 'Profile saved.'];
 }
 
-/** All accounts, for the admin Users page. */
+/** Every account with its details, for the admin Users page. */
 function get_all_profiles_admin(): array
 {
-    return supabase_user_request('profiles', 'select=id,full_name,role,year_level,course,created_at,organizations!profiles_organization_id_fkey(name)&order=role.asc,full_name.asc');
+    return supabase_user_request('profiles', 'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,created_at,organization_id,department_id,'
+        . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)&order=role.asc,full_name.asc');
 }
 
+/**
+ * Change someone's role: 'user' (student / faculty), 'moderator' (runs
+ * their organization's events — they need an organization) or 'admin'.
+ */
 function set_user_role_admin(string $userId, string $role): array
 {
-    if (!in_array($role, ['admin', 'user'], true)) {
+    if (!isset(ROLES[$role])) {
         return ['ok' => false, 'message' => 'Invalid role.'];
     }
     if ($userId === (current_user()['id'] ?? '')) {
         return ['ok' => false, 'message' => "You can't change your own role."];
     }
+    if ($role === 'moderator') {
+        $target = supabase_user_request('profiles', 'select=organization_id&id=eq.' . urlencode($userId));
+        if (empty($target[0]['organization_id'])) {
+            return ['ok' => false, 'message' => 'A moderator runs their organization\'s events, so this account needs an organization first.'];
+        }
+    }
     $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($userId), 'PATCH', ['role' => $role]);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not change the role.')];
     }
-    return ['ok' => true, 'message' => $rows[0]['full_name'] . ' is now ' . ($role === 'admin' ? 'an admin.' : 'a student.')];
+    $as = ['admin' => 'an admin', 'moderator' => 'a moderator', 'user' => 'a regular ' . strtolower(role_display('user', $rows[0]['account_type'] ?? null)) . ' account'][$role];
+    return ['ok' => true, 'message' => $rows[0]['full_name'] . ' is now ' . $as . '.'];
+}
+
+/**
+ * Student accounts with their school IDs (Import & Verify compares the
+ * registrar's list against these).
+ */
+function get_student_accounts_admin(): array
+{
+    return supabase_user_request('profiles', 'select=id,full_name,account_type,year_level,course,student_type,irregular_year_levels,'
+        . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)'
+        . '&role=eq.user&or=(account_type.eq.student,account_type.is.null)&order=full_name.asc&limit=5000');
+}
+
+/** Mark accounts' school IDs as verified (matched with the registrar's list). */
+function mark_school_ids_verified(array $userIds): array
+{
+    $ids = array_values(array_unique(array_filter($userIds, 'is_uuid')));
+    if (!$ids) return ['ok' => false, 'message' => 'Nothing to verify.'];
+    $rows = [];
+    foreach (array_chunk($ids, 150) as $chunk) {
+        $rows = array_merge($rows, supabase_user_request('school_ids', 'user_id=in.(' . implode(',', $chunk) . ')&verified_at=is.null', 'PATCH', [
+            'verified_at' => gmdate('c'),
+            'verified_by' => current_user()['id'] ?? null,
+        ]));
+    }
+    if (!$rows && supabase_last_error() !== '') {
+        return ['ok' => false, 'message' => friendly_error('Could not mark the accounts as verified.')];
+    }
+    return ['ok' => true, 'message' => count($rows) . ' ' . (count($rows) === 1 ? 'account was' : 'accounts were') . ' marked verified.'];
+}
+
+/** Admin: set / correct / un-verify a student's school ID. */
+function set_school_id_admin(string $userId, string $schoolId, bool $verified): array
+{
+    $schoolId = normalize_school_id($schoolId);
+    if (!valid_school_id($schoolId)) {
+        return ['ok' => false, 'message' => 'Please enter a valid School ID (like ' . SCHOOL_ID_EXAMPLE . ').'];
+    }
+    $fields = ['school_id' => $schoolId, 'verified_at' => $verified ? gmdate('c') : null, 'verified_by' => $verified ? (current_user()['id'] ?? null) : null];
+    $existing = supabase_user_request('school_ids', 'select=user_id&user_id=eq.' . urlencode($userId));
+    $rows = $existing
+        ? supabase_user_request('school_ids', 'user_id=eq.' . urlencode($userId), 'PATCH', $fields)
+        : supabase_user_request('school_ids', '', 'POST', $fields + ['user_id' => $userId]);
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not save the School ID.')]
+        : ['ok' => true, 'message' => 'School ID saved' . ($verified ? ' and verified.' : '.')];
 }
 
 // =============================================================================
@@ -825,35 +1227,24 @@ function get_upcoming_events(int $limit = 3, ?string $excludeId = null): array
 }
 
 /**
- * Search/browse published events (events.php).
- * $filters: q, category, organization, type, audience ('students'|'faculty'), venue_type,
- *           when ('upcoming'|'past'|'all'), sort ('date'|'popular')
+ * Events for the Event Calendar (events.php): published and completed
+ * events that overlap $from..$to ('Y-m-d'; '' = no bound), in date order.
+ * $filters: q (keyword: title, description, venue, or an organization /
+ * category whose name matches), category, organization,
+ * audience ('students'|'faculty'), venue_type.
  * "For students" also lists events for students & faculty (same for faculty).
- * @return array{events: array, has_more: bool}
  */
-function search_events(array $filters, int $page = 1, int $perPage = 12): array
+function find_events(array $filters, string $from = '', string $to = '', int $limit = 500): array
 {
-    $today = date('Y-m-d');
-    $parts = [EVENT_CARD_SELECT, 'status=eq.published'];
-
-    $when = $filters['when'] ?? 'upcoming';
-    if ($when === 'past') {
-        $parts[] = 'end_date=lt.' . $today;
-        $parts[] = 'order=start_date.desc';
-    } elseif ($when === 'all') {
-        $parts[] = 'order=start_date.desc';
-    } else {
-        $parts[] = 'end_date=gte.' . $today;
-        $parts[] = 'order=start_date.asc,start_time.asc.nullslast';
-    }
+    $parts = [EVENT_CARD_SELECT, 'status=in.(published,completed)', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=' . $limit];
+    if ($to !== '') $parts[] = 'start_date=lte.' . $to;
+    if ($from !== '') $parts[] = 'end_date=gte.' . $from;
 
     if (is_uuid($filters['category'] ?? null)) $parts[] = 'category_id=eq.' . $filters['category'];
     if (is_uuid($filters['organization'] ?? null)) $parts[] = 'organization_id=eq.' . $filters['organization'];
-    if (isset(EVENT_TYPES[$filters['type'] ?? ''])) $parts[] = 'event_type=eq.' . $filters['type'];
     if (in_array($filters['audience'] ?? '', ['students', 'faculty'], true)) $parts[] = 'audience=in.(' . $filters['audience'] . ',all)';
     if (isset(VENUE_TYPES[$filters['venue_type'] ?? ''])) $parts[] = 'venue_type=eq.' . $filters['venue_type'];
 
-    // Keyword: title, description, venue — or an organization/category whose name matches.
     $term = trim(preg_replace('/[^\p{L}\p{N}\s\-\'&]/u', ' ', (string) ($filters['q'] ?? '')));
     $term = preg_replace('/\s+/', ' ', $term);
     if ($term !== '') {
@@ -865,19 +1256,20 @@ function search_events(array $filters, int $page = 1, int $perPage = 12): array
         if ($catIds) $or[] = 'category_id.in.(' . implode(',', $catIds) . ')';
         $parts[] = 'or=(' . implode(',', $or) . ')';
     }
+    return supabase_request('events', implode('&', $parts));
+}
 
-    $page = max(1, $page);
-    if (($filters['sort'] ?? '') === 'popular') {
-        $events = supabase_request('events', implode('&', $parts) . '&limit=500');
-        $counts = get_registration_counts();
-        foreach ($events as &$ev) $ev['going'] = $counts[$ev['id']] ?? 0;
-        unset($ev);
-        usort($events, fn($a, $b) => $b['going'] <=> $a['going']);
-        $slice = array_slice($events, ($page - 1) * $perPage, $perPage + 1);
-    } else {
-        $slice = supabase_request('events', implode('&', $parts) . '&limit=' . ($perPage + 1) . '&offset=' . (($page - 1) * $perPage));
+/** Every date ('Y-m-d') from an event's start date to its end date (capped at 62 days). */
+function event_dates(array $ev): array
+{
+    $start = $ev['start_date'] ?? null;
+    if (!$start) return [];
+    $end = max($start, $ev['end_date'] ?? $start);
+    $dates = [];
+    for ($d = new DateTimeImmutable($start); $d->format('Y-m-d') <= $end && count($dates) < 62; $d = $d->modify('+1 day')) {
+        $dates[] = $d->format('Y-m-d');
     }
-    return ['events' => array_slice($slice, 0, $perPage), 'has_more' => count($slice) > $perPage];
+    return $dates;
 }
 
 /** Programs (segments) of one event, in running order — the event details Schedule. */
@@ -924,12 +1316,23 @@ function get_trending_events(int $limit = 3): array
     return array_slice($events, 0, $limit);
 }
 
-/** Dates of published events for the dashboard calendar dots. */
+/**
+ * Published and completed events for the dashboard's small calendar: a dot
+ * on each day, and clicking a day lists all of that day's events.
+ */
 function get_calendar_events(): array
 {
     return array_map(
-        fn($e) => ['id' => $e['id'], 'title' => $e['title'], 'start' => $e['start_date'], 'end' => $e['end_date']],
-        supabase_request('events', 'select=id,title,start_date,end_date&status=eq.published&limit=500')
+        fn($e) => [
+            'id' => $e['id'],
+            'title' => $e['title'],
+            'start' => $e['start_date'],
+            'end' => $e['end_date'],
+            'time' => format_event_time($e['start_time'] ?? null),
+            'place' => event_place($e),
+            'status' => $e['status'],
+        ],
+        supabase_request('events', 'select=id,title,start_date,end_date,start_time,venue,is_online,status&status=in.(published,completed)&order=start_date.asc,start_time.asc.nullslast&limit=1000')
     );
 }
 
@@ -964,11 +1367,38 @@ function get_my_registration(string $eventId): ?array
 }
 
 /**
+ * Why this user may NOT register for this event because of who it's for
+ * (audience, year levels), or '' if they may. Mirrors the database's
+ * check_event_registration(): admins / the event's moderators are exempt;
+ * irregular students count every year level they have subjects in.
+ */
+function registration_restriction(array $ev, ?array $user): string
+{
+    if (!$user || can_manage_event($ev, $user)) return '';
+    $type = $user['account_type'] ?? null;
+    $audience = $ev['audience'] ?? 'students';
+    if ($audience === 'faculty' && $type === 'student') return 'This event is for faculty only.';
+    if ($audience === 'students' && $type === 'faculty') return 'This event is for students only.';
+
+    $levels = parse_year_levels($ev['year_levels'] ?? []);
+    if ($levels && $type !== 'faculty') {
+        if (empty($user['year_level'])) return 'This event is only for some year levels. Add your year level in My Profile first.';
+        $mine = ($user['student_type'] ?? '') === 'irregular' && !empty($user['irregular_year_levels'])
+            ? parse_year_levels(array_merge($user['irregular_year_levels'], [$user['year_level']]))
+            : [(int) $user['year_level']];
+        if (!array_intersect($mine, $levels)) {
+            return 'This event is only open to ' . year_levels_label($levels) . ' students.';
+        }
+    }
+    return '';
+}
+
+/**
  * What the Register button should do for this user and event — mirrors the
  * rules the database enforces in check_event_registration().
  * @return array{state:string, can_register:bool, can_cancel:bool, note:string}
  */
-function registration_state(array $ev, ?array $myReg, int $going): array
+function registration_state(array $ev, ?array $myReg, int $going, ?array $user = null): array
 {
     $today = date('Y-m-d');
     $ended = ($ev['end_date'] ?? $ev['start_date'] ?? $today) < $today || ($ev['status'] ?? '') === 'completed';
@@ -986,6 +1416,8 @@ function registration_state(array $ev, ?array $myReg, int $going): array
     if (!empty($ev['registration_deadline']) && $today > $ev['registration_deadline']) {
         return $state('closed', false, false, 'Registration closed on ' . format_event_date($ev['registration_deadline']) . '.');
     }
+    $restriction = registration_restriction($ev, $user ?? current_user());
+    if ($restriction !== '') return $state('restricted', false, false, $restriction);
     $limit = (int) ($ev['registration_limit'] ?? 0);
     if ($limit > 0 && $going >= $limit) return $state('full', false, false, 'This event is full.');
 
@@ -1186,10 +1618,86 @@ function upload_public_image(string $bucket, array $file, string $folder = ''): 
 // Writes run AS the logged-in admin: the events RLS policies require
 // is_admin() for insert/update/delete, which only an admin's token satisfies.
 
-/** All events (every status), newest first, for the admin table. */
+/**
+ * Events (every status), newest first, for the Manage Events table:
+ * every event for admins, their organization's events for moderators.
+ */
 function get_all_events_admin(): array
 {
-    return supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url),event_programs(count)&order=created_at.desc');
+    $user = current_user();
+    $scope = ($user['role'] ?? '') === 'admin' ? '' : '&organization_id=eq.' . urlencode((string) ($user['organization_id'] ?? '00000000-0000-0000-0000-000000000000'));
+    return supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url),event_programs(count)&order=created_at.desc' . $scope);
+}
+
+/** Organizations the logged-in user may create events for: all (admin) or their own (moderator). */
+function get_event_organizations_for(array $user): array
+{
+    $organizations = get_organizations();
+    if (($user['role'] ?? '') === 'admin') return $organizations;
+    return array_values(array_filter($organizations, fn($o) => $o['id'] === ($user['organization_id'] ?? null)));
+}
+
+/**
+ * Other events (not cancelled) on the dates of an event being created or
+ * edited, and which of them it would clash with — the same rules as the
+ * database's trg_events_schedule_rules, checked first for a clear message
+ * and for the "other events on these dates" hint on the form.
+ * $ev: title, start_date, end_date, start_time, end_time, venue, venue_type
+ * @return array{same_dates: array, duplicate: ?array, venue_conflict: ?array}
+ */
+function find_schedule_conflicts(array $ev, ?string $excludeId = null): array
+{
+    $out = ['same_dates' => [], 'duplicate' => null, 'venue_conflict' => null];
+    $start = (string) ($ev['start_date'] ?? '');
+    $end = (string) ($ev['end_date'] ?? '') ?: $start;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) return $out;
+
+    $rows = supabase_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,organizations(name)'
+        . '&status=neq.cancelled&start_date=lte.' . max($start, $end) . '&end_date=gte.' . min($start, $end) . '&order=start_date.asc,start_time.asc.nullslast&limit=100',
+        'GET', null, session_access_token());
+
+    // Start / end as comparable 'Y-m-d H:i:s' strings (no end time = end of the end date).
+    $range = function (array $e): array {
+        $s = ($e['start_date'] ?? '') . ' ' . (!empty($e['start_time']) ? substr($e['start_time'], 0, 8) : '00:00:00');
+        $endDate = $e['end_date'] ?: $e['start_date'];
+        $f = !empty($e['end_time']) ? $endDate . ' ' . substr($e['end_time'], 0, 8) : date('Y-m-d', strtotime($endDate . ' +1 day')) . ' 00:00:00';
+        return [$s, max($s, $f)];
+    };
+    $online = fn(array $e): bool => !empty($e['is_online']) || ($e['venue_type'] ?? '') === 'online';
+    [$newStart, $newEnd] = $range($ev + ['end_date' => $end]);
+    $venue = mb_strtolower(trim((string) ($ev['venue'] ?? '')));
+
+    foreach ($rows as $row) {
+        if ($excludeId && $row['id'] === $excludeId) continue;
+        $out['same_dates'][] = $row;
+        if (!$out['duplicate'] && mb_strtolower(trim($row['title'])) === mb_strtolower(trim((string) ($ev['title'] ?? ''))) && $row['start_date'] === $start) {
+            $out['duplicate'] = $row;
+        }
+        if (!$out['venue_conflict'] && $venue !== '' && !$online($ev) && !$online($row)
+            && mb_strtolower(trim((string) $row['venue'])) === $venue) {
+            [$s, $f] = $range($row);
+            if ($s < $newEnd && $newStart < $f) $out['venue_conflict'] = $row;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Mark ended events 'completed' (the database's complete_ended_events()).
+ * Runs at most every 5 minutes for the whole site, with a short timeout so
+ * a slow connection never holds up a page. $now: run right away (after an
+ * event is saved, so one that's already over shows Completed at once).
+ */
+function auto_complete_events(bool $now = false): void
+{
+    $stamp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ceh-complete-events-' . md5(SUPABASE_URL) . '.txt';
+    if (!$now && is_file($stamp) && filemtime($stamp) > time() - 300) return;
+    @touch($stamp);
+    supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/rest/v1/rpc/complete_ended_events', [
+        'apikey: ' . SUPABASE_ANON_KEY,
+        'Authorization: Bearer ' . SUPABASE_ANON_KEY,
+        'Content-Type: application/json',
+    ], new stdClass(), 4);
 }
 
 /** Single event by id (any status), for pre-filling the edit form. */
@@ -1221,9 +1729,12 @@ function update_event_admin(string $eventId, array $fields): array
     return ['ok' => true, 'message' => 'Event updated.'];
 }
 
-/** Delete an event (its registrations, programs and notifications go with it). */
+/** Delete an event (its registrations, programs and notifications go with it). Admins only. */
 function delete_event_admin(string $eventId): array
 {
+    if (!is_admin_user()) {
+        return ['ok' => false, 'message' => 'Only admins can delete events. Cancel it instead.'];
+    }
     $rows = supabase_user_request('events', 'id=eq.' . urlencode($eventId), 'DELETE');
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not delete the event — it may already be gone.')];
@@ -1327,7 +1838,15 @@ function get_event_registrations_admin(string $eventId): array
 {
     if (!is_uuid($eventId)) return [];
     return supabase_user_request('event_registrations',
-        'select=id,status,registered_at,attended_at,user_id,profiles(full_name,year_level,course,organizations!profiles_organization_id_fkey(name))&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc,id.asc');
+        'select=id,status,registered_at,attended_at,user_id,profiles(full_name,account_type,year_level,course,student_type,irregular_year_levels,'
+        . 'organizations!profiles_organization_id_fkey(name),school_ids(school_id,verified_at))&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc,id.asc');
+}
+
+/** Ids of the people who evaluated an event (their participation is Completed). */
+function get_event_evaluator_ids(string $eventId): array
+{
+    if (!is_uuid($eventId)) return [];
+    return array_column(supabase_user_request('event_evaluations', 'select=user_id&event_id=eq.' . urlencode($eventId)), 'user_id');
 }
 
 /**
@@ -2118,4 +2637,9 @@ function summarize_evaluations(array $questions, array $evaluations): array
         'overall_mean' => $allRatings ? round(array_sum($allRatings) / count($allRatings), 2) : null,
         'responses' => count($evaluations),
     ];
+}
+
+// Ended events become 'completed' on their own (at most every 5 minutes, site-wide).
+if (PHP_SAPI !== 'cli') {
+    auto_complete_events();
 }

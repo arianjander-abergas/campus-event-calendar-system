@@ -2,11 +2,20 @@
 /** Organizations directory: every org with its current officers and upcoming events. */
 require_once __DIR__ . '/../config/supabase.php';
 
-$activePage = 'organizations';
 $organizations = get_organizations_directory();
 $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) || !empty($o['year_level'])
     ? ' · ' . trim(($o['course'] ?? '') . ' ' . (!empty($o['year_level']) ? $o['year_level'] . (['', 'st', 'nd', 'rd'][$o['year_level']] ?? 'th') . ' yr' : ''))
     : '');
+
+// Grouped by department (organizations without one come last).
+$byDepartment = [];
+foreach ($organizations as $org) {
+    $byDepartment[!empty($org['departments']['name']) ? department_label($org['departments']) : 'Other organizations'][] = $org;
+}
+uksort($byDepartment, fn($a, $b) => ($a === 'Other organizations') <=> ($b === 'Other organizations') ?: strcmp($a, $b));
+
+$activeNav = 'organizations';
+$breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -18,9 +27,12 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
 </head>
 <body>
 
-<?php include __DIR__ . '/../includes/header.php'; ?>
+<div class="dashboard-shell no-rail">
 
-<main class="container page-main">
+<?php include __DIR__ . '/../includes/nav.php'; ?>
+<?php include __DIR__ . '/../includes/topbar.php'; ?>
+
+<main class="dash-main public-main">
   <div class="page-head">
     <div>
       <h1>Organizations</h1>
@@ -34,13 +46,18 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
 
   <?php if (count($organizations) > 1): ?>
     <nav class="org-jump" aria-label="Jump to organization">
-      <?php foreach ($organizations as $org): ?>
-        <a href="#org-<?= htmlspecialchars($org['id']) ?>"><?= htmlspecialchars($org['name']) ?></a>
+      <?php foreach ($byDepartment as $deptName => $orgs): ?>
+        <span class="org-jump-dept"><?= htmlspecialchars($deptName) ?>:</span>
+        <?php foreach ($orgs as $org): ?>
+          <a href="#org-<?= htmlspecialchars($org['id']) ?>"><?= htmlspecialchars($org['name']) ?></a>
+        <?php endforeach; ?>
       <?php endforeach; ?>
     </nav>
   <?php endif; ?>
 
-  <?php foreach ($organizations as $org): ?>
+  <?php foreach ($byDepartment as $deptName => $orgs): ?>
+  <h2 class="org-dept-heading"><?= htmlspecialchars($deptName) ?> <span><?= count($orgs) ?> organization<?= count($orgs) === 1 ? '' : 's' ?></span></h2>
+  <?php foreach ($orgs as $org): ?>
     <section class="org-card" id="org-<?= htmlspecialchars($org['id']) ?>">
       <header class="org-card-head">
         <?php if (!empty($org['logo_url'])): ?>
@@ -57,7 +74,7 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
             <p><?= nl2br(htmlspecialchars($org['description'])) ?></p>
           <?php endif; ?>
         </div>
-        <a href="events.php?organization=<?= urlencode($org['id']) ?>&amp;when=all" class="btn btn-outline org-events-link">All events</a>
+        <a href="events.php?organization=<?= urlencode($org['id']) ?>" class="btn btn-outline org-events-link">All events</a>
       </header>
 
       <div class="org-card-body">
@@ -101,9 +118,14 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
       </div>
     </section>
   <?php endforeach; ?>
-</main>
+  <?php endforeach; ?>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+</main>
+
+</div>
+
+<script src="assets/js/sidebar.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

@@ -1,20 +1,21 @@
 <?php
 /**
- * Top bar for dashboard-style pages: breadcrumbs (or a search box), the
- * notification bell and the user menu. Set before including:
+ * Top bar for every page with the sidebar: breadcrumbs (or a search box),
+ * the notification bell and the user menu — or Log in / Sign up for
+ * visitors who aren't logged in. Set before including:
  *   $breadcrumbs  = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['Events', null]]
  *   $topbarSearch = true   // show the event search box instead of breadcrumbs
  *   $notifications         // optional, loaded here if not set
  */
 $topUser = current_user();
-$notifications = $notifications ?? get_my_notifications();
+$notifications = $topUser ? ($notifications ?? get_my_notifications()) : [];
 $unreadCount = unread_count($notifications);
 ?>
 <header class="dash-topbar">
   <?php if (!empty($topbarSearch)): ?>
     <form class="search-box" action="<?= BASE_URL ?>/events.php" method="get" role="search">
       <?= icon('search', 16) ?>
-      <input type="search" name="q" placeholder="Search for events, organizations, or keywords" aria-label="Search events">
+      <input type="search" name="q" value="<?= htmlspecialchars(basename($_SERVER['SCRIPT_NAME'] ?? '') === 'events.php' ? get_param('q') : '') ?>" placeholder="Search for events, organizations, or keywords" aria-label="Search events">
     </form>
   <?php else: ?>
     <nav class="breadcrumb" aria-label="Breadcrumb">
@@ -30,6 +31,10 @@ $unreadCount = unread_count($notifications);
   <?php endif; ?>
 
   <div class="topbar-right">
+    <?php if (!$topUser): ?>
+      <a href="<?= BASE_URL ?>/auth/login.php" class="btn-login">LOG IN</a>
+      <a href="<?= BASE_URL ?>/auth/register.php" class="btn btn-outline topbar-signup">Sign up</a>
+    <?php else: ?>
     <div class="notif" data-notifications>
       <button class="bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
         <?= icon('bell', 20) ?><span class="dot" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
@@ -45,7 +50,7 @@ $unreadCount = unread_count($notifications);
         <span class="avatar"><?= htmlspecialchars(initials($topUser['full_name'] ?? '')) ?></span>
         <span class="user-text">
           <span class="user-name"><?= htmlspecialchars($topUser['full_name'] ?? '') ?></span>
-          <span class="user-role"><?= htmlspecialchars(role_display($topUser['role'] ?? 'user')) ?></span>
+          <span class="user-role"><?= htmlspecialchars(role_display($topUser['role'] ?? 'user', $topUser['account_type'] ?? null)) ?></span>
         </span>
         <span class="user-caret" aria-hidden="true"><?= icon('chevron-down', 12) ?></span>
       </summary>
@@ -55,6 +60,9 @@ $unreadCount = unread_count($notifications);
         <a href="<?= BASE_URL ?>/auth/logout.php">Log out</a>
       </div>
     </details>
+    <?php endif; ?>
   </div>
 </header>
+<?php if ($topUser): ?>
 <?= notifications_bootstrap($notifications) ?>
+<?php endif; ?>

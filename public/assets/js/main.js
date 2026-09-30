@@ -10,24 +10,46 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ---------------- Calendar (dashboard right rail) ---------------- */
-// Real current month; ‹ › change month. Days with a published event
-// (window.CALENDAR_EVENTS from enduser/dashboard.php) get a dot; hovering
-// lists the titles and clicking opens the event.
+// Real current month; ‹ › change month. Days with a published or completed
+// event (window.CALENDAR_EVENTS from enduser/dashboard.php) get a dot;
+// clicking a day lists ALL of that day's events below the calendar, with a
+// link to the day on the full Event Calendar.
 function buildCalendar() {
   const grid = document.getElementById("calendar-grid");
   if (!grid) return;
 
   const label = document.getElementById("calendar-month");
+  const list = document.getElementById("calendar-day-list");
   const events = window.CALENDAR_EVENTS || [];
   const eventUrl = grid.dataset.eventUrl || "";
+  const calendarUrl = grid.dataset.calendarUrl || "";
   const today = new Date();
   let year = today.getFullYear();
   let month = today.getMonth(); // 0-11
+  let selected = null;
 
   const pad = (n) => String(n).padStart(2, "0");
   const iso = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
   const eventsOn = (date) => events.filter((e) => e.start <= date && date <= (e.end || e.start));
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+  function showDay(date) {
+    selected = date;
+    grid.querySelectorAll(".day.selected").forEach((d) => d.classList.remove("selected"));
+    grid.querySelector(`[data-date="${date}"]`)?.classList.add("selected");
+    if (!list) return;
+    const [y, m, d] = date.split("-").map(Number);
+    const title = new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const onDay = eventsOn(date);
+    const shown = 6; // the full list is one click away on the Event Calendar
+    const more = onDay.length - shown;
+    list.innerHTML = `<h4>${esc(title)} · ${onDay.length} event${onDay.length === 1 ? "" : "s"}</h4>`
+      + (onDay.length
+        ? onDay.slice(0, shown).map((e) => `<a href="${esc(eventUrl + encodeURIComponent(e.id))}"><strong>${esc(e.title)}</strong>`
+            + `<span>${esc([e.time || "All day", e.place].filter(Boolean).join(" · "))}${e.status === "completed" ? " · Completed" : ""}</span></a>`).join("")
+        : "<p>No events on this date.</p>")
+      + (calendarUrl ? `<a class="cal-open-link" href="${esc(calendarUrl + "?date=" + date)}">${more > 0 ? "See all " + onDay.length + " in the Event Calendar ›" : "Open this day in the Event Calendar ›"}</a>` : "");
+  }
 
   function render() {
     if (label) {
@@ -49,10 +71,9 @@ function buildCalendar() {
       }
       const date = iso(year, month, day);
       const onDay = eventsOn(date);
-      const cls = `day${date === todayIso ? " today" : ""}${onDay.length ? " has-event" : ""}`;
-      html += onDay.length
-        ? `<a class="${cls}" href="${esc(eventUrl + encodeURIComponent(onDay[0].id))}" title="${esc(onDay.map((e) => e.title).join("\n"))}">${day}<span class="marker marker-blue"></span></a>`
-        : `<div class="${cls}">${day}</div>`;
+      const cls = `day${date === todayIso ? " today" : ""}${onDay.length ? " has-event" : ""}${date === selected ? " selected" : ""}`;
+      const tip = onDay.length ? onDay.map((e) => e.title).join("\n") : "No events";
+      html += `<button type="button" class="${cls}" data-date="${date}" title="${esc(tip)}" aria-label="${esc(date + ": " + onDay.length + " event" + (onDay.length === 1 ? "" : "s"))}">${day}${onDay.length ? '<span class="marker marker-blue"></span>' : ""}</button>`;
     }
     grid.innerHTML = html;
   }
@@ -63,9 +84,15 @@ function buildCalendar() {
     if (month > 11) { month = 0; year++; }
     render();
   }
+  grid.addEventListener("click", (e) => {
+    const day = e.target.closest("button.day");
+    if (day) showDay(day.dataset.date);
+  });
   document.getElementById("calPrev")?.addEventListener("click", () => step(-1));
   document.getElementById("calNext")?.addEventListener("click", () => step(1));
   render();
+  // Start with today's events listed.
+  showDay(iso(today.getFullYear(), today.getMonth(), today.getDate()));
 }
 
 /* ---------------- Carousel (dashboard "Upcoming events") ---------------- */
