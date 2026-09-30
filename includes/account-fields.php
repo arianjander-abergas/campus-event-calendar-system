@@ -4,7 +4,7 @@
  * Profile (enduser/profile.php): student or faculty, department,
  * organization (grouped by department), and for students the school ID,
  * course, highest year level and regular / irregular — irregular opens a
- * pop-up to tick the year levels of their subjects. Behaviour:
+ * pop-up to pick the year levels of their subjects. Behaviour:
  * assets/js/account.js. Checked by validate_account_fields().
  *
  * Set before including:
@@ -131,7 +131,7 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
     <!-- Pop-up for irregular students (its fields are part of the form) -->
     <dialog class="acct-modal" id="irregularModal" aria-labelledby="irregularTitle">
       <h2 id="irregularTitle">Irregular student registration</h2>
-      <p>Irregular students take subjects from more than one year level. Tick <strong>every</strong> year level you have subjects in this semester. Your highest year level is always included.</p>
+      <p>Irregular students take subjects from more than one year level. Pick <strong>every</strong> year level you have subjects in this semester. Your highest year level is always included.</p>
       <div class="acct-levels">
         <?php foreach (YEAR_LEVELS as $y => $label): ?>
           <label><input type="checkbox" name="irregular_year_levels[]" value="<?= $y ?>" <?= in_array($y, $acctLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
@@ -140,9 +140,9 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
       <div class="acct-rules">
         <strong>Registration rules for irregular students</strong>
         <ul>
-          <li>You can register for events open to <em>any</em> of the year levels you tick.</li>
+          <li>You can register for events open to <em>any</em> of the year levels you pick.</li>
           <li>Events limited to other year levels stay closed to you.</li>
-          <li>Your highest year level can't be lower than a year level you tick.</li>
+          <li>Your highest year level can't be lower than a year level you pick.</li>
           <li>Moderators and admins see the year levels you declare, and admins may check them against the registrar's list.</li>
         </ul>
       </div>

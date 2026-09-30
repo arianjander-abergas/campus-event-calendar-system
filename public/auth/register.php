@@ -3,7 +3,7 @@
  * Sign up. Everyone chooses student or faculty, their department and their
  * organization (required). Students also give their School ID, course,
  * highest year level and whether they're regular or irregular — irregular
- * students tick the year levels of their subjects in a pop-up.
+ * students pick the year levels of their subjects in a pop-up.
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
