@@ -170,7 +170,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
 
     <?php if ($tab === 'categories'): ?>
       <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=categories" class="admin-card">
+        <form method="POST" action="admin-taxonomy.php?tab=categories" class="admin-card" data-autoreset>
           <input type="hidden" name="action" value="save_category">
           <?php if (!empty($cf['id'])): ?><input type="hidden" name="id" value="<?= $catVal('id') ?>"><?php endif; ?>
           <h2 class="admin-card-title"><?= !empty($cf['id']) ? 'Edit Category' : 'Add Category' ?></h2>
@@ -200,7 +200,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                 <tr>
                   <td><strong><?= htmlspecialchars($c['name']) ?></strong></td>
                   <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
-                  <td><a href="../events.php?category=<?= urlencode($c['id']) ?>&amp;when=all"><?= $used ?></a></td>
+                  <td><a href="../events.php?category=<?= urlencode($c['id']) ?>"><?= $used ?></a></td>
                   <td class="admin-row-actions">
                     <a href="admin-taxonomy.php?tab=categories&amp;edit_category=<?= urlencode($c['id']) ?>" class="btn-sm">Edit</a>
                     <form method="POST" action="admin-taxonomy.php?tab=categories" onsubmit="return confirm('Delete the category &quot;<?= htmlspecialchars(addslashes($c['name'])) ?>&quot;?');">
@@ -218,7 +218,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
       </div>
     <?php elseif ($tab === 'departments'): ?>
       <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=departments" class="admin-card">
+        <form method="POST" action="admin-taxonomy.php?tab=departments" class="admin-card" data-autoreset>
           <input type="hidden" name="action" value="save_department">
           <?php if (!empty($df['id'])): ?><input type="hidden" name="id" value="<?= $deptVal('id') ?>"><?php endif; ?>
           <h2 class="admin-card-title"><?= !empty($df['id']) ? 'Edit Department' : 'Add Department' ?></h2>
@@ -272,7 +272,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
       </div>
     <?php else: ?>
       <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=organizations" class="admin-card" enctype="multipart/form-data">
+        <form method="POST" action="admin-taxonomy.php?tab=organizations" class="admin-card" data-autoreset enctype="multipart/form-data">
           <input type="hidden" name="action" value="save_organization">
           <?php if (!empty($of['id'])): ?><input type="hidden" name="id" value="<?= $orgVal('id') ?>"><?php endif; ?>
           <h2 class="admin-card-title"><?= !empty($of['id']) ? 'Edit Organization' : 'Add Organization' ?></h2>
@@ -331,7 +331,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                     <?php if (!empty($o['description'])): ?><div class="admin-table-sub"><?= htmlspecialchars(excerpt($o['description'], 70)) ?></div><?php endif; ?>
                   </td>
                   <td><?= !empty($o['departments']) ? htmlspecialchars($o['departments']['code'] ?: $o['departments']['name']) : '<span class="admin-table-sub">None</span>' ?></td>
-                  <td><a href="../events.php?organization=<?= urlencode($o['id']) ?>&amp;when=all"><?= $used ?></a></td>
+                  <td><a href="../events.php?organization=<?= urlencode($o['id']) ?>"><?= $used ?></a></td>
                   <td><?= $count($o, 'organization_officers') ?></td>
                   <td class="admin-row-actions">
                     <a href="organization-officers.php?org=<?= urlencode($o['id']) ?>" class="btn-sm btn-sm-accent">Officers</a>
@@ -355,6 +355,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

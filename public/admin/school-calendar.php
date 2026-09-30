@@ -120,7 +120,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
       1st Semester August–December, 2nd Semester January–May, Summer June–July.</p>
 
     <div class="admin-split">
-      <form method="POST" action="school-calendar.php<?= $isEditing ? '?edit=' . urlencode($f['id']) : '' ?>" class="admin-card">
+      <form method="POST" action="school-calendar.php<?= $isEditing ? '?edit=' . urlencode($f['id']) : '' ?>" class="admin-card" data-autoreset>
         <input type="hidden" name="action" value="save_term">
         <?php if ($isEditing): ?><input type="hidden" name="id" value="<?= $val('id') ?>"><?php endif; ?>
         <h2 class="admin-card-title"><?= $isEditing ? 'Edit Term' : 'Add Term' ?></h2>
@@ -193,6 +193,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

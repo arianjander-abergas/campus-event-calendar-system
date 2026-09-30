@@ -6,10 +6,8 @@ $user = require_login(); // redirects to login.php if not authenticated
 $events = get_upcoming_events(9);            // carousel: today's events first, 3 per page
 $myRegistrations = get_my_registrations(5);
 $trending = get_trending_events();
-$calendarEvents = get_calendar_events();
+$calendarEvents = get_calendar_events();    // small calendar: click a day to list its events
 $notifications = get_my_notifications();     // bell + Announcements panel
-$categories = get_categories();
-$organizations = get_organizations();
 $toEvaluate = get_my_pending_evaluations();  // attended, not evaluated yet
 
 $activeNav = 'dashboard';
@@ -94,7 +92,7 @@ $topbarSearch = true;
             <?php if ($toEvaluate): ?>
               <span class="mini-badge badge-evaluate">Evaluate</span>
             <?php elseif ($reg['status'] === 'attended'): ?>
-              <span class="mini-badge badge-registered">Attended</span>
+              <span class="mini-badge badge-completed" title="Attended and evaluated">Completed</span>
             <?php elseif ($ev['status'] === 'cancelled'): ?>
               <span class="mini-badge badge-unavailable">Cancelled</span>
             <?php elseif ($unavailable): ?>
@@ -109,7 +107,7 @@ $topbarSearch = true;
       <div class="list-card" id="trending-events">
         <div class="section-head">
           <h2>Trending events</h2>
-          <a href="../events.php?sort=popular" class="view-all">View All</a>
+          <a href="../events.php" class="view-all">Calendar</a>
         </div>
 
         <?php if (empty($trending)): ?>
@@ -137,44 +135,13 @@ $topbarSearch = true;
         <span id="calendar-month"></span>
         <span class="cal-nav"><button type="button" id="calPrev" aria-label="Previous month">‹</button><button type="button" id="calNext" aria-label="Next month">›</button></span>
       </div>
-      <div class="cal-grid" id="calendar-grid" data-event-url="../event-details.php?id=">
+      <div class="cal-grid" id="calendar-grid" data-event-url="../event-details.php?id=" data-calendar-url="../events.php">
         <!-- filled by assets/js/main.js -->
       </div>
+      <div class="cal-day-list" id="calendar-day-list" aria-live="polite">
+        <p>Click a date to see its events.</p>
+      </div>
     </div>
-
-    <form class="rail-card filters-card" action="../events.php" method="get">
-      <h3>Filters</h3>
-      <select name="type" aria-label="Event type">
-        <option value="">All Event Types</option>
-        <?php foreach (EVENT_TYPES as $key => $label): ?>
-          <option value="<?= $key ?>"><?= $label ?></option>
-        <?php endforeach; ?>
-      </select>
-      <select name="organization" aria-label="Organization">
-        <option value="">All Organizations</option>
-        <?php foreach ($organizations as $o): ?>
-          <option value="<?= htmlspecialchars($o['id']) ?>"><?= htmlspecialchars($o['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <select name="category" aria-label="Category">
-        <option value="">All Categories</option>
-        <?php foreach ($categories as $c): ?>
-          <option value="<?= htmlspecialchars($c['id']) ?>"><?= htmlspecialchars($c['name']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <select name="audience" aria-label="Audience">
-        <option value="">Any Audience</option>
-        <option value="students">For Students</option>
-        <option value="faculty">For Faculty</option>
-      </select>
-      <select name="venue_type" aria-label="Venue type">
-        <option value="">Any Venue</option>
-        <?php foreach (VENUE_TYPES as $key => $label): ?>
-          <option value="<?= $key ?>"><?= $label ?></option>
-        <?php endforeach; ?>
-      </select>
-      <button type="submit" class="btn btn-accent">Apply Filters</button>
-    </form>
 
     <div class="rail-card">
       <h3>Announcements</h3>

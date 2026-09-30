@@ -1006,3 +1006,129 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .eval-callout-item small { display: block; font-weight: 500; color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; }
 .eval-callout-item strong { color: var(--orange); font-size: 0.8rem; white-space: nowrap; }
 .eval-callout-item:hover { box-shadow: var(--shadow-hover); }
+
+/* ============================================================
+   Public pages in the sidebar layout (home, Event Calendar,
+   organizations) — every page now has the same sidebar.
+   ============================================================ */
+.public-main { display: flex; flex-direction: column; }
+.public-main > .container, .public-main .container { max-width: none; margin: 0; padding: 0; }
+.public-main .hero { border-radius: var(--radius); min-height: 380px; }
+.public-main .feature-strip { margin: -34px 24px 0; }
+/* The footer runs edge to edge under the page content. */
+.public-main .site-footer { margin: 40px -28px -26px; }
+.public-main .site-footer .container { padding: 0 28px; }
+.topbar-signup { padding: 9px 18px; font-size: 0.82rem; }
+.topbar-right .btn-login { padding: 10px 22px; }
+
+/* Card pills: Completed (event over / your participation done), My Events labels. */
+.status-completed { background: #4f46e5; }
+.status-registered { background: var(--green); }
+.status-evaluate { background: var(--orange); }
+.status-cancelled { background: var(--red); }
+
+/* Dashboard calendar: all events of the clicked day. */
+.cal-grid button.day { border: none; background: transparent; font: inherit; cursor: pointer; }
+.cal-grid .day.has-event { font-weight: 700; color: var(--blue-accent); }
+.cal-grid button.day.has-event:hover { background: #e8f0fe; }
+.cal-grid .day.selected { box-shadow: inset 0 0 0 2px var(--orange); }
+.cal-day-list { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.cal-day-list h4 { margin: 0 0 8px; font-size: 0.8rem; color: var(--navy); }
+.cal-day-list a { display: block; padding: 7px 0; border-bottom: 1px solid #f1f1f1; font-size: 0.78rem; }
+.cal-day-list a:last-of-type { border-bottom: none; }
+.cal-day-list a strong { display: block; overflow-wrap: anywhere; }
+.cal-day-list a span { color: var(--text-muted); font-size: 0.7rem; }
+.cal-day-list a:hover strong { color: var(--blue-accent); }
+.cal-day-list .cal-open-link { color: var(--blue-accent); font-weight: 700; border-bottom: none; padding-bottom: 0; }
+.cal-day-list p { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
+
+/* "Completed" on the dashboard lists (attended + evaluated). */
+.badge-completed { background: #4f46e5; }
+
+@media (max-width: 760px) {
+  .public-main .site-footer { margin: 32px -16px -20px; }
+  .public-main .site-footer .container { padding: 0 16px; }
+  .public-main .feature-strip { margin: -24px 10px 0; }
+  .topbar-signup { display: none; }
+}
+
+/* ============================================================
+   Account fields — sign-up and My Profile (includes/account-fields.php)
+   ============================================================ */
+.acct-fields { display: flex; flex-direction: column; gap: 4px; }
+.acct-type { border: 0; margin: 0 0 12px; padding: 0; min-width: 0; }
+.acct-type legend { padding: 0; }
+.acct-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.acct-option { position: relative; display: block; cursor: pointer; }
+.acct-option input { position: absolute; opacity: 0; pointer-events: none; }
+.acct-option span {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+}
+.acct-option small { font-size: 0.74rem; color: var(--text-muted); font-weight: 400; }
+.acct-option input:checked + span { border-color: var(--orange); background: #fff7f2; box-shadow: 0 0 0 2px rgba(244, 98, 44, 0.15); }
+.acct-option input:focus-visible + span { outline: 3px solid var(--blue-accent); outline-offset: 2px; }
+.acct-locked { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+.acct-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.acct-student { border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px; }
+.acct-status { display: flex; gap: 18px; align-items: center; min-height: 40px; margin-bottom: 14px; }
+.acct-status label { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; font-size: 0.9rem; cursor: pointer; }
+.acct-label { display: block; }
+.acct-verified { margin: -10px 0 12px; font-size: 0.74rem; color: #166534; font-weight: 600; }
+.acct-irregular-summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 9px 12px;
+  border-radius: 8px; background: #fff7f2; border: 1px solid #fbd3bf;
+  font-size: 0.82rem; font-weight: 600; color: #9a3412;
+}
+.acct-link { background: none; border: none; padding: 0; color: var(--blue-accent); font-weight: 700; font-size: 0.82rem; text-decoration: underline; }
+
+/* The "Irregular student registration" pop-up */
+.acct-modal {
+  width: min(520px, calc(100vw - 32px));
+  border: none;
+  border-radius: 14px;
+  padding: 24px 26px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+  color: var(--text-main);
+  font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.acct-modal::backdrop { background: rgba(10, 25, 55, 0.55); }
+.acct-modal h2 { margin: 0 0 8px; font-size: 1.15rem; color: var(--navy); }
+.acct-modal p { margin: 0 0 12px; font-size: 0.88rem; line-height: 1.55; color: #374151; }
+.acct-levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin: 4px 0 14px; }
+.acct-levels label {
+  display: flex !important; align-items: center; gap: 6px; margin: 0 !important;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.85rem !important; color: var(--text-main) !important; cursor: pointer;
+}
+.acct-levels label:has(input:checked) { border-color: var(--orange); background: #fff7f2; }
+.acct-levels label:has(input:disabled) { cursor: default; opacity: 0.75; }
+.acct-rules { background: #f3f6fd; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: 0.82rem; }
+.acct-rules ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; line-height: 1.5; color: #374151; }
+.acct-ack { display: flex !important; gap: 8px; align-items: flex-start; margin: 0 0 10px !important; font-size: 0.85rem !important; color: var(--text-main) !important; cursor: pointer; }
+.acct-ack input { margin-top: 3px; }
+.acct-modal-error { color: var(--red) !important; font-weight: 600; }
+.acct-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.acct-modal-actions .btn { padding: 10px 22px; font-size: 0.85rem; }
+
+/* School ID verification badge (profile, users, registrations, import). */
+.verify-badge {
+  display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px;
+  background: #f3f4f6; color: #6b7280; font-size: 0.66rem; font-weight: 700; vertical-align: middle;
+}
+.verify-badge.is-verified { background: #dcfce7; color: #166534; }
+.text-warn { color: #b45309; font-weight: 600; }
+
+@media (max-width: 560px) {
+  .acct-grid, .acct-choice { grid-template-columns: 1fr; }
+}
+
+/* Organizations page: grouped by department. */
+.org-jump-dept { align-self: center; font-size: 0.74rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-left: 6px; }
+.org-jump-dept:first-child { margin-left: 0; }
+.org-dept-heading { margin: 26px 0 12px; font-size: 1.05rem; color: var(--navy); display: flex; align-items: baseline; gap: 10px; }
+.org-dept-heading span { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }

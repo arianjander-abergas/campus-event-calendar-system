@@ -1,4 +1,4 @@
-<?php /** Footer for the public pages (home, events, organizations). */ ?>
+<?php /** Footer at the bottom of the public pages (home, event calendar, organizations). */ ?>
 <footer class="site-footer">
   <div class="container site-footer-inner">
     <div class="site-footer-brand">
@@ -9,7 +9,7 @@
       </div>
     </div>
     <nav class="site-footer-links" aria-label="Footer">
-      <a href="<?= BASE_URL ?>/events.php">Events</a>
+      <a href="<?= BASE_URL ?>/events.php">Event Calendar</a>
       <a href="<?= BASE_URL ?>/organizations.php">Organizations</a>
       <a href="<?= BASE_URL ?>/index.php#about">About Us</a>
       <?php if (current_user()): ?>

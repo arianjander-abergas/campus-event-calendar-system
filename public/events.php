@@ -1,53 +1,107 @@
 <?php
 /**
- * All events: search + filters (the header / dashboard search boxes, the
- * dashboard Filters panel and every "View All" link land here).
- *   ?q=keyword &category=<id> &organization=<id> &type=seminar
- *   &audience=students|faculty &venue_type=on_campus|off_campus|online
- *   &when=upcoming|past|all &sort=date|popular &page=2
- *   ?mine=1  -> the logged-in user's registered events
+ * Event Calendar — the one place to browse events. A month calendar with a
+ * single filter bar; clicking a day shows every event on that date.
+ *   ?month=2026-09        the month shown (default: this month)
+ *   ?date=2026-09-30      the selected day (default: today, or the 1st event of the month)
+ *   ?q=keyword &category=<id> &organization=<id> &audience=students|faculty
+ *   &venue_type=on_campus|off_campus|online
+ *   ?mine=1               the logged-in user's registered events (a list)
+ * The header / dashboard search boxes, "View All" links and the
+ * organizations page all land here.
  */
 require_once __DIR__ . '/../config/supabase.php';
 
-$activePage = 'events';
-$mine = !empty($_GET['mine']);
-if ($mine) {
-    require_login();
-}
-
-// Query values as plain strings (a crafted "?category[]=x" becomes '').
-$param = fn(string $key): string => get_param($key);
-$filters = [
-    'q' => $param('q'),
-    'category' => is_uuid($param('category')) ? $param('category') : '',
-    'organization' => is_uuid($param('organization')) ? $param('organization') : '',
-    'type' => isset(EVENT_TYPES[$param('type')]) ? $param('type') : '',
-    'audience' => in_array($param('audience'), ['students', 'faculty'], true) ? $param('audience') : '',
-    'venue_type' => isset(VENUE_TYPES[$param('venue_type')]) ? $param('venue_type') : '',
-    'when' => in_array($param('when'), ['upcoming', 'past', 'all'], true) ? $param('when') : 'upcoming',
-    'sort' => $param('sort') === 'popular' ? 'popular' : 'date',
-];
-$page = max(1, (int) $param('page'));
-
-if ($mine) {
-    $registrations = get_my_registrations(0);
-    $events = array_map(fn($r) => $r['events'] + ['my_status' => $r['status']], $registrations);
-    $hasMore = false;
-} else {
-    $result = search_events($filters, $page);
-    $events = $result['events'];
-    $hasMore = $result['has_more'];
-}
+$mine = get_param('mine') !== '';
+$user = $mine ? require_login() : current_user();
 
 $categories = get_categories();
 $organizations = get_organizations();
-$isFiltered = $filters['q'] !== '' || $filters['category'] || $filters['organization'] || $filters['type']
-    || $filters['audience'] || $filters['venue_type'] || $filters['when'] !== 'upcoming' || $filters['sort'] !== 'date';
 
-// Link to another page of results, keeping the current filters.
-$pageUrl = fn(int $p): string => 'events.php?' . http_build_query(array_filter($filters + ['page' => $p], fn($v) => $v !== '' && $v !== null));
+// ---- My Events: a list of the user's registrations ----------------------
+if ($mine) {
+    $registrations = get_my_registrations(0);
+    $evaluated = get_my_evaluated_event_ids();
+    $events = array_map(function ($r) use ($evaluated) {
+        $ev = $r['events'];
+        $ev['my_label'] = match (true) {
+            $r['status'] === 'attended' && in_array($ev['id'], $evaluated, true) => 'Completed',
+            $r['status'] === 'attended' => 'Evaluate',
+            $ev['status'] === 'cancelled' => 'Cancelled',
+            default => 'Registered',
+        };
+        return $ev;
+    }, $registrations);
+}
 
-$heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filters['q'] . '"' : ['upcoming' => 'Upcoming Events', 'past' => 'Past Events', 'all' => 'All Events'][$filters['when']]);
+// ---- Calendar -------------------------------------------------------------
+$filters = [
+    'q' => get_param('q'),
+    'category' => is_uuid(get_param('category')) ? get_param('category') : '',
+    'organization' => is_uuid(get_param('organization')) ? get_param('organization') : '',
+    'audience' => in_array(get_param('audience'), ['students', 'faculty'], true) ? get_param('audience') : '',
+    'venue_type' => isset(VENUE_TYPES[get_param('venue_type')]) ? get_param('venue_type') : '',
+];
+$isFiltered = implode('', $filters) !== '';
+$today = date('Y-m-d');
+
+$selected = preg_match('/^\d{4}-\d{2}-\d{2}$/', get_param('date')) && strtotime(get_param('date')) ? get_param('date') : '';
+$month = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', get_param('month')) ? get_param('month') : ($selected !== '' ? substr($selected, 0, 7) : '');
+
+// Searching or filtering without choosing a month (e.g. an organization's "All events"
+// link): jump to the next matching event, or the latest past one.
+$matches = [];
+if (!$mine && ($filters['q'] !== '' || ($isFiltered && $month === ''))) {
+    $matches = find_events($filters, '', '', 200);
+    if ($month === '' && $matches) {
+        $upcoming = array_values(array_filter($matches, fn($e) => ($e['end_date'] ?? $e['start_date']) >= $today));
+        $jump = $upcoming[0] ?? end($matches);
+        $selected = max($jump['start_date'], $today <= ($jump['end_date'] ?? $jump['start_date']) ? $today : $jump['start_date']);
+        $month = substr($selected, 0, 7);
+    }
+}
+if ($month === '') $month = date('Y-m');
+
+$first = new DateTimeImmutable($month . '-01');
+$gridStart = $first->modify('-' . (int) $first->format('w') . ' days');                  // Sunday on/before the 1st
+$last = $first->modify('last day of this month');
+$gridEnd = $last->modify('+' . (6 - (int) $last->format('w')) . ' days');                // Saturday on/after the last day
+
+$byDate = [];
+if (!$mine) {
+    foreach (find_events($filters, $gridStart->format('Y-m-d'), $gridEnd->format('Y-m-d')) as $ev) {
+        foreach (event_dates($ev) as $d) {
+            $byDate[$d][] = $ev;
+        }
+    }
+}
+if ($selected === '' || substr($selected, 0, 7) !== $month) {
+    // Today when it's in this month, else the month's first day with events, else the 1st.
+    $monthDays = array_filter(array_keys($byDate), fn($d) => substr($d, 0, 7) === $month);
+    sort($monthDays);
+    $selected = substr($today, 0, 7) === $month ? $today : ($monthDays[0] ?? $first->format('Y-m-d'));
+}
+
+$counts = get_registration_counts();
+$query = fn(array $extra): string => 'events.php?' . http_build_query(array_filter($filters + $extra, fn($v) => $v !== '' && $v !== null));
+$prevMonth = $first->modify('-1 month')->format('Y-m');
+$nextMonth = $first->modify('+1 month')->format('Y-m');
+
+$activeNav = $mine ? 'my-events' : 'events';
+$breadcrumbs = [['Home', BASE_URL . '/index.php'], [$mine ? 'My Events' : 'Event Calendar', null]];
+$heading = $mine ? 'My Events' : 'Event Calendar';
+
+/** "9:00 AM – 12:00 PM", "All day", or "Sep 30 – Oct 2" for multi-day events. */
+function calendar_time_line(array $ev): string
+{
+    $multi = !empty($ev['end_date']) && $ev['end_date'] !== $ev['start_date'];
+    $time = format_event_time($ev['start_time'] ?? null);
+    if ($time !== '' && !empty($ev['end_time'])) $time .= ' – ' . format_event_time($ev['end_time']);
+    if ($multi) {
+        return date('M j', strtotime($ev['start_date'])) . ' – ' . date('M j', strtotime($ev['end_date'])) . ($time !== '' ? ' · ' . $time : '');
+    }
+    return $time !== '' ? $time : 'All day';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -56,12 +110,16 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= htmlspecialchars($heading) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/calendar.css">
 </head>
 <body>
 
-<?php include __DIR__ . '/../includes/header.php'; ?>
+<div class="dashboard-shell no-rail">
 
-<main class="container page-main">
+<?php include __DIR__ . '/../includes/nav.php'; ?>
+<?php include __DIR__ . '/../includes/topbar.php'; ?>
+
+<main class="dash-main public-main">
   <?= render_flashes() ?>
 
   <div class="page-head">
@@ -69,21 +127,33 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
       <h1><?= htmlspecialchars($heading) ?></h1>
       <p class="page-sub">
         <?php if ($mine): ?>
-          Events you've registered for. Open one to see its schedule or cancel your registration.
+          Events you've registered for. Open one to see its schedule, cancel, or evaluate it after you attend.
         <?php else: ?>
-          Browse campus events — search by keyword, organization, category, type, audience or venue.
+          Every campus event on one calendar. Click a date to see all of that day's events.
         <?php endif; ?>
       </p>
     </div>
     <?php if ($mine): ?>
-      <a href="events.php" class="btn btn-outline">Browse all events</a>
-    <?php elseif (current_user()): ?>
+      <a href="events.php" class="btn btn-outline">Open the calendar</a>
+    <?php elseif ($user): ?>
       <a href="events.php?mine=1" class="btn btn-outline">My registered events</a>
     <?php endif; ?>
   </div>
 
-  <?php if (!$mine): ?>
-  <form class="filter-bar" method="get" action="events.php" role="search">
+  <?php if ($mine): ?>
+    <div class="events-grid events-grid-page">
+      <?php if (empty($events)): ?>
+        <div class="events-empty">You haven't registered for any events yet. <a href="events.php">Find one on the calendar</a>.</div>
+      <?php endif; ?>
+      <?php foreach ($events as $ev): ?>
+        <?php include __DIR__ . '/../includes/event-card.php'; ?>
+      <?php endforeach; ?>
+    </div>
+  <?php else: ?>
+
+  <!-- The one filter bar: keyword + category, organization, audience, venue -->
+  <form class="filter-bar cal-filters" method="get" action="events.php" role="search">
+    <input type="hidden" name="month" value="<?= htmlspecialchars($filters['q'] === '' ? $month : '') ?>">
     <input type="search" name="q" value="<?= htmlspecialchars($filters['q']) ?>" placeholder="Search events, organizations, or keywords" aria-label="Keyword">
     <select name="category" aria-label="Category">
       <option value="">All categories</option>
@@ -97,12 +167,6 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
         <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
       <?php endforeach; ?>
     </select>
-    <select name="type" aria-label="Event type">
-      <option value="">All event types</option>
-      <?php foreach (EVENT_TYPES as $key => $label): ?>
-        <option value="<?= $key ?>" <?= $filters['type'] === $key ? 'selected' : '' ?>><?= $label ?></option>
-      <?php endforeach; ?>
-    </select>
     <select name="audience" aria-label="Audience">
       <option value="">Any audience</option>
       <option value="students" <?= $filters['audience'] === 'students' ? 'selected' : '' ?>>For students</option>
@@ -114,49 +178,119 @@ $heading = $mine ? 'My Events' : ($filters['q'] !== '' ? 'Results for "' . $filt
         <option value="<?= $key ?>" <?= $filters['venue_type'] === $key ? 'selected' : '' ?>><?= $label ?></option>
       <?php endforeach; ?>
     </select>
-    <select name="when" aria-label="When">
-      <option value="upcoming" <?= $filters['when'] === 'upcoming' ? 'selected' : '' ?>>Upcoming</option>
-      <option value="past" <?= $filters['when'] === 'past' ? 'selected' : '' ?>>Past</option>
-      <option value="all" <?= $filters['when'] === 'all' ? 'selected' : '' ?>>All dates</option>
-    </select>
-    <select name="sort" aria-label="Sort by">
-      <option value="date" <?= $filters['sort'] === 'date' ? 'selected' : '' ?>>Sort by date</option>
-      <option value="popular" <?= $filters['sort'] === 'popular' ? 'selected' : '' ?>>Most popular</option>
-    </select>
-    <button type="submit" class="btn btn-accent">Search</button>
+    <button type="submit" class="btn btn-accent">Apply</button>
     <?php if ($isFiltered): ?>
-      <a href="events.php" class="filter-clear">Clear</a>
+      <a href="events.php?month=<?= htmlspecialchars($month) ?>" class="filter-clear">Clear</a>
     <?php endif; ?>
   </form>
+
+  <?php if ($filters['q'] !== ''): ?>
+    <div class="cal-matches">
+      <strong><?= count($matches) ?> event<?= count($matches) === 1 ? '' : 's' ?> match "<?= htmlspecialchars($filters['q']) ?>"</strong>
+      <?php foreach (array_slice($matches, 0, 12) as $m): ?>
+        <a href="<?= htmlspecialchars($query(['month' => substr($m['start_date'], 0, 7), 'date' => $m['start_date']])) ?>"><?= htmlspecialchars(date('M j', strtotime($m['start_date']))) ?> · <?= htmlspecialchars($m['title']) ?></a>
+      <?php endforeach; ?>
+    </div>
   <?php endif; ?>
 
-  <div class="events-grid events-grid-page">
-    <?php if (empty($events)): ?>
-      <div class="events-empty">
-        <?php if ($mine): ?>
-          You haven't registered for any events yet. <a href="events.php">Find an event</a>.
-        <?php elseif ($isFiltered): ?>
-          No events match your search. <a href="events.php">Clear the filters</a>.
-        <?php else: ?>
-          No upcoming events yet. Check back soon!
+  <div class="cal-layout">
+    <section class="cal-card" aria-labelledby="calMonthTitle">
+      <div class="cal-toolbar">
+        <a href="<?= htmlspecialchars($query(['month' => $prevMonth])) ?>" class="cal-step" aria-label="Previous month">‹</a>
+        <h2 id="calMonthTitle"><?= htmlspecialchars($first->format('F Y')) ?></h2>
+        <a href="<?= htmlspecialchars($query(['month' => $nextMonth])) ?>" class="cal-step" aria-label="Next month">›</a>
+        <?php if ($month !== date('Y-m')): ?>
+          <a href="<?= htmlspecialchars($query(['month' => date('Y-m')])) ?>" class="btn btn-outline cal-today-btn">Today</a>
         <?php endif; ?>
       </div>
-    <?php endif; ?>
-    <?php foreach ($events as $ev): ?>
-      <?php include __DIR__ . '/../includes/event-card.php'; ?>
-    <?php endforeach; ?>
-  </div>
 
-  <?php if ($page > 1 || $hasMore): ?>
-    <nav class="pagination" aria-label="Pages">
-      <?php if ($page > 1): ?><a href="<?= htmlspecialchars($pageUrl($page - 1)) ?>" class="btn btn-outline">‹ Previous</a><?php endif; ?>
-      <span>Page <?= $page ?></span>
-      <?php if ($hasMore): ?><a href="<?= htmlspecialchars($pageUrl($page + 1)) ?>" class="btn btn-outline">Next ›</a><?php endif; ?>
-    </nav>
+      <table class="cal-table" data-calendar>
+        <thead>
+          <tr><?php foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dow): ?><th scope="col"><?= $dow ?></th><?php endforeach; ?></tr>
+        </thead>
+        <tbody>
+          <?php for ($d = $gridStart; $d <= $gridEnd; $d = $d->modify('+1 day')):
+            $iso = $d->format('Y-m-d');
+            $dayEvents = $byDate[$iso] ?? [];
+            $classes = array_filter([
+              'cal-cell',
+              $d->format('Y-m') !== $month ? 'is-outside' : '',
+              $iso === $today ? 'is-today' : '',
+              $iso === $selected ? 'is-selected' : '',
+              $dayEvents ? 'has-events' : '',
+              $iso < $today ? 'is-past' : '',
+            ]);
+          ?>
+            <?php if ($d->format('w') === '0'): ?><tr><?php endif; ?>
+            <td class="<?= implode(' ', $classes) ?>">
+              <a href="<?= htmlspecialchars($query(['month' => $d->format('Y-m'), 'date' => $iso])) ?>" class="cal-day" data-date="<?= $iso ?>"
+                 aria-label="<?= htmlspecialchars($d->format('l, F j') . ': ' . (count($dayEvents) ?: 'no') . ' event' . (count($dayEvents) === 1 ? '' : 's')) ?>"<?= $iso === $selected ? ' aria-current="date"' : '' ?>>
+                <span class="cal-num"><?= $d->format('j') ?></span>
+                <?php foreach (array_slice($dayEvents, 0, 3) as $ev): ?>
+                  <span class="cal-chip cal-chip-<?= htmlspecialchars($ev['venue_type'] ?? 'on_campus') ?><?= ($ev['status'] ?? '') === 'completed' ? ' is-done' : '' ?>"><?= htmlspecialchars($ev['title']) ?></span>
+                <?php endforeach; ?>
+                <?php if (count($dayEvents) > 3): ?><span class="cal-more">+<?= count($dayEvents) - 3 ?> more</span><?php endif; ?>
+                <?php if ($dayEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($dayEvents) ?></span><?php endif; ?>
+              </a>
+            </td>
+            <?php if ($d->format('w') === '6'): ?></tr><?php endif; ?>
+          <?php endfor; ?>
+        </tbody>
+      </table>
+
+      <div class="cal-legend" aria-hidden="true">
+        <span><i class="cal-chip cal-chip-on_campus"></i> On-campus</span>
+        <span><i class="cal-chip cal-chip-off_campus"></i> Off-campus</span>
+        <span><i class="cal-chip cal-chip-online"></i> Online</span>
+        <span><i class="cal-chip cal-chip-on_campus is-done"></i> Completed</span>
+      </div>
+    </section>
+
+    <!-- All events of the selected day. One panel per day that has events; the script shows the clicked one. -->
+    <aside class="cal-day-panel" aria-live="polite">
+      <?php foreach ($byDate as $iso => $dayEvents): ?>
+        <section class="cal-day-events" id="day-<?= $iso ?>"<?= $iso === $selected ? '' : ' hidden' ?>>
+          <h2><?= htmlspecialchars(date('l, F j, Y', strtotime($iso))) ?></h2>
+          <p class="cal-day-count"><?= count($dayEvents) ?> event<?= count($dayEvents) === 1 ? '' : 's' ?><?= $iso === $today ? ' · Today' : '' ?></p>
+          <?php foreach ($dayEvents as $ev):
+            $ended = ($ev['status'] ?? '') === 'completed' || ($ev['end_date'] ?? $ev['start_date']) < $today;
+            $levels = year_levels_label($ev['year_levels'] ?? []);
+          ?>
+            <a class="cal-event" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+              <span class="cal-event-time"><?= htmlspecialchars(calendar_time_line($ev)) ?></span>
+              <strong class="cal-event-title"><?= htmlspecialchars($ev['title']) ?></strong>
+              <span class="cal-event-meta"><?= icon(($ev['venue_type'] ?? '') === 'online' ? 'online' : 'location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></span>
+              <?php if (!empty($ev['organizations']['name'])): ?>
+                <span class="cal-event-meta"><?= icon('organizations', 13) ?> <?= htmlspecialchars($ev['organizations']['name']) ?></span>
+              <?php endif; ?>
+              <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
+              <span class="cal-event-tags">
+                <span class="cal-tag"><?= htmlspecialchars($ev['categories']['name'] ?? label_of(EVENT_TYPES, $ev['event_type'] ?? 'other', 'Event')) ?></span>
+                <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>
+                <?php elseif ($ended): ?><span class="cal-tag cal-tag-muted">Ended</span>
+                <?php elseif ($ev['start_date'] <= $today): ?><span class="cal-tag cal-tag-today">Happening now</span><?php endif; ?>
+                <span class="cal-tag cal-tag-plain"><?= (int) ($counts[$ev['id']] ?? 0) ?> going</span>
+              </span>
+            </a>
+          <?php endforeach; ?>
+        </section>
+      <?php endforeach; ?>
+      <section class="cal-day-events" id="day-empty"<?= isset($byDate[$selected]) ? ' hidden' : '' ?>>
+        <h2 data-empty-date><?= htmlspecialchars(date('l, F j, Y', strtotime($selected))) ?></h2>
+        <p class="cal-day-count">No events on this date<?= $isFiltered ? ' that match your filters' : '' ?>.</p>
+        <p class="cal-day-hint">Dates with events are marked on the calendar. Use ‹ › to see other months.</p>
+      </section>
+    </aside>
+  </div>
   <?php endif; ?>
-</main>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
+</main>
+
+</div>
+
+<script src="assets/js/sidebar.js"></script>
+<script src="assets/js/calendar.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>
