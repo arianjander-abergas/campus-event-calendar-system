@@ -79,8 +79,8 @@ $breadcrumbs = [['Dashboard', 'dashboard.php'], [$event['title'], '../event-deta
         <div class="eval-event-poster" style="background-image:url('<?= css_url(event_poster_url($event['poster_url'] ?? null)) ?>');"></div>
         <div>
           <h2><?= htmlspecialchars($event['title']) ?></h2>
-          <p>📅 <?= htmlspecialchars(event_when($event)) ?></p>
-          <p>📍 <?= htmlspecialchars(event_place($event)) ?><?= !empty($org['name']) ? ' · ' . htmlspecialchars($org['name']) : '' ?></p>
+          <p><?= icon('calendar', 14) ?> <?= htmlspecialchars(event_when($event)) ?></p>
+          <p><?= icon('location', 14) ?> <?= htmlspecialchars(event_place($event)) ?><?= !empty($org['name']) ? ' · ' . htmlspecialchars($org['name']) : '' ?></p>
         </div>
       </div>
 

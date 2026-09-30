@@ -296,6 +296,26 @@ function event_poster_url(?string $posterUrl): string
     return asset_url($posterUrl, BASE_URL . '/assets/images/event-placeholder.svg');
 }
 
+/**
+ * File type of the UI icons in assets/images/icons/. They're SVG
+ * placeholders for now; if the real icons are PNGs, save them with the same
+ * names (home.png, bell.png, ...) and change this to 'png'.
+ */
+const ICON_EXT = 'svg';
+
+/**
+ * A small UI icon: <img> of assets/images/icons/<name>.svg. Every icon on the
+ * site goes through here, so replacing one file (e.g. icons/bell.svg) changes
+ * that icon everywhere it's used. The list of icons and where each appears
+ * is in assets/images/icons/README.md.
+ */
+function icon(string $name, int $size = 18, string $class = ''): string
+{
+    return '<img src="' . htmlspecialchars(BASE_URL . '/assets/images/icons/' . $name . '.' . ICON_EXT) . '"'
+        . ' alt="" class="ui-icon' . ($class !== '' ? ' ' . htmlspecialchars($class) : '') . '"'
+        . ' width="' . $size . '" height="' . $size . '" data-icon="' . htmlspecialchars($name) . '">';
+}
+
 /** "Juan Dela Cruz" -> "JD" (avatar bubbles). */
 function initials(string $name): string
 {

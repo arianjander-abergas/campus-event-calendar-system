@@ -307,11 +307,11 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         <?php if ($editId): ?>
           <div class="admin-card admin-card-links">
             <h2 class="admin-card-title">More for this event</h2>
-            <a href="event-programs.php?event=<?= urlencode($editId) ?>">🗓️ Edit the schedule (programs)</a>
-            <a href="event-registrations.php?event=<?= urlencode($editId) ?>">👥 See registrations &amp; attendance</a>
-            <a href="attendance-print.php?event=<?= urlencode($editId) ?>">🖨️ Print the attendance sheet</a>
-            <a href="event-evaluations.php?event=<?= urlencode($editId) ?>">📝 See evaluation results</a>
-            <a href="../event-details.php?id=<?= urlencode($editId) ?>">👁️ View the event page</a>
+            <a href="event-programs.php?event=<?= urlencode($editId) ?>"><?= icon('schedule', 16) ?> Edit the schedule (programs)</a>
+            <a href="event-registrations.php?event=<?= urlencode($editId) ?>"><?= icon('people', 16) ?> See registrations &amp; attendance</a>
+            <a href="attendance-print.php?event=<?= urlencode($editId) ?>"><?= icon('print', 16) ?> Print the attendance sheet</a>
+            <a href="event-evaluations.php?event=<?= urlencode($editId) ?>"><?= icon('evaluation', 16) ?> See evaluation results</a>
+            <a href="../event-details.php?id=<?= urlencode($editId) ?>"><?= icon('view', 16) ?> View the event page</a>
           </div>
         <?php endif; ?>
       </div>

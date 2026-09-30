@@ -92,7 +92,7 @@ $positionLabel = fn(array $o): string => $o['position'] . (!empty($o['course']) 
                 <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
                 <div class="mini-info">
                   <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-                  <div class="mini-meta">📅 <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; 📍 <?= htmlspecialchars(event_place($ev)) ?></div>
+                  <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
                 </div>
               </a>
             <?php endforeach; ?>
