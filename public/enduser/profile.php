@@ -1,39 +1,53 @@
 <?php
-/** My Profile: name, year level, course, organization, and password. */
+/**
+ * My Profile: name, student / faculty details (department, organization,
+ * School ID, course, highest year level, regular / irregular), and password.
+ * Accounts missing a required detail are sent here first (?complete=1)
+ * — see profile_missing_fields().
+ */
 require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_login();
+$departments = get_departments();
 $organizations = get_organizations();
-$orgIds = array_column($organizations, 'id');
-$errors = [];
+$isAdmin = ($user['role'] ?? '') === 'admin';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post_param('action');
+    $errors = [];
 
     if ($action === 'save_profile') {
         $fullName = post_param('full_name');
-        $yearLevel = post_param('year_level');
-        $course = post_param('course');
-        $organizationId = post_param('organization_id');
-
         if ($fullName === '') $errors[] = 'Please enter your name.';
-        if ($yearLevel !== '' && !in_array($yearLevel, ['1', '2', '3', '4', '5'], true)) $errors[] = 'Please choose a valid year level.';
-        if ($organizationId !== '' && !in_array($organizationId, $orgIds, true)) $errors[] = 'Please choose an organization from the list.';
+
+        $account = validate_account_fields([
+            // The student / faculty choice is fixed once made (only an admin changes it).
+            'account_type' => !empty($user['account_type']) ? $user['account_type'] : post_param('account_type'),
+            'department_id' => post_param('department_id'),
+            'organization_id' => ($user['role'] ?? '') === 'moderator' ? (string) $user['organization_id'] : post_param('organization_id'),
+            'school_id' => !empty($user['school_id_verified']) ? (string) $user['school_id'] : post_param('school_id'),
+            'course' => post_param('course'),
+            'year_level' => post_param('year_level'),
+            'student_type' => post_param('student_type'),
+            'irregular_year_levels' => $_POST['irregular_year_levels'] ?? [],
+        ], $departments, $organizations, $user['school_id'] ?? null);
+        // Admins don't have to belong to a department / organization.
+        if ($isAdmin) {
+            $account['errors'] = array_values(array_filter($account['errors'], fn($e) => !str_contains($e, 'department') && !str_contains($e, 'organization') && !str_contains($e, 'student or faculty')));
+        }
+        $errors = array_merge($errors, $account['errors']);
 
         if (!$errors) {
-            $result = update_my_profile([
-                'full_name' => $fullName,
-                'year_level' => $yearLevel !== '' ? (int) $yearLevel : null,
-                'course' => $course !== '' ? $course : null,
-                'organization_id' => $organizationId !== '' ? $organizationId : null,
-            ]);
+            $result = update_my_profile(['full_name' => $fullName] + $account['fields'], $account['school_id']);
             if ($result['ok']) {
-                flash('success', $result['message']);
-                header('Location: profile.php');
+                $stillMissing = profile_missing_fields(current_user());
+                flash('success', $stillMissing ? 'Saved. Still missing: ' . implode(', ', $stillMissing) . '.' : (get_param('complete') !== '' ? 'Profile complete — welcome aboard!' : $result['message']));
+                header('Location: ' . ($stillMissing ? 'profile.php?complete=1' : (get_param('complete') !== '' ? 'dashboard.php' : 'profile.php')));
                 exit;
             }
             $errors[] = $result['message'];
         }
+        remember_form('profile', ['full_name' => $fullName] + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
     } elseif ($action === 'change_password') {
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
@@ -50,13 +64,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $errors[] = $result['message'];
         }
+        remember_form('profile', [], $errors);
     }
-    $user = current_user();
+    header('Location: profile.php' . (get_param('complete') !== '' ? '?complete=1' : ''));
+    exit;
 }
 
-// Re-show what was typed after an error, otherwise the saved profile.
-$posted = $_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_profile';
-$val = fn(string $key): string => htmlspecialchars($posted ? post_param($key) : (string) ($user[$key] ?? ''));
+// Typed values after an error (shown once), otherwise the saved profile.
+$state = recall_form('profile');
+$errors = $state['errors'] ?? [];
+$acct = ($state['values'] ?? []) ?: $user;
+$missing = profile_missing_fields($user);
+$completing = get_param('complete') !== '' || $missing;
+
+$acctStyle = 'admin';
+$acctTypeLocked = !empty($user['account_type']);
+$acctOrgLocked = ($user['role'] ?? '') === 'moderator';
+$acctSchoolIdLocked = !empty($user['school_id_verified']);
+$acctOptional = $isAdmin; // admins don't need a department or organization
+if ($acctTypeLocked) $acct['account_type'] = $user['account_type'];
 
 $activeNav = 'profile';
 $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile', null]];
@@ -78,12 +104,18 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
   <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
   <main class="dash-main">
-    <h1 class="page-title">My Profile</h1>
+    <h1 class="page-title"><?= $missing ? 'Complete your profile' : 'My Profile' ?></h1>
     <?= render_flashes() ?>
+    <?php if ($missing): ?>
+      <div class="admin-note">
+        Before you continue, please fill in: <strong><?= htmlspecialchars(implode(', ', $missing)) ?></strong>.
+        Every account needs a department and organization; students also need their School ID, course and highest year level.
+      </div>
+    <?php endif; ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
     <div class="profile-layout">
-      <form method="POST" class="admin-card">
+      <form method="POST" action="profile.php<?= $completing ? '?complete=1' : '' ?>" class="admin-card" data-autoreset>
         <input type="hidden" name="action" value="save_profile">
         <h2 class="admin-card-title">Your details</h2>
 
@@ -91,43 +123,29 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
           <span class="avatar avatar-lg"><?= htmlspecialchars(initials($user['full_name'])) ?></span>
           <div>
             <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
-            <div class="user-role"><?= htmlspecialchars($user['email'] ?? '') ?> · <?= htmlspecialchars(role_display($user['role'])) ?></div>
+            <div class="user-role"><?= htmlspecialchars($user['email'] ?? '') ?> · <?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></div>
+            <?php if (($user['account_type'] ?? '') === 'student' && !empty($user['year_level'])): ?>
+              <div class="profile-year">Highest year level: <strong><?= htmlspecialchars(student_year_line($user)) ?></strong></div>
+            <?php endif; ?>
+            <?php if (!empty($user['school_id'])): ?>
+              <div class="profile-year">School ID: <strong><?= htmlspecialchars($user['school_id']) ?></strong>
+                <?= !empty($user['school_id_verified']) ? '<span class="verify-badge is-verified">Verified</span>' : '<span class="verify-badge">Not verified yet</span>' ?></div>
+            <?php endif; ?>
           </div>
         </div>
 
         <label class="admin-label" for="full_name">Full Name <span class="req">*</span></label>
-        <input type="text" id="full_name" name="full_name" class="admin-input" required value="<?= $val('full_name') ?>">
+        <input type="text" id="full_name" name="full_name" class="admin-input" required value="<?= htmlspecialchars((string) ($acct['full_name'] ?? $user['full_name'])) ?>">
 
-        <div class="admin-two-col">
-          <div>
-            <label class="admin-label" for="year_level">Year Level</label>
-            <select id="year_level" name="year_level" class="admin-input">
-              <option value="">Not a student / Faculty</option>
-              <?php foreach ([1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'] as $y => $label): ?>
-                <option value="<?= $y ?>" <?= $val('year_level') === (string) $y ? 'selected' : '' ?>><?= $label ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div>
-            <label class="admin-label" for="course">Course</label>
-            <input type="text" id="course" name="course" class="admin-input" placeholder="e.g. BSIT" value="<?= $val('course') ?>">
-          </div>
-        </div>
-
-        <label class="admin-label" for="organization_id">Organization</label>
-        <select id="organization_id" name="organization_id" class="admin-input">
-          <option value="">None</option>
-          <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $val('organization_id') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
+        <?php include __DIR__ . '/../../includes/account-fields.php'; ?>
 
         <div class="admin-actions admin-actions-start">
-          <button type="submit" class="btn btn-primary">Save profile</button>
+          <button type="submit" class="btn btn-primary"><?= $missing ? 'Save and continue' : 'Save profile' ?></button>
         </div>
       </form>
 
-      <form method="POST" class="admin-card">
+      <?php if (!$missing): ?>
+      <form method="POST" action="profile.php" class="admin-card" data-autoreset autocomplete="off">
         <input type="hidden" name="action" value="change_password">
         <h2 class="admin-card-title">Change password</h2>
         <label class="admin-label" for="password">New Password</label>
@@ -138,12 +156,15 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
           <button type="submit" class="btn btn-outline">Change password</button>
         </div>
       </form>
+      <?php endif; ?>
     </div>
   </main>
 
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/account.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

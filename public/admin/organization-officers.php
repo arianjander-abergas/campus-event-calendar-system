@@ -1,10 +1,19 @@
 <?php
-/** Admin: an organization's officers (organization_officers), with photos. */
+/**
+ * An organization's officers (organization_officers), with photos.
+ * Admins: any organization. Moderators: their own organization only.
+ */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
+$user = require_staff();
+$isAdmin = ($user['role'] ?? '') === 'admin';
 
 $orgId = get_param('org');
+if (!$isAdmin && $orgId !== ($user['organization_id'] ?? '')) {
+    flash('error', "Moderators can only manage their own organization's officers.");
+    header('Location: organization-officers.php?org=' . urlencode((string) $user['organization_id']));
+    exit;
+}
 $org = is_uuid($orgId) ? get_organization_admin($orgId) : null;
 if (!$org) {
     flash('error', "That organization doesn't exist anymore.");
@@ -84,8 +93,8 @@ foreach ($officers as $o) {
 }
 krsort($byYear);
 
-$activeNav = 'admin-taxonomy';
-$breadcrumbs = [['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'], [$org['name'], null], ['Officers', null]];
+$activeNav = $isAdmin ? 'admin-taxonomy' : 'my-officers';
+$breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'] : ['Dashboard', '../enduser/dashboard.php'], [$org['name'], null], ['Officers', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -116,7 +125,7 @@ $breadcrumbs = [['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'], [
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
     <div class="admin-split">
-      <form method="POST" action="<?= htmlspecialchars($back) ?>" class="admin-card" enctype="multipart/form-data">
+      <form method="POST" action="<?= htmlspecialchars($back) ?>" class="admin-card" data-autoreset enctype="multipart/form-data">
         <input type="hidden" name="action" value="save">
         <?php if (!empty($editing['id'])): ?><input type="hidden" name="id" value="<?= $val('id') ?>"><?php endif; ?>
         <h2 class="admin-card-title"><?= !empty($editing['id']) ? 'Edit officer' : 'Add an officer' ?></h2>
@@ -223,6 +232,7 @@ $breadcrumbs = [['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'], [
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

@@ -1,4 +1,10 @@
 <?php
+/**
+ * Sign up. Everyone chooses student or faculty, their department and their
+ * organization (required). Students also give their School ID, course,
+ * highest year level and whether they're regular or irregular — irregular
+ * students tick the year levels of their subjects in a pop-up.
+ */
 require_once __DIR__ . '/../../config/supabase.php';
 
 if (current_user()) {
@@ -6,9 +12,9 @@ if (current_user()) {
     exit;
 }
 
+$departments = get_departments();
 $organizations = get_organizations();
-$orgIds = array_column($organizations, 'id');
-$error = null;
+$errors = [];
 $success = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,28 +22,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = post_param('email');
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
     $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
-    $yearLevel = post_param('year_level');
-    $course = post_param('course');
-    $organizationId = post_param('organization_id');
 
-    if ($fullName === '' || $email === '' || $password === '') {
-        $error = 'Please fill in your name, email and password.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Please enter a valid email address.';
-    } elseif (strlen($password) < 6) {
-        $error = 'Password must be at least 6 characters.';
+    if ($fullName === '') $errors[] = 'Please enter your full name.';
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
+    if (strlen($password) < 6) {
+        $errors[] = 'Password must be at least 6 characters.';
     } elseif ($password !== $confirm) {
-        $error = 'Passwords do not match.';
-    } elseif ($yearLevel !== '' && !in_array($yearLevel, ['1', '2', '3', '4', '5'], true)) {
-        $error = 'Please choose a valid year level.';
-    } elseif ($organizationId !== '' && !in_array($organizationId, $orgIds, true)) {
-        $error = 'Please choose an organization from the list.';
-    } else {
-        $result = supabase_auth_signup($email, $password, $fullName, [
-            'year_level' => $yearLevel !== '' ? (int) $yearLevel : null,
-            'course' => $course !== '' ? $course : null,
-            'organization_id' => $organizationId !== '' ? $organizationId : null,
-        ]);
+        $errors[] = 'Passwords do not match.';
+    }
+
+    $account = validate_account_fields([
+        'account_type' => post_param('account_type'),
+        'department_id' => post_param('department_id'),
+        'organization_id' => post_param('organization_id'),
+        'school_id' => post_param('school_id'),
+        'course' => post_param('course'),
+        'year_level' => post_param('year_level'),
+        'student_type' => post_param('student_type'),
+        'irregular_year_levels' => $_POST['irregular_year_levels'] ?? [],
+    ], $departments, $organizations);
+    $errors = array_merge($errors, $account['errors']);
+
+    if (!$errors) {
+        $result = supabase_auth_signup($email, $password, $fullName, $account['fields'] + ['school_id' => $account['school_id']]);
         if ($result['ok'] && empty($result['needsEmailConfirmation'])) {
             flash('success', 'Welcome to Campus Event Hub, ' . explode(' ', $fullName)[0] . '!');
             header('Location: ' . BASE_URL . '/enduser/dashboard.php');
@@ -46,11 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($result['ok']) {
             $success = $result['message']; // "confirm your email" case
         } else {
-            $error = $result['message'];
+            $errors[] = $result['message'];
         }
     }
+
+    if ($errors) {
+        // Back to a clean URL: the typed values show once (passwords never).
+        remember_form('register', ['full_name' => $fullName, 'email' => $email] + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
+        header('Location: register.php');
+        exit;
+    }
 }
-$old = fn(string $key): string => htmlspecialchars(post_param($key));
+
+$state = recall_form('register');
+$errors = $state['errors'] ?? [];
+$acct = $state['values'] ?? [];
+$acctStyle = 'auth';
+$old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,15 +100,22 @@ $old = fn(string $key): string => htmlspecialchars(post_param($key));
 
   <h1>Create your account</h1>
 
-  <?php if ($error): ?>
-    <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
+  <?php if ($errors): ?>
+    <div class="login-alert" role="alert">
+      <?php if (count($errors) === 1): ?>
+        <?= htmlspecialchars($errors[0]) ?>
+      <?php else: ?>
+        Please fix these:
+        <ul><?php foreach ($errors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
+      <?php endif; ?>
+    </div>
   <?php endif; ?>
   <?php if ($success): ?>
     <div class="login-notice"><?= htmlspecialchars($success) ?> <a href="login.php">Log in</a></div>
   <?php endif; ?>
 
   <?php if (!$success): ?>
-  <form method="POST" class="login-form register-form">
+  <form method="POST" action="register.php" class="login-form register-form" data-autoreset>
     <div class="register-grid">
       <div class="register-full">
         <label for="full_name">Full Name</label>
@@ -112,33 +138,7 @@ $old = fn(string $key): string => htmlspecialchars(post_param($key));
         <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="6" autocomplete="new-password" placeholder="Type it again">
       </div>
 
-      <div>
-        <label for="year_level">Year Level</label>
-        <select id="year_level" name="year_level" class="login-input">
-          <option value="">Not a student / Faculty</option>
-          <?php foreach ([1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'] as $y => $label): ?>
-            <option value="<?= $y ?>" <?= post_param('year_level') === (string) $y ? 'selected' : '' ?>><?= $label ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div>
-        <label for="course">Course</label>
-        <input type="text" id="course" name="course" class="login-input" list="course-options" placeholder="e.g. BSIT" value="<?= $old('course') ?>">
-        <datalist id="course-options">
-          <option value="BSIT"><option value="BSCS"><option value="BSCpE"><option value="BSECE"><option value="BSEE">
-          <option value="BSA"><option value="BSBA"><option value="BSN"><option value="BSPsych"><option value="BSEd">
-        </datalist>
-      </div>
-
-      <div class="register-full">
-        <label for="organization_id">Organization <span class="login-optional">(optional)</span></label>
-        <select id="organization_id" name="organization_id" class="login-input">
-          <option value="">None</option>
-          <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= post_param('organization_id') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
+      <?php include __DIR__ . '/../../includes/account-fields.php'; ?>
     </div>
 
     <button type="submit" class="login-btn login-submit">Sign Up</button>
@@ -148,5 +148,7 @@ $old = fn(string $key): string => htmlspecialchars(post_param($key));
 
 <p class="login-signup">Already have an account? <a href="login.php">Log in</a></p>
 
+<script src="../assets/js/account.js"></script>
+<script src="../assets/js/forms.js"></script>
 </body>
 </html>

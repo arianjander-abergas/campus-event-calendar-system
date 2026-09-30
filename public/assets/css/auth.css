@@ -247,3 +247,12 @@ button.login-field-icon { cursor: pointer; }
   .login-socials .login-btn { flex: 1; }
   .login-logo-text .campus { font-size: 2.1rem; }
 }
+
+/* ---- Sign-up: account fields (includes/account-fields.php) ---- */
+.register-form .acct-type legend { font-size: 1.05rem; color: var(--login-label); margin-bottom: 10px; }
+.register-form .acct-option span { background: var(--login-field); border-color: transparent; }
+.register-form .acct-option strong { font-weight: 700; color: #222; }
+.register-form .acct-option input:checked + span { background: #fff; border-color: var(--login-btn); box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.25); }
+.register-form .acct-student { border-top-color: #bdbdbd; }
+.register-form .req { color: #c0392b; }
+.login-alert ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
