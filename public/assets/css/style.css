@@ -1132,3 +1132,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .org-jump-dept:first-child { margin-left: 0; }
 .org-dept-heading { margin: 26px 0 12px; font-size: 1.05rem; color: var(--navy); display: flex; align-items: baseline; gap: 10px; }
 .org-dept-heading span { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+
+/* "Database update needed" banner (admins, until the migration is run). */
+.db-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.db-banner .btn { padding: 7px 16px; font-size: 0.8rem; }

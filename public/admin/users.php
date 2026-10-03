@@ -134,12 +134,12 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
             $isMe = $p['id'] === $user['id'];
             $sid = $p['school_ids'] ?? null;
             $isStudent = ($p['account_type'] ?? '') === 'student';
-            $incomplete = profile_missing_fields($p + ['school_id' => $sid['school_id'] ?? null]);
+            $incomplete = !schema_outdated() && profile_missing_fields($p + ['school_id' => $sid['school_id'] ?? null]);
           ?>
             <tr>
               <td>
                 <strong><?= htmlspecialchars($p['full_name']) ?></strong><?= $isMe ? ' <span class="admin-table-sub">(you)</span>' : '' ?>
-                <div class="admin-table-sub"><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $p['account_type'] ?? null, 'Type not set')) ?><?= $incomplete ? ' · <span class="text-warn">Profile incomplete</span>' : '' ?></div>
+                <?php if (!schema_outdated()): ?><div class="admin-table-sub"><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $p['account_type'] ?? null, 'Type not set')) ?><?= $incomplete ? ' · <span class="text-warn">Profile incomplete</span>' : '' ?></div><?php endif; ?>
               </td>
               <td class="nowrap">
                 <?php if ($editSchoolId === $p['id']): ?>

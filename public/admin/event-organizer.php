@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $audience = isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students';
     $venueType = post_param('venue_type', 'on_campus');
     $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
-    // Year levels that may register (none or all ticked = every year level; not used for faculty-only events).
+    // Year levels that may register (none or all picked = every year level; not used for faculty-only events).
     $yearLevels = $audience === 'faculty' ? [] : parse_year_levels($_POST['year_levels'] ?? []);
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
 
@@ -96,6 +96,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'is_published' => $intent === 'publish',
         'status' => $intent === 'publish' ? 'published' : 'draft',
     ];
+
+    // Only send year levels when used (or being cleared), so saving still works
+    // on a database that doesn't have the column yet.
+    if (!$fields['year_levels'] && empty($previous['year_levels'])) unset($fields['year_levels']);
 
     if ($fields['title'] === '') $errors[] = 'Event title is required.';
     if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors[] = 'Please choose a category.';
@@ -297,7 +301,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
               <label class="admin-radio"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
             <?php endforeach; ?>
           </div>
-          <p class="admin-hint">Leave all unticked to open the event to every year level. Students outside these year levels can't register; irregular students can if any of their subjects' year levels is ticked.</p>
+          <p class="admin-hint">Pick none to open the event to every year level. Students outside the picked year levels can't register; irregular students can if any of their subjects' year levels is picked.</p>
         </div>
 
         <label class="admin-label" for="description">Description <span class="req">*</span></label>

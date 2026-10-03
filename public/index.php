@@ -26,7 +26,7 @@ $topbarSearch = true;
 
 <main class="dash-main public-main">
 <section class="hero">
-  <div class="hero-bg" style="background-image:url('assets/images/campus-hero.jpg');"></div>
+  <div class="hero-bg" style="background-image:url('assets/images/lcup-campus.jpg');"></div>
   <div class="hero-overlay"></div>
   <div class="hero-content">
     <p class="hero-eyebrow">LA CONSOLACION UNIVERSITY PHILIPPINES</p>

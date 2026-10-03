@@ -11,7 +11,7 @@ $eventId = get_param('event');
 [$user, $event] = require_event_manager($eventId); // admins, or moderators of the event's organization
 $back = 'event-registrations.php?event=' . urlencode($eventId);
 
-// ---- Attendance: one row (id) or the ticked rows (ids[]) ----
+// ---- Attendance: one row (id) or the picked rows (ids[]) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_status') {
     $ids = is_array($_POST['ids'] ?? null) ? array_filter($_POST['ids'], 'is_string') : [post_param('id')];
     $result = set_registration_status_admin($event, $ids, post_param('status'));
@@ -94,7 +94,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
       <!-- Bulk attendance: the checkboxes in the table belong to this form (form="bulkForm"). -->
       <form method="POST" action="<?= htmlspecialchars($back) ?>" id="bulkForm" class="bulk-bar">
         <input type="hidden" name="action" value="set_status">
-        <span>Mark ticked people as:</span>
+        <span>Mark picked people as:</span>
         <button type="submit" name="status" value="attended" class="btn-sm btn-sm-accent">Attended</button>
         <button type="submit" name="status" value="no_show" class="btn-sm">No-show</button>
         <button type="submit" name="status" value="registered" class="btn-sm">Reset</button>
@@ -106,7 +106,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
       <table class="admin-table">
         <thead>
           <tr>
-            <th><?php if ($registrations): ?><input type="checkbox" aria-label="Tick everyone" data-check-all><?php endif; ?></th>
+            <th><?php if ($registrations): ?><input type="checkbox" aria-label="Pick everyone" data-check-all><?php endif; ?></th>
             <th>Name</th><th>School ID</th><th>Year &amp; Course</th><th>Organization</th><th>Registered</th><th>Time in</th><th>Status</th><th>Evaluation</th><th><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
@@ -116,7 +116,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
           <?php endif; ?>
           <?php foreach ($registrations as $r): ?>
             <tr>
-              <td><input type="checkbox" name="ids[]" value="<?= htmlspecialchars($r['id']) ?>" form="bulkForm" aria-label="Tick <?= htmlspecialchars($r['profiles']['full_name'] ?? 'this person') ?>"></td>
+              <td><input type="checkbox" name="ids[]" value="<?= htmlspecialchars($r['id']) ?>" form="bulkForm" aria-label="Pick <?= htmlspecialchars($r['profiles']['full_name'] ?? 'this person') ?>"></td>
               <td><strong><?= htmlspecialchars($r['profiles']['full_name'] ?? 'Unknown') ?></strong><?= ($r['profiles']['account_type'] ?? '') === 'faculty' ? ' <span class="admin-table-sub">Faculty</span>' : '' ?></td>
               <td class="nowrap"><?php $sid = $r['profiles']['school_ids'] ?? null; ?><?= !empty($sid['school_id']) ? htmlspecialchars($sid['school_id']) . (!empty($sid['verified_at']) ? ' <span class="verify-badge is-verified" title="Verified with the registrar list">✓</span>' : '') : '—' ?></td>
               <td><?= htmlspecialchars(trim(student_year_line($r['profiles'] ?? []) . ' ' . ($r['profiles']['course'] ?? ''))) ?: '—' ?></td>
@@ -144,7 +144,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
 </div>
 
 <script>
-// "Tick everyone" checkbox in the table header.
+// "Pick everyone" checkbox in the table header.
 document.querySelectorAll('[data-check-all]').forEach(function (all) {
   all.addEventListener('change', function () {
     document.querySelectorAll('input[name="ids[]"]').forEach(function (box) { box.checked = all.checked; });
