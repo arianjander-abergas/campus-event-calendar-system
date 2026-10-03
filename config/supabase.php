@@ -225,6 +225,28 @@ function supabase_user_request(string $table, string $query = '', string $method
 }
 
 /**
+ * A read that uses the columns added by migration
+ * 20260930120000_solis_suggestions.sql. If the database doesn't have them yet
+ * (the migration hasn't been run), $fallbackQuery — the same read without
+ * them — is used instead, so lists and roles keep working until it is.
+ */
+function supabase_user_request_compat(string $table, string $query, string $fallbackQuery): array
+{
+    $rows = supabase_user_request($table, $query);
+    if (!$rows && supabase_last_error() !== '' && !supabase_session_expired()) {
+        $GLOBALS['schema_outdated'] = true;
+        $rows = supabase_user_request($table, $fallbackQuery);
+    }
+    return $rows;
+}
+
+/** True if a read this page load found the database without the new columns (migration not run). */
+function schema_outdated(): bool
+{
+    return !empty($GLOBALS['schema_outdated']) || (($_SESSION['user']['schema_ready'] ?? true) === false);
+}
+
+/**
  * Call a database function. $asUser = run it with the logged-in user's token.
  * @return array{ok:bool, data:mixed}
  */
@@ -416,6 +438,12 @@ function take_flashes(): array
 function render_flashes(): string
 {
     $html = '';
+    // Tell admins when the database is missing this version's columns.
+    if (schema_outdated() && is_admin_user()) {
+        $html .= '<div class="flash flash-info db-banner" role="status"><span><strong>Database update needed.</strong> '
+            . 'Moderators, School IDs, year levels and the duplicate checks turn on once it\'s run.</span> '
+            . '<a href="' . htmlspecialchars(BASE_URL . '/admin/database-update.php') . '" class="btn btn-primary">Run the update</a></div>';
+    }
     foreach (take_flashes() as $f) {
         $type = in_array($f['type'], ['success', 'error', 'info'], true) ? $f['type'] : 'info';
         $html .= '<div class="flash flash-' . $type . '" role="' . ($type === 'error' ? 'alert' : 'status') . '">'
@@ -826,12 +854,22 @@ const SESSION_PROFILE_SELECT = 'full_name,role,account_type,department_id,organi
 function reload_session_profile(): void
 {
     if (empty($_SESSION['user']['id'])) return;
-    $rows = supabase_request('profiles', 'select=' . SESSION_PROFILE_SELECT . '&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, $_SESSION['access_token'] ?? null);
+    $id = '&id=eq.' . urlencode($_SESSION['user']['id']);
+    $rows = supabase_request('profiles', 'select=' . SESSION_PROFILE_SELECT . $id, 'GET', null, $_SESSION['access_token'] ?? null);
+    $schemaReady = true;
+    if (empty($rows) && supabase_last_error() !== '' && !supabase_session_expired()) {
+        // The database doesn't have the new account columns yet (migration
+        // 20260930120000_solis_suggestions.sql not run): read the columns that
+        // exist, so roles (admins!) still work in the meantime.
+        $rows = supabase_request('profiles', 'select=full_name,role,year_level,course,organization_id' . $id, 'GET', null, $_SESSION['access_token'] ?? null);
+        $schemaReady = false;
+    }
     if (!empty($rows[0])) {
         $row = $rows[0];
         $row['school_id'] = $row['school_ids']['school_id'] ?? null;
         $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
         unset($row['school_ids']);
+        $row['schema_ready'] = $schemaReady;
         $_SESSION['user'] = array_merge($_SESSION['user'], $row);
     }
     $_SESSION['user_checked_at'] = time();
@@ -895,6 +933,8 @@ function role_display(string $role, ?string $accountType = null): string
 function profile_missing_fields(array $user): array
 {
     if (($user['role'] ?? '') === 'admin') return [];
+    // Before the database has the new columns, nobody can fill them in: don't ask.
+    if (($user['schema_ready'] ?? true) === false) return [];
     $missing = [];
     if (!isset(ACCOUNT_TYPES[$user['account_type'] ?? ''])) $missing[] = 'Student or faculty';
     if (empty($user['department_id'])) $missing[] = 'Department';
@@ -1059,9 +1099,9 @@ function validate_account_fields(array $in, array $departments, array $organizat
                 $levels = parse_year_levels(array_merge($levels, [$yearLevel]));
             }
             if (count($levels) < 2) {
-                $errors[] = 'Irregular students: tick every year level you have subjects in (at least one besides your highest year level).';
+                $errors[] = 'Irregular students: pick every year level you have subjects in (at least one besides your highest year level).';
             } elseif ($yearLevel && max($levels) > $yearLevel) {
-                $errors[] = 'Your highest year level must be the highest of the year levels you ticked.';
+                $errors[] = 'Your highest year level must be the highest of the year levels you picked.';
             }
             $fields['irregular_year_levels'] = $levels;
         }
@@ -1078,8 +1118,9 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
 {
     $user = current_user();
     if (!$user) return ['ok' => false, 'message' => 'Please log in again.'];
+    $schemaReady = ($user['schema_ready'] ?? true) !== false;
 
-    if ($schoolId !== null && $schoolId !== ($user['school_id'] ?? null)) {
+    if ($schemaReady && $schoolId !== null && $schoolId !== ($user['school_id'] ?? null)) {
         if (!empty($user['school_id_verified'])) {
             return ['ok' => false, 'message' => 'Your School ID is already verified. Ask an admin if it needs to change.'];
         }
@@ -1091,7 +1132,9 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
         }
     }
 
-    $allowed = array_intersect_key($fields, array_flip(['full_name', 'account_type', 'department_id', 'organization_id', 'year_level', 'course', 'student_type', 'irregular_year_levels']));
+    $allowed = array_intersect_key($fields, array_flip($schemaReady
+        ? ['full_name', 'account_type', 'department_id', 'organization_id', 'year_level', 'course', 'student_type', 'irregular_year_levels']
+        : ['full_name', 'organization_id', 'year_level', 'course'])); // database not updated yet: the older columns only
     // Moderators' organization is their scope: only an admin changes it (the database refuses too).
     if (($user['role'] ?? '') === 'moderator') {
         unset($allowed['organization_id']);
@@ -1107,8 +1150,10 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
 /** Every account with its details, for the admin Users page. */
 function get_all_profiles_admin(): array
 {
-    return supabase_user_request('profiles', 'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,created_at,organization_id,department_id,'
-        . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)&order=role.asc,full_name.asc');
+    return supabase_user_request_compat('profiles',
+        'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,created_at,organization_id,department_id,'
+        . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)&order=role.asc,full_name.asc',
+        'select=id,full_name,role,year_level,course,created_at,organization_id,organizations!profiles_organization_id_fkey(name)&order=role.asc,full_name.asc');
 }
 
 /**
@@ -1143,9 +1188,11 @@ function set_user_role_admin(string $userId, string $role): array
  */
 function get_student_accounts_admin(): array
 {
-    return supabase_user_request('profiles', 'select=id,full_name,account_type,year_level,course,student_type,irregular_year_levels,'
+    return supabase_user_request_compat('profiles',
+        'select=id,full_name,account_type,year_level,course,student_type,irregular_year_levels,'
         . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)'
-        . '&role=eq.user&or=(account_type.eq.student,account_type.is.null)&order=full_name.asc&limit=5000');
+        . '&role=eq.user&or=(account_type.eq.student,account_type.is.null)&order=full_name.asc&limit=5000',
+        'select=id,full_name,year_level,course,organizations!profiles_organization_id_fkey(name)&role=eq.user&order=full_name.asc&limit=5000');
 }
 
 /** Mark accounts' school IDs as verified (matched with the registrar's list). */
@@ -1837,9 +1884,11 @@ function move_program_admin(string $eventId, string $programId, int $direction):
 function get_event_registrations_admin(string $eventId): array
 {
     if (!is_uuid($eventId)) return [];
-    return supabase_user_request('event_registrations',
+    $where = '&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc,id.asc';
+    return supabase_user_request_compat('event_registrations',
         'select=id,status,registered_at,attended_at,user_id,profiles(full_name,account_type,year_level,course,student_type,irregular_year_levels,'
-        . 'organizations!profiles_organization_id_fkey(name),school_ids(school_id,verified_at))&event_id=eq.' . urlencode($eventId) . '&order=registered_at.asc,id.asc');
+        . 'organizations!profiles_organization_id_fkey(name),school_ids(school_id,verified_at))' . $where,
+        'select=id,status,registered_at,attended_at,user_id,profiles(full_name,year_level,course,organizations!profiles_organization_id_fkey(name))' . $where);
 }
 
 /** Ids of the people who evaluated an event (their participation is Completed). */
