@@ -263,9 +263,9 @@ button.login-field-icon { cursor: pointer; }
 /* ============================================================
    LOGIN — dark glass card with sliding panel
    (body.login-page.login-glass, auth/login.php)
-   On load a solid purple-blue panel covers the card, then slides left
-   and rests as a glowing strip, revealing the form on the right.
-   Tweak: --panel-rest (how far it slides) and the 38fr/62fr split.
+   A solid purple-blue panel rests as a glowing strip on the left, with the
+   form on the right. Google / Admin Login slide it left / right (see below).
+   Tweak: --panel-rest (strip position) and the 38fr/62fr split.
    ============================================================ */
 .login-glass {
   --glass-text: #f5f3ff;
@@ -364,12 +364,11 @@ button.login-field-icon { cursor: pointer; }
     inset -1px 0 0 rgba(196, 181, 253, 0.35),
     18px 0 60px rgba(124, 92, 255, 0.32);
   transform: translateX(var(--panel-rest));
-  animation: login-panel-slide 1.1s cubic-bezier(0.77, 0, 0.18, 1) 0.3s both;
+  /* Only the visible strip is drawn (the glow on its edge is kept), so when it
+     moves between sides it travels as one solid block. */
+  clip-path: var(--panel-clip);
+  transition: transform 0.6s ease-in-out;
   pointer-events: none;
-}
-@keyframes login-panel-slide {
-  from { transform: translateX(0); }
-  to   { transform: translateX(var(--panel-rest)); }
 }
 
 .login-pane {
@@ -377,11 +376,7 @@ button.login-field-icon { cursor: pointer; }
   position: relative;
   z-index: 1;
   padding: 44px 48px 30px;
-  animation: login-pane-in 0.7s ease-out 0.85s both;
-}
-@keyframes login-pane-in {
-  from { opacity: 0; transform: translateX(28px); }
-  to   { opacity: 1; transform: none; }
+  transition: transform 0.6s ease-in-out;
 }
 
 .login-glass .login-close {
@@ -514,38 +509,33 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-signup { margin: 24px 0 0; text-align: center; color: var(--glass-muted); }
 .login-glass .login-signup a { color: var(--glass-link); }
 
-/* ---- Leaving animations (added by auth.js on click) ----
-   slide-left  (Google, Admin Login): form slides left, panel retreats left out of the card.
-   slide-right (Sign up): panel's glowing edge sweeps right until it covers the card. */
-.login-card.slide-left .login-slide-panel {
-  animation: login-panel-exit-left 0.65s cubic-bezier(0.77, 0, 0.18, 1) both;
+/* ---- Sign in / admin toggle (auth.js) — same mechanics as
+   github.com/BOSS0exe/Sign-in-and-Sign-up-page: a solid panel and the form
+   swap sides with a 0.6s ease-in-out transition.
+   Admin Login: adds .is-admin    → panel slides RIGHT, form slides LEFT; stays.
+   Google:      removes .is-admin → panel slides back LEFT, form slides RIGHT; stays. */
+.login-glass .login-card {
+  --panel-clip: inset(0 -120px 0 62%); /* draw only the 38% strip (+ its glow) */
+  --panel-admin: 0%;                   /* panel's strip on the right side */
+  --pane-admin: -61.3%;                /* form moves left by the strip width (38/62 of itself) */
+  --panel-swap: 0%;
+  --pane-out-right: 100%;
 }
-.login-card.slide-left .login-pane { animation: login-pane-out-left 0.55s ease-in both; }
-@keyframes login-panel-exit-left {
-  from { transform: translateX(var(--panel-rest)); }
-  to   { transform: translateX(-100%); }
-}
-@keyframes login-pane-out-left {
-  from { opacity: 1; transform: none; }
-  to   { opacity: 0; transform: translateX(-70px); }
-}
+.login-card.is-admin .login-slide-panel { transform: translateX(var(--panel-admin)); }
+.login-card.is-admin .login-pane        { transform: translateX(var(--pane-admin)); }
 
-.login-card.slide-right .login-slide-panel {
-  animation: login-panel-cover-right 0.65s cubic-bezier(0.77, 0, 0.18, 1) both;
-}
-.login-card.slide-right .login-pane { animation: login-pane-out-right 0.5s ease-in both; }
-@keyframes login-panel-cover-right {
-  from { transform: translateX(var(--panel-rest)); }
-  to   { transform: translateX(0); }
-}
-@keyframes login-pane-out-right {
-  from { opacity: 1; transform: none; }
-  to   { opacity: 0; transform: translateX(70px); }
-}
+/* ---- Sign up: panel and form move RIGHT together, then sign-up opens ---- */
+.login-card.slide-right .login-slide-panel { animation: login-panel-to-right 0.6s ease-in-out both; }
+.login-card.slide-right .login-pane        { animation: login-pane-to-right 0.6s ease-in-out both; }
 
-/* No replay of the intro after a failed login (page reloads with an error). */
-.login-no-intro .login-slide-panel,
-.login-no-intro .login-pane { animation: none; }
+@keyframes login-panel-to-right {
+  from { transform: translateX(var(--panel-rest)); }
+  to   { transform: translateX(var(--panel-swap)); }
+}
+@keyframes login-pane-to-right {
+  from { transform: none; }
+  to   { transform: translateX(var(--pane-out-right)); }
+}
 
 @media (max-width: 860px) {
   .glass-backdrop { grid-template-columns: 1fr; }
@@ -554,7 +544,15 @@ button.login-field-icon { cursor: pointer; }
 }
 /* Phones/tablets: no side strip — the panel slides all the way out. */
 @media (max-width: 760px) {
-  .login-glass .login-card { --panel-rest: -101%; grid-template-columns: 1fr; max-width: 480px; }
+  .login-glass .login-card {
+    --panel-rest: -101%;
+    --panel-swap: 0%;     /* right: panel follows the form in from the left */
+    --panel-clip: none;
+    --panel-admin: 101%;  /* admin toggle: panel wipes across the form to the right */
+    --pane-admin: 0%;     /* form stays full width */
+    grid-template-columns: 1fr;
+    max-width: 480px;
+  }
   .login-pane { grid-column: 1; padding: 40px 24px 28px; }
 }
 @media (max-width: 520px) {
@@ -562,7 +560,7 @@ button.login-field-icon { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .login-slide-panel,
-  .login-pane { animation: none; }
+  .login-pane { animation: none; transition: none; }
   .login-glass .login-btn,
   .login-glass .login-field { transition: none; }
   .login-glass .login-btn:hover { transform: none; }
