@@ -81,24 +81,40 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&display=swap">
 <link rel="stylesheet" href="../assets/css/style.css">
-<link rel="stylesheet" href="../assets/css/auth.css">
+<link rel="stylesheet" href="../assets/css/auth.css?v=<?= filemtime(__DIR__ . '/../assets/css/auth.css') ?>">
 </head>
-<body class="login-page">
+<body class="login-page login-glass">
 
-<a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
-  <span class="login-logo-text">
-    <span class="campus">CAMPUS</span>
-    <span class="hub">EVENT HUB</span>
-  </span>
-</a>
+<!-- Decorative blurred "dashboard" behind the glass card (pure CSS, no images). -->
+<div class="glass-backdrop" aria-hidden="true">
+  <div class="gb-sidebar"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="gb-main">
+    <div class="gb-topbar"></div>
+    <div class="gb-hero"></div>
+    <div class="gb-cards"><i></i><i></i><i></i><i></i></div>
+    <div class="gb-rows"><i></i><i></i><i></i></div>
+  </div>
+</div>
 
 <main class="login-card register-card">
   <a href="../index.php" class="login-close" aria-label="Close and go back home">
     <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
   </a>
 
+  <!-- Solid panel on the right (the login page's is on the left); "Log in" slides it left. -->
+  <div class="login-slide-panel" aria-hidden="true"></div>
+
+  <div class="login-pane">
+  <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="88" height="88">
+    <span class="login-logo-text">
+      <span class="campus">CAMPUS</span>
+      <span class="hub">EVENT HUB</span>
+    </span>
+  </a>
+
   <h1>Create your account</h1>
+  <p class="login-subtitle">Join Campus Event Hub to discover and register for campus events.</p>
 
   <?php if ($errors): ?>
     <div class="login-alert" role="alert">
@@ -144,11 +160,13 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
     <button type="submit" class="login-btn login-submit">Sign Up</button>
   </form>
   <?php endif; ?>
-</main>
 
-<p class="login-signup">Already have an account? <a href="login.php">Log in</a></p>
+  <p class="login-signup">Already have an account? <a href="login.php" data-slide="left">Log in</a></p>
+  </div>
+</main>
 
 <script src="../assets/js/account.js"></script>
 <script src="../assets/js/forms.js"></script>
+<script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
 </body>
 </html>

@@ -27,6 +27,8 @@ document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
  *     stay there (no page reload). If Google sign-in is switched on, Google
  *     opens after the slide; otherwise its message shows in the card.
  *   Sign up [data-slide="right"]: panel and form slide RIGHT, then sign-up opens.
+ *   Log in on the sign-up page [data-slide="left"]: panel and form slide LEFT,
+ *     then the login page opens (its panel is on the left).
  * New-tab clicks just follow the link.
  */
 const slideCard = document.querySelector(".login-glass .login-card");
@@ -68,19 +70,88 @@ document.querySelectorAll("[data-google]").forEach((link) => {
   });
 });
 
-document.querySelectorAll('a[data-slide="right"]').forEach((link) => {
+// Links that leave the page with a slide: Sign up (right, login page) and
+// Log in (left, sign-up page).
+document.querySelectorAll("a[data-slide]").forEach((link) => {
   link.addEventListener("click", (e) => {
     if (!slideCard || !isPlainClick(e) || reducedMotion()) return;
-    if (slideCard.classList.contains("is-admin")) return; // just open sign-up
+    if (slideCard.classList.contains("is-admin")) return; // just open the page
     e.preventDefault();
-    slideCard.classList.remove("slide-right");
+    slideCard.classList.remove("slide-left", "slide-right");
     void slideCard.offsetWidth; // restart the animation if clicked twice
-    slideCard.classList.add("slide-right");
+    slideCard.classList.add(link.dataset.slide === "left" ? "slide-left" : "slide-right");
     setTimeout(() => { window.location.href = link.href; }, SLIDE_MS);
   });
 });
 
 // Coming back with the browser's Back button: show the form again.
 window.addEventListener("pageshow", (e) => {
-  if (e.persisted && slideCard) slideCard.classList.remove("slide-right");
+  if (e.persisted && slideCard) slideCard.classList.remove("slide-left", "slide-right");
 });
+
+/**
+ * Smooth show / hide for what the options reveal on the glass login and
+ * sign-up cards: the student-only fields (Student / Faculty), the irregular
+ * summary (Regular / Irregular) and the admin / Google messages. Other
+ * scripts keep using the plain `hidden` attribute; this watches it and
+ * animates the height and fade instead of letting the card jump.
+ */
+(() => {
+  if (!slideCard) return;
+  const targets = slideCard.querySelectorAll(
+    "[data-student-only], [data-irregular-summary], .login-admin-notice, .login-google-notice"
+  );
+  if (!targets.length) return;
+
+  const DURATION = 320;
+  const EASING = "cubic-bezier(0.4, 0, 0.2, 1)";
+  const CLOSED = {
+    height: "0px", paddingTop: "0px", paddingBottom: "0px", marginTop: "0px", marginBottom: "0px",
+    borderTopWidth: "0px", borderBottomWidth: "0px", opacity: 0, transform: "translateY(-8px)",
+  };
+  const shown = new WeakMap();   // last visibility we know about
+  const running = new WeakMap(); // animation in progress
+  const ownChanges = new WeakMap(); // `hidden` changes made here, to ignore
+
+  const openFrame = (el) => {
+    const cs = getComputedStyle(el);
+    return {
+      height: el.offsetHeight + "px", paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom,
+      marginTop: cs.marginTop, marginBottom: cs.marginBottom,
+      borderTopWidth: cs.borderTopWidth, borderBottomWidth: cs.borderBottomWidth,
+      opacity: 1, transform: "none",
+    };
+  };
+  const setHidden = (el, value) => {
+    ownChanges.set(el, (ownChanges.get(el) || 0) + 1);
+    el.hidden = value;
+  };
+
+  function play(el, show) {
+    running.get(el)?.cancel();
+    if (!show) setHidden(el, false); // keep it on screen while it closes
+    const open = openFrame(el);
+    el.style.overflow = "hidden";
+    el.style.boxSizing = "border-box";
+    const anim = el.animate(show ? [CLOSED, open] : [open, CLOSED], { duration: DURATION, easing: EASING });
+    running.set(el, anim);
+    const cleanUp = () => { el.style.overflow = ""; el.style.boxSizing = ""; running.delete(el); };
+    anim.oncancel = cleanUp;
+    anim.onfinish = () => { cleanUp(); if (!show) setHidden(el, true); };
+  }
+
+  const observer = new MutationObserver((records) => {
+    records.forEach(({ target: el }) => {
+      const own = ownChanges.get(el) || 0;
+      if (own) { ownChanges.set(el, own - 1); return; }
+      const visible = !el.hidden;
+      if (visible === shown.get(el)) return;
+      shown.set(el, visible);
+      if (!reducedMotion()) play(el, visible);
+    });
+  });
+  targets.forEach((el) => {
+    shown.set(el, !el.hidden);
+    observer.observe(el, { attributes: true, attributeFilter: ["hidden"] });
+  });
+})();
