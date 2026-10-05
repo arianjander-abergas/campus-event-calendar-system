@@ -475,7 +475,7 @@ button.login-field-icon { cursor: pointer; }
   height: 50px;
   border-radius: 14px;
   font-size: 0.95rem;
-  transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+  transition: transform 0.15s, box-shadow 0.25s, background 0.25s, border-color 0.25s;
 }
 /* The one splash of orange-red on the page. */
 .login-glass .login-submit {
@@ -505,6 +505,12 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-socials .login-btn:hover { background: rgba(43, 56, 140, 0.75); transform: translateY(-1px); }
 /* IMAGE SLOTS 6, 7 — Google + Admin icons */
 .login-glass .login-socials .login-btn img { width: 22px; height: 22px; }
+/* Admin Login stays lit while admin mode is on (fades in/out with the slide). */
+.login-glass .login-socials .login-btn[aria-pressed="true"] {
+  background: rgba(245, 185, 66, 0.12);
+  border-color: var(--glass-gold);
+  box-shadow: 0 0 0 3px var(--glass-gold-ring);
+}
 
 .login-glass .login-signup { margin: 24px 0 0; text-align: center; color: var(--glass-muted); }
 .login-glass .login-signup a { color: var(--glass-link); }
@@ -564,4 +570,129 @@ button.login-field-icon { cursor: pointer; }
   .login-glass .login-btn,
   .login-glass .login-field { transition: none; }
   .login-glass .login-btn:hover { transform: none; }
+}
+
+/* ============================================================
+   SIGN-UP — same glass card, mirrored: form on the LEFT, panel strip
+   on the RIGHT (where the login page's "Sign up" slide leaves it).
+   "Log in" slides panel + form LEFT, then the login page opens with
+   its panel on the left.
+   ============================================================ */
+.login-glass .register-card {
+  --panel-rest: 62%;                         /* panel shifted right: its left 38% shows */
+  --reg-panel-clip: inset(0 62% 0 -120px);   /* while sliding: only that 38% block (+ glow) */
+  grid-template-columns: 62fr 38fr;
+  max-width: 980px;
+}
+.register-card .login-pane { grid-column: 1; }
+.register-card .login-slide-panel {
+  clip-path: none;
+  box-shadow:
+    inset 1px 0 0 rgba(196, 181, 253, 0.35),
+    -18px 0 60px rgba(124, 92, 255, 0.32);
+}
+
+/* "Log in": panel and form move LEFT together. */
+.register-card.slide-left .login-slide-panel {
+  clip-path: var(--reg-panel-clip);
+  animation: reg-panel-to-left 0.6s ease-in-out both;
+}
+.register-card.slide-left .login-pane { animation: reg-pane-to-left 0.6s ease-in-out both; }
+@keyframes reg-panel-to-left {
+  from { transform: translateX(var(--panel-rest)); }
+  to   { transform: translateX(0); }
+}
+@keyframes reg-pane-to-left {
+  from { transform: none; }
+  to   { transform: translateX(-100%); }
+}
+
+/* ---- Sign-up fields on dark glass ---- */
+.login-glass { color-scheme: dark; } /* dark native select arrows, radios, dropdown lists */
+.login-glass .login-input {
+  height: 48px;
+  margin-bottom: 16px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: var(--glass-field);
+  border: 1px solid var(--glass-field-border);
+  color: var(--glass-text);
+  font-size: 0.92rem;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.login-glass .login-input::placeholder { color: var(--glass-placeholder); }
+.login-glass .login-input:focus {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: var(--glass-gold);
+  box-shadow: 0 0 0 4px var(--glass-gold-ring);
+}
+.login-glass select.login-input option,
+.login-glass select.login-input optgroup { background: #1e1a52; color: var(--glass-text); }
+.login-glass .login-input:-webkit-autofill {
+  -webkit-text-fill-color: var(--glass-text);
+  -webkit-box-shadow: 0 0 0 1000px rgba(30, 26, 82, 0.98) inset;
+  caret-color: var(--glass-text);
+  transition: background-color 9999s;
+}
+
+.login-glass .register-form .acct-type legend { color: var(--glass-muted); font-size: 0.85rem; font-weight: 700; }
+.login-glass .register-form .acct-option span {
+  background: var(--glass-field);
+  border: 1px solid var(--glass-field-border);
+  border-radius: 14px;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+.login-glass .register-form .acct-option:hover span { border-color: rgba(245, 185, 66, 0.5); transform: translateY(-1px); }
+.login-glass .register-form .acct-option strong { color: var(--glass-text); }
+.login-glass .register-form .acct-option small { color: var(--glass-muted); font-weight: 400; }
+.login-glass .register-form .acct-option input:checked + span {
+  background: rgba(245, 185, 66, 0.1);
+  border-color: var(--glass-gold);
+  box-shadow: 0 0 0 3px var(--glass-gold-ring);
+}
+.login-glass .register-form .acct-option input:focus-visible + span { outline: 3px solid var(--glass-gold); }
+.login-glass .register-form .req { color: #fca5a5; }
+.login-glass .register-form .acct-student { border-top-color: rgba(165, 180, 252, 0.2); }
+.login-glass .register-form .acct-label {
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--glass-muted);
+}
+.login-glass .acct-status label { font-weight: 400; color: var(--glass-text); }
+.login-glass .acct-status input { accent-color: var(--glass-gold); }
+.login-glass .acct-irregular-summary {
+  background: rgba(245, 185, 66, 0.1);
+  border-color: rgba(245, 185, 66, 0.35);
+  color: #fde68a;
+}
+.login-glass .acct-link { color: var(--glass-link); }
+/* The irregular-student pop-up keeps its light look (dark text on white). */
+.login-glass .acct-modal { color-scheme: light; background: #fff; }
+.login-glass .register-form .login-submit { margin-top: 8px; }
+
+/* ---- Smooth page change between login and sign-up ----
+   Browsers that support cross-page view transitions cross-fade the pages
+   and morph the card from one size/layout to the other instead of flashing. */
+@view-transition { navigation: auto; }
+.login-glass .login-card { view-transition-name: auth-card; }
+::view-transition-group(auth-card) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: 0.3s; }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  .login-glass .register-form .acct-option span { transition: none; }
+}
+
+@media (max-width: 760px) {
+  .login-glass .register-card {
+    --panel-rest: 101%;       /* no strip on phones: panel waits off to the right */
+    --reg-panel-clip: none;   /* "Log in": panel follows the form in from the right */
+    grid-template-columns: 1fr;
+    max-width: 560px;
+  }
 }
