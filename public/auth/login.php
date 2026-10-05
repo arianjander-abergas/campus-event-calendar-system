@@ -56,16 +56,18 @@ $flashes = render_flashes();
 <link rel="stylesheet" href="../assets/css/style.css">
 <link rel="stylesheet" href="../assets/css/auth.css">
 </head>
-<body class="login-page">
+<body class="login-page login-glass<?= $error ? ' login-no-intro' : '' ?>">
 
-<a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-  <!-- IMAGE SLOT 1: School logo, left of "CAMPUS EVENT HUB" | file: assets/images/school-logo.png (config SCHOOL_LOGO) -->
-  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
-  <span class="login-logo-text">
-    <span class="campus">CAMPUS</span>
-    <span class="hub">EVENT HUB</span>
-  </span>
-</a>
+<!-- Decorative blurred "dashboard" behind the glass card (pure CSS, no images). -->
+<div class="glass-backdrop" aria-hidden="true">
+  <div class="gb-sidebar"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="gb-main">
+    <div class="gb-topbar"></div>
+    <div class="gb-hero"></div>
+    <div class="gb-cards"><i></i><i></i><i></i><i></i></div>
+    <div class="gb-rows"><i></i><i></i><i></i></div>
+  </div>
+</div>
 
 <main class="login-card">
   <a href="../index.php" class="login-close" aria-label="Close and go back home">
@@ -73,7 +75,21 @@ $flashes = render_flashes();
     <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
   </a>
 
+  <!-- Solid panel that slides left on load to reveal the form (see auth.css). -->
+  <div class="login-slide-panel" aria-hidden="true"></div>
+
+  <div class="login-pane">
+  <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+    <!-- IMAGE SLOT 1: School logo, top of the card | file: assets/images/school-logo.png (config SCHOOL_LOGO) -->
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="88" height="88">
+    <span class="login-logo-text">
+      <span class="campus">CAMPUS</span>
+      <span class="hub">EVENT HUB</span>
+    </span>
+  </a>
+
   <h1>Login to your account</h1>
+  <p class="login-subtitle">Welcome back! Sign in to see what's happening on campus.</p>
 
   <?= $flashes ?>
   <?php if ($error): ?>
@@ -88,8 +104,8 @@ $flashes = render_flashes();
     <label for="email">Email Address</label>
     <div class="login-field">
       <span class="login-field-icon" aria-hidden="true">
-        <!-- IMAGE SLOT 3: Email field icon | file: assets/images/login/icon-email.svg | 28×28 -->
-        <img src="../assets/images/login/icon-email.svg" alt="" width="28" height="28">
+        <!-- IMAGE SLOT 3: Email field icon | file: assets/images/login/icon-user.png | 28×28 -->
+        <img src="../assets/images/login/icon-user.png" alt="" width="28" height="28">
       </span>
       <input type="email" id="email" name="email" required autocomplete="email"
              placeholder="name@email.lcup.edu.ph"
@@ -98,17 +114,21 @@ $flashes = render_flashes();
 
     <label for="password">Password</label>
     <div class="login-field">
-      <button type="button" class="login-field-icon" data-toggle-password="password" aria-label="Show password">
+      <span class="login-field-icon" aria-hidden="true">
+        <!-- IMAGE SLOT 8: Password field icon | file: assets/images/login/icon-lock.png | 28×28 -->
+        <img src="../assets/images/login/icon-lock.png" alt="" width="28" height="28">
+      </span>
+      <input type="password" id="password" name="password" required autocomplete="current-password"
+             placeholder="Enter your password">
+      <button type="button" class="login-field-toggle" data-toggle-password="password" aria-label="Show password">
         <!-- IMAGE SLOT 4: Password eye, default (password hidden) | file: assets/images/login/icon-eye-off.svg | 28×28 -->
         <img class="icon-hidden" src="../assets/images/login/icon-eye-off.svg" alt="" width="28" height="28">
         <!-- IMAGE SLOT 5: Password eye, shown after clicking (password visible) | file: assets/images/login/icon-eye.svg | 28×28 -->
         <img class="icon-visible" src="../assets/images/login/icon-eye.svg" alt="" width="28" height="28" hidden>
       </button>
-      <input type="password" id="password" name="password" required autocomplete="current-password"
-             placeholder="************************">
     </div>
 
-    <a href="forgot-password.php" class="login-forgot">Forgot Password</a>
+    <a href="forgot-password.php" class="login-forgot">Forgot Password?</a>
 
     <button type="submit" class="login-btn login-submit">Login</button>
   </form>
@@ -116,20 +136,21 @@ $flashes = render_flashes();
   <div class="login-divider">Or Sign in with</div>
 
   <div class="login-socials">
-    <a href="<?= htmlspecialchars($googleEnabled ? google_signin_url() : 'login.php?notice=google') ?>" class="login-btn">
+    <a href="<?= htmlspecialchars($googleEnabled ? google_signin_url() : 'login.php?notice=google') ?>" class="login-btn" data-slide="left">
       <!-- IMAGE SLOT 6: Google button icon | file: assets/images/login/icon-google.svg | 34×34 -->
       <img src="../assets/images/login/icon-google.svg" alt="" width="34" height="34">
       Google
     </a>
-    <a href="<?= htmlspecialchars($adminLoginUrl) ?>" class="login-btn">
+    <a href="<?= htmlspecialchars($adminLoginUrl) ?>" class="login-btn" data-slide="left">
       <!-- IMAGE SLOT 7: Admin Login button icon | file: assets/images/login/icon-admin.svg | 34×34 -->
       <img src="../assets/images/login/icon-admin.svg" alt="" width="34" height="34">
       Admin Login
     </a>
   </div>
-</main>
 
-<p class="login-signup">Don't have an account? <a href="register.php">Sign up</a></p>
+  <p class="login-signup">Don't have an account? <a href="register.php" data-slide="right">Sign up</a></p>
+  </div>
+</main>
 
 <script src="../assets/js/auth.js"></script>
 </body>
