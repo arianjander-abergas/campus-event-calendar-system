@@ -27,7 +27,7 @@ date_default_timezone_set('Asia/Manila');
 // Shown in the header, sidebar, footer, login pages and on every printout.
 const SCHOOL_NAME = 'La Consolacion University Philippines';
 // IMAGE SLOT: school logo | file: public/assets/images/school-logo.png | square, 256×256 or larger
-// Replace the placeholder file with the real logo (keep the file name).
+// Replace the file with a new logo (keep the file name). Transparent PNG works best.
 const SCHOOL_LOGO = 'assets/images/school-logo.png';
 
 // ---- Site base URL ----------------------------------------------------------
@@ -326,10 +326,16 @@ function css_url(string $url): string
     return htmlspecialchars(str_replace(["'", '"', '(', ')', ' ', '\\'], ['%27', '%22', '%28', '%29', '%20', '%5C'], $url));
 }
 
-/** URL of the school logo (header, sidebar, footer, printouts). */
+/**
+ * URL of the school logo (header, sidebar, footer, printouts). Adds the file's
+ * last-modified time (?v=...) so browsers fetch the new logo as soon as the
+ * file is replaced, instead of showing an old cached copy.
+ */
 function school_logo_url(): string
 {
-    return asset_url(SCHOOL_LOGO);
+    $url = asset_url(SCHOOL_LOGO);
+    $file = __DIR__ . '/../public/' . SCHOOL_LOGO;
+    return is_file($file) ? $url . '?v=' . filemtime($file) : $url;
 }
 
 /** Placeholder shown on event cards when an event has no poster. */
