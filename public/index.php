@@ -1,10 +1,17 @@
 <?php
 require_once __DIR__ . '/../config/supabase.php';
 
-$events = get_upcoming_events(8);          // today's events first, then the next dates
-$stats = get_site_stats();                 // refreshed every 30s by main.js wireLiveStats()
 $todayEvents = get_events_today();
-$organizations = get_organizations();
+// Upcoming = the next dates; today's events are already in the "Happening Today" panel next to it.
+// When nothing is scheduled after today, show today's events here too (marked "Today")
+// so the section is never empty while events are still running.
+$todayIds = array_column($todayEvents, 'id');
+$upcoming = get_upcoming_events(8 + count($todayIds));
+$events = array_slice(array_values(array_filter($upcoming, fn($e) => !in_array($e['id'], $todayIds, true))), 0, 8);
+if (!$events) {
+    $events = array_slice($upcoming, 0, 8);
+}
+$stats = get_site_stats();                 // refreshed every 30s by main.js wireLiveStats()
 
 $activeNav = 'home';
 $topbarSearch = true;
@@ -34,10 +41,10 @@ $topbarSearch = true;
     <p class="hero-desc">Campus Event Hub is your one-stop platform for discovering campus events, registering, and getting involved.</p>
     <a href="events.php" class="btn btn-primary">EXPLORE EVENTS</a>
   </div>
-  <div class="hero-badge">
+  <a class="hero-badge" href="<?= current_user() ? 'enduser/dashboard.php' : 'auth/register.php' ?>">
     <span class="circle"><?= icon('megaphone', 22) ?></span>
     STAY UPDATED
-  </div>
+  </a>
 </section>
 
 <div class="container">
@@ -73,8 +80,8 @@ $topbarSearch = true;
       </div>
     </div>
     <div class="stats-block" data-stats-url="api/stats.php">
-      <?php foreach ($stats as $s): ?>
-        <div class="stat">
+      <?php foreach ($stats as $s): /** @var array<string,string> $s */ ?>
+        <div class="stat"<?= $s['value'] === '0' ? ' hidden' : '' ?>>
           <div class="stat-value" data-stat="<?= htmlspecialchars($s['key']) ?>"><?= htmlspecialchars($s['value']) ?></div>
           <div class="stat-label"><?= htmlspecialchars($s['label']) ?></div>
         </div>
@@ -134,23 +141,12 @@ $topbarSearch = true;
     </ul>
   </section>
 
-  <?php if ($organizations): ?>
-  <section class="trusted-strip">
-    <div class="trusted-logos">
-      <?php foreach (array_slice($organizations, 0, 5) as $o): ?>
-        <a href="organizations.php#org-<?= htmlspecialchars($o['id']) ?>" title="<?= htmlspecialchars($o['name']) ?>"><?= htmlspecialchars(initials($o['name'])) ?></a>
-      <?php endforeach; ?>
-    </div>
-    <div class="trusted-title">TRUSTED BY CAMPUS ORGANIZATIONS</div>
-    <div class="trusted-copy">Campus Event Hub helps us connect, organize and engage more students in campus activities. <a href="organizations.php">Meet the organizations →</a></div>
-  </section>
-  <?php endif; ?>
+</div>
+
+</main>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
-</main>
-
-</div>
 
 <script src="assets/js/sidebar.js"></script>
 <script src="assets/js/main.js"></script>

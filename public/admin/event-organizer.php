@@ -218,8 +218,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= $editId ? 'Edit Event' : 'Manage Events' ?> — Campus Event Hub</title>
-<link rel="stylesheet" href="../assets/css/style.css">
-<link rel="stylesheet" href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
+<link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
 <body>
 
@@ -410,8 +410,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
       <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= count($events) ?>)</h2>
     </div>
     <p class="admin-hint admin-hint-block">Published events become <strong>Completed</strong> automatically once they end. Use Mark Completed to close one early.</p>
-    <div class="admin-table-wrap">
-      <table class="admin-table">
+    <div class="admin-table-wrap admin-table-scroll">
+      <table class="admin-table admin-table-compact">
         <thead>
           <tr>
             <th>Title</th>
@@ -443,13 +443,18 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                   </span>
                 <?php else: ?>—<?php endif; ?>
               </td>
-              <td><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
+              <td class="admin-nowrap"><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
               <td><?= (int) ($counts[$ev['id']] ?? 0) ?><?= !empty($ev['registration_limit']) ? ' / ' . (int) $ev['registration_limit'] : '' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span></td>
-              <td class="admin-row-actions">
+              <td>
+                <div class="admin-row-actions admin-row-actions-nowrap">
                 <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Edit</a>
                 <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
                 <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
+                <?php /* Less-used actions live in the "More" menu so every row stays one line. */ ?>
+                <details class="row-more">
+                  <summary class="btn-sm">More <span aria-hidden="true">▾</span></summary>
+                  <div class="row-more-menu">
                 <?php if ($status !== 'draft'): ?><a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a><?php endif; ?>
 
                 <?php if (in_array($status, ['draft', 'published'], true)): ?>
@@ -486,6 +491,9 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                   <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
                 </form>
                 <?php endif; ?>
+                  </div>
+                </details>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -556,6 +564,26 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
   syncVenue();
   syncAudience();
   checkSchedule();
+})();
+</script>
+<script>
+// Events table "More ▾" menus: one open at a time; a click outside or Escape closes it.
+(function () {
+  var menus = document.querySelectorAll('details.row-more');
+  menus.forEach(function (menu) {
+    menu.addEventListener('toggle', function () {
+      if (menu.open) menus.forEach(function (m) { if (m !== menu) m.open = false; });
+    });
+  });
+  document.addEventListener('click', function (e) {
+    menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    menus.forEach(function (m) {
+      if (m.open) { m.open = false; m.querySelector('summary').focus(); }
+    });
+  });
 })();
 </script>
 <script src="../assets/js/sidebar.js"></script>

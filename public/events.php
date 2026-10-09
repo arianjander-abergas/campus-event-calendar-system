@@ -19,6 +19,7 @@ $categories = get_categories();
 $organizations = get_organizations();
 
 // ---- My Events: a list of the user's registrations ----------------------
+$events = [];
 if ($mine) {
     $registrations = get_my_registrations(0);
     $evaluated = get_my_evaluated_event_ids();
@@ -75,6 +76,14 @@ if (!$mine) {
         }
     }
 }
+// Events running a week or longer are listed once above the calendar
+// ("Ongoing") instead of filling every day cell; the day panel still lists them.
+$ongoing = [];
+foreach ($byDate as $dayEvents) {
+    foreach ($dayEvents as $ev) {
+        if (is_long_event($ev)) $ongoing[$ev['id']] = $ev;
+    }
+}
 if ($selected === '' || substr($selected, 0, 7) !== $month) {
     // Today when it's in this month, else the month's first day with events, else the 1st.
     $monthDays = array_filter(array_keys($byDate), fn($d) => substr($d, 0, 7) === $month);
@@ -95,10 +104,11 @@ $heading = $mine ? 'My Events' : 'Event Calendar';
 function calendar_time_line(array $ev): string
 {
     $multi = !empty($ev['end_date']) && $ev['end_date'] !== $ev['start_date'];
-    $time = format_event_time($ev['start_time'] ?? null);
-    if ($time !== '' && !empty($ev['end_time'])) $time .= ' – ' . format_event_time($ev['end_time']);
+    $time = event_time_range($ev);
     if ($multi) {
-        return date('M j', strtotime($ev['start_date'])) . ' – ' . date('M j', strtotime($ev['end_date'])) . ($time !== '' ? ' · ' . $time : '');
+        // Years only when the event crosses into another year ("Sep 1, 2026 – Dec 31, 2031").
+        $fmt = substr($ev['start_date'], 0, 4) === substr($ev['end_date'], 0, 4) ? 'M j' : 'M j, Y';
+        return date($fmt, strtotime($ev['start_date'])) . ' – ' . date($fmt, strtotime($ev['end_date'])) . ($time !== '' ? ' · ' . $time : '');
     }
     return $time !== '' ? $time : 'All day';
 }
@@ -193,6 +203,35 @@ function calendar_time_line(array $ev): string
     </div>
   <?php endif; ?>
 
+  <?php if ($ongoing): ?>
+    <section class="cal-ongoing" aria-labelledby="calOngoingTitle">
+      <h2 id="calOngoingTitle">Ongoing <span><?= count($ongoing) ?> event<?= count($ongoing) === 1 ? '' : 's' ?> running a week or more</span></h2>
+      <?php
+        // The first few are shown; the rest open with "Show N more" (no script needed).
+        $ongoingShown = 6;
+        $ongoingItem = fn(array $ev): string => '<a class="cal-ongoing-item" href="event-details.php?id=' . urlencode($ev['id']) . '">'
+            . '<strong>' . htmlspecialchars($ev['title']) . '</strong>'
+            . '<span>' . htmlspecialchars(event_date_range($ev)) . ' · ' . htmlspecialchars(event_place($ev)) . '</span></a>';
+        $ongoingList = array_values($ongoing);
+      ?>
+      <div class="cal-ongoing-list">
+        <?php foreach (array_slice($ongoingList, 0, $ongoingShown) as $ev): ?>
+          <?= $ongoingItem($ev) ?>
+        <?php endforeach; ?>
+      </div>
+      <?php if (count($ongoingList) > $ongoingShown): ?>
+        <details class="cal-ongoing-more">
+          <summary>Show <?= count($ongoingList) - $ongoingShown ?> more</summary>
+          <div class="cal-ongoing-list">
+            <?php foreach (array_slice($ongoingList, $ongoingShown) as $ev): ?>
+              <?= $ongoingItem($ev) ?>
+            <?php endforeach; ?>
+          </div>
+        </details>
+      <?php endif; ?>
+    </section>
+  <?php endif; ?>
+
   <div class="cal-layout">
     <section class="cal-card" aria-labelledby="calMonthTitle">
       <div class="cal-toolbar">
@@ -212,12 +251,13 @@ function calendar_time_line(array $ev): string
           <?php for ($d = $gridStart; $d <= $gridEnd; $d = $d->modify('+1 day')):
             $iso = $d->format('Y-m-d');
             $dayEvents = $byDate[$iso] ?? [];
+            $chipEvents = array_values(array_filter($dayEvents, fn($e) => !is_long_event($e))); // ongoing ones are in the strip above
             $classes = array_filter([
               'cal-cell',
               $d->format('Y-m') !== $month ? 'is-outside' : '',
               $iso === $today ? 'is-today' : '',
               $iso === $selected ? 'is-selected' : '',
-              $dayEvents ? 'has-events' : '',
+              $chipEvents ? 'has-events' : '',
               $iso < $today ? 'is-past' : '',
             ]);
           ?>
@@ -226,11 +266,11 @@ function calendar_time_line(array $ev): string
               <a href="<?= htmlspecialchars($query(['month' => $d->format('Y-m'), 'date' => $iso])) ?>" class="cal-day" data-date="<?= $iso ?>"
                  aria-label="<?= htmlspecialchars($d->format('l, F j') . ': ' . (count($dayEvents) ?: 'no') . ' event' . (count($dayEvents) === 1 ? '' : 's')) ?>"<?= $iso === $selected ? ' aria-current="date"' : '' ?>>
                 <span class="cal-num"><?= $d->format('j') ?></span>
-                <?php foreach (array_slice($dayEvents, 0, 3) as $ev): ?>
+                <?php foreach (array_slice($chipEvents, 0, 3) as $ev): ?>
                   <span class="cal-chip cal-chip-<?= htmlspecialchars($ev['venue_type'] ?? 'on_campus') ?><?= ($ev['status'] ?? '') === 'completed' ? ' is-done' : '' ?>"><?= htmlspecialchars($ev['title']) ?></span>
                 <?php endforeach; ?>
-                <?php if (count($dayEvents) > 3): ?><span class="cal-more">+<?= count($dayEvents) - 3 ?> more</span><?php endif; ?>
-                <?php if ($dayEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($dayEvents) ?></span><?php endif; ?>
+                <?php if (count($chipEvents) > 3): ?><span class="cal-more">+<?= count($chipEvents) - 3 ?> more</span><?php endif; ?>
+                <?php if ($chipEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($chipEvents) ?></span><?php endif; ?>
               </a>
             </td>
             <?php if ($d->format('w') === '6'): ?></tr><?php endif; ?>
@@ -284,10 +324,10 @@ function calendar_time_line(array $ev): string
   </div>
   <?php endif; ?>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
 </main>
-
 </div>
+
+<?php include __DIR__ . '/../includes/footer.php'; ?>
 
 <script src="assets/js/sidebar.js"></script>
 <script src="assets/js/calendar.js"></script>

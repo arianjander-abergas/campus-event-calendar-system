@@ -47,5 +47,7 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `register.svg` | REG | Register | Home About "Register", sidebar "Sign up" (logged out) |
 | `import.svg` | IMP | Import & Verify (Excel upload) | Sidebar (admin + moderator) |
 | `arrow-left.svg` | — | Back | Event details "Back to All Events" |
+| `menu.svg` | — | Open the menu | Top bar on tablets and phones (opens the sidebar) |
+| `close.svg` | — | Close the menu | Sidebar on tablets and phones |
 
 The login page (`../login/`) and the event details page (`../event-details/`) have their own numbered image slots — see the `IMAGE SLOT` comments in those pages.
