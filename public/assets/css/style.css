@@ -37,10 +37,16 @@ ul { list-style: none; margin: 0; padding: 0; }
 img { max-width: 100%; display: block; }
 button { font-family: inherit; cursor: pointer; }
 
-/* UI icons — icon('name') in config/supabase.php. The images are
-   placeholders in assets/images/icons/ (list in the README there);
+/* UI icons — icon('name') in config/supabase.php. The images are line
+   icons in assets/images/icons/ (list in the README there), drawn in blue;
    replace a file and that icon changes everywhere. */
 .ui-icon { display: inline-block; vertical-align: middle; flex-shrink: 0; object-fit: contain; }
+/* On dark backgrounds the blue icons are shown white. */
+.sidebar .ui-icon,
+.hero-badge .circle .ui-icon,
+.ann-icon .ui-icon,
+.btn-primary .ui-icon,
+.btn-accent .ui-icon { filter: brightness(0) invert(1); }
 .user-caret, .side-nav .chevron { display: inline-flex; line-height: 0; }
 [hidden] { display: none !important; }
 
@@ -1136,3 +1142,469 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 /* "Database update needed" banner (admins, until the migration is run). */
 .db-banner { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
 .db-banner .btn { padding: 7px 16px; font-size: 0.8rem; }
+
+/* ============================================================
+   NEUMORPHISM — body.neu: home, Event Calendar, Organizations, My Profile
+   Soft light-grey surface; controls look pressed out of it (raised:
+   light shadow top-left + dark shadow bottom-right) or into it (inset),
+   with blue for the active / primary state.
+   Sidebar, top bar, buttons and icon circles; the hero photo and the
+   footer keep their look.
+   ============================================================ */
+.neu {
+  --neu-bg: #e7ecf3;
+  --neu-light: rgba(255, 255, 255, 0.95);
+  --neu-dark: rgba(163, 177, 198, 0.6);
+  --neu-out: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light);
+  --neu-out-sm: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
+  --neu-in: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light);
+  --neu-blue: #3d74c9;
+  --neu-blue-hi: #5b8fdc;
+  --neu-blue-glow: 4px 4px 12px rgba(61, 116, 201, 0.35), -4px -4px 12px var(--neu-light);
+  --neu-text: #3b4a63;
+  --neu-muted: #6b7a92;
+  background: var(--neu-bg);
+}
+.neu .dashboard-shell { background: none; }
+
+/* ---- Sidebar: the login page's deep blue, with dark neumorphism ----
+   Same colours as the login / sign-up background (navy to blue with a soft
+   blue glow). Raised = dark shadow bottom-right + faint blue light top-left;
+   pressed = the same shadows inset. Current page: orange pill like the
+   login page's Login button. Icons show white (shared .sidebar rule). */
+.neu .sidebar {
+  --sb-text: #dbe7ff;
+  --sb-muted: rgba(191, 210, 245, 0.72);
+  --sb-surface: rgba(255, 255, 255, 0.05);
+  --sb-out: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
+  --sb-in: inset 3px 3px 7px rgba(2, 8, 24, 0.6), inset -3px -3px 7px rgba(80, 130, 220, 0.14);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(37, 99, 235, 0.35), transparent 45%),
+    radial-gradient(circle at 90% 95%, rgba(59, 91, 219, 0.3), transparent 50%),
+    linear-gradient(170deg, #0e2a6b 0%, #0b2257 55%, #061430 100%);
+  color: var(--sb-text);
+  box-shadow: 6px 0 24px rgba(6, 20, 48, 0.35);
+  z-index: 2;
+}
+.neu .sidebar .brand { color: #fff; }
+.neu .sidebar .brand-text .campus { color: #ff7a21; }
+.neu .sidebar .brand-text .hub { color: #fff; }
+.neu .sidebar .brand-logo {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.neu .side-nav { gap: 8px; }
+.neu .side-nav a,
+.neu .side-nav .submenu-toggle {
+  padding: 8px 12px 8px 8px;
+  border-radius: 16px;
+  color: var(--sb-text);
+  transition: box-shadow 0.25s ease, color 0.2s ease, background 0.25s ease;
+}
+.neu .side-nav a:hover,
+.neu .submenu-toggle:hover { background: var(--sb-surface); color: #fff; box-shadow: var(--sb-out); }
+/* Icon in a small raised circle. */
+.neu .side-nav .icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sb-surface);
+  box-shadow: var(--sb-out);
+  transition: box-shadow 0.25s ease, background 0.25s ease;
+}
+/* Current page: orange raised pill (login page's button colour), icon well pressed in. */
+.neu .side-nav a.active {
+  background: linear-gradient(135deg, #f76b15 0%, #d9480f 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(247, 107, 21, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
+}
+.neu .side-nav a.active .icon {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 2px 2px 5px rgba(120, 40, 0, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+}
+/* Events group: pressed in while open. */
+.neu .submenu-toggle.is-current,
+.neu .submenu-toggle[aria-expanded="true"] { background: var(--sb-surface); color: #fff; box-shadow: var(--sb-in); }
+.neu .side-nav .event-submenu { padding-left: 18px; gap: 6px; margin-top: 6px; }
+.neu .side-nav .event-submenu a { color: var(--sb-muted); padding: 6px 10px 6px 6px; }
+.neu .side-nav .event-submenu a .icon { width: 28px; height: 28px; }
+.neu .side-nav .event-submenu a:hover { color: #fff; }
+.neu .side-nav .event-submenu a.active { background: rgba(247, 107, 21, 0.14); color: #ffb37a; box-shadow: var(--sb-in); }
+.neu .side-group-label { color: var(--sb-muted); }
+.neu .side-admin { border-top-color: rgba(147, 197, 253, 0.2); }
+
+/* ---- Top bar ---- */
+.neu .dash-topbar {
+  background: var(--neu-bg);
+  border-bottom: none;
+  box-shadow: 0 8px 16px -10px var(--neu-dark);
+}
+/* Search: a field pressed into the surface. */
+.neu .search-box {
+  background: var(--neu-bg);
+  box-shadow: var(--neu-in);
+  color: var(--neu-muted);
+  transition: box-shadow 0.25s ease;
+}
+.neu .search-box input { color: var(--neu-text); }
+.neu .search-box:focus-within { box-shadow: var(--neu-in), 0 0 0 2px rgba(61, 116, 201, 0.35); }
+/* Bell: a raised round button that presses in while its list is open. */
+.neu .bell {
+  width: 42px;
+  height: 42px;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease;
+}
+.neu .bell:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .bell[aria-expanded="true"] { box-shadow: var(--neu-in); }
+/* User menu: raised pill, pressed while open. */
+.neu .user-chip { padding: 5px 14px 5px 5px; border-radius: 999px; box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .user-menu > summary:hover { background: transparent; box-shadow: var(--neu-out); }
+.neu .user-menu[open] > summary { box-shadow: var(--neu-in); }
+.neu .avatar { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.35); }
+.neu .user-name { color: var(--neu-text); }
+.neu .user-role { color: var(--neu-muted); }
+.neu .notif-dropdown,
+.neu .user-dropdown { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 16px; }
+.neu .user-dropdown a { color: var(--neu-text); }
+.neu .user-dropdown a:hover,
+.neu a.notif-item:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu .notif-head { border-bottom-color: rgba(163, 177, 198, 0.45); }
+.neu .notif-item { border-bottom-color: rgba(163, 177, 198, 0.3); }
+.neu .notif-item.unread { background: rgba(61, 116, 201, 0.08); }
+/* Logged out: Log in / Sign up. */
+.neu .btn-login {
+  background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
+  border-radius: 14px;
+  box-shadow: var(--neu-blue-glow);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.neu .btn-login:hover { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); transform: translateY(-1px); }
+.neu .btn-login:active { box-shadow: inset 3px 3px 7px rgba(20, 50, 110, 0.4); transform: none; }
+
+/* ---- Buttons ---- */
+.neu .btn-primary {
+  background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
+  color: #fff;
+  box-shadow: var(--neu-blue-glow);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.neu .btn-primary:hover { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); transform: translateY(-1px); }
+.neu .btn-primary:active { transform: none; box-shadow: inset 3px 3px 7px rgba(20, 50, 110, 0.4); }
+.neu .hero .btn-primary { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); } /* on the photo */
+.neu .btn-outline {
+  background: var(--neu-bg);
+  border: none;
+  color: var(--neu-blue);
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease, color 0.2s ease;
+}
+.neu .btn-outline:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .btn-outline:active { box-shadow: var(--neu-in); }
+.neu .view-all {
+  padding: 7px 16px;
+  border-radius: 999px;
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease;
+}
+.neu .view-all:hover { text-decoration: none; box-shadow: var(--neu-in); }
+
+/* ---- Icons in raised circles ---- */
+.neu .feature-icon,
+.neu .about-points li > span {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-out-sm);
+}
+.neu .hero-badge { background: var(--neu-bg); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3); color: var(--neu-text); }
+.neu .hero-badge .circle {
+  background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
+  box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.4);
+}
+.neu .trusted-logos a { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .trusted-logos a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+
+/* ---- Cards sit on the same soft surface ---- */
+.neu .feature-strip,
+.neu .stats-block,
+.neu .upcoming-panel,
+.neu .about-section { background: var(--neu-bg); }
+.neu .feature-strip,
+.neu .upcoming-panel,
+.neu .about-section { box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .event-card { background: var(--neu-bg); border-radius: 18px; box-shadow: var(--neu-out); }
+.neu .event-card:hover { box-shadow: 10px 10px 22px var(--neu-dark), -10px -10px 22px var(--neu-light); }
+.neu .feature-item { border-right-color: rgba(163, 177, 198, 0.4); }
+.neu .event-org,
+.neu .upcoming-item { border-color: rgba(163, 177, 198, 0.4); }
+.neu .trusted-strip { border-top-color: rgba(163, 177, 198, 0.45); }
+.neu .stat-value { color: var(--neu-blue); }
+
+/* Feature strip + stats under the hero: same deep blue as the sidebar
+   (and the login page), icons in dark raised circles. */
+.neu .feature-strip {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.35), transparent 40%),
+    radial-gradient(circle at 92% 100%, rgba(59, 91, 219, 0.3), transparent 45%),
+    linear-gradient(170deg, #0e2a6b 0%, #0b2257 55%, #061430 100%);
+  box-shadow: 0 14px 30px rgba(6, 20, 48, 0.35);
+}
+.neu .stats-block { background: transparent; }
+.neu .feature-item { border-right-color: rgba(147, 197, 253, 0.18); }
+.neu .feature-title { color: #fff; }
+.neu .feature-sub,
+.neu .stat-label { color: rgba(191, 210, 245, 0.72); }
+.neu .stat-value { color: #ff7a21; } /* brand orange, like "CAMPUS" */
+.neu .feature-strip .feature-icon {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
+}
+.neu .feature-strip .ui-icon { filter: brightness(0) invert(1); }
+
+@media (max-width: 760px) {
+  .neu .sidebar { box-shadow: 0 6px 14px -8px var(--neu-dark); }
+  .neu .side-nav .icon { width: 30px; height: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .neu .btn-primary:hover,
+  .neu .btn-login:hover { transform: none; }
+}
+
+/* ---- Shared page parts on neumorphic pages ---- */
+.neu .page-head h1,
+.neu .page-title { color: var(--navy); }
+/* Filter bar (Event Calendar): raised panel, pressed-in fields. */
+.neu .filter-bar { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .filter-bar input,
+.neu .filter-bar select {
+  background: var(--neu-bg);
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--neu-in);
+  color: var(--neu-text);
+  outline: none;
+  transition: box-shadow 0.25s ease;
+}
+.neu .filter-bar input:focus,
+.neu .filter-bar select:focus { box-shadow: var(--neu-in), 0 0 0 2px rgba(61, 116, 201, 0.35); }
+.neu .btn-accent {
+  background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
+  border-radius: 12px;
+  box-shadow: var(--neu-blue-glow);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.neu .btn-accent:hover { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); transform: translateY(-1px); }
+.neu .btn-accent:active { transform: none; box-shadow: inset 3px 3px 7px rgba(20, 50, 110, 0.4); }
+.neu .btn-muted { background: var(--neu-bg); color: var(--neu-text); box-shadow: var(--neu-out-sm); }
+.neu .btn-muted:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .filter-clear { padding: 8px 14px; border-radius: 999px; box-shadow: var(--neu-out-sm); }
+.neu .filter-clear:hover { box-shadow: var(--neu-in); }
+.neu .pagination .btn-outline { padding: 8px 18px; }
+
+/* ---- Event Calendar (events.php, calendar.css) ---- */
+.neu .cal-card,
+.neu .cal-day-panel { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .cal-matches a { background: var(--neu-bg); border: none; box-shadow: var(--neu-out-sm); color: var(--neu-text); }
+.neu .cal-matches a:hover { box-shadow: var(--neu-in); color: var(--neu-blue); }
+/* ‹ › month arrows: raised round buttons. */
+.neu .cal-step {
+  border-radius: 50%;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-out-sm);
+  color: var(--neu-blue);
+  transition: box-shadow 0.25s ease;
+}
+.neu .cal-step:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+/* Day cells: softly raised, pressed in on hover / when selected. */
+.neu .cal-day {
+  background: var(--neu-bg);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  box-shadow: 2px 2px 5px var(--neu-dark), -2px -2px 5px var(--neu-light);
+  transition: box-shadow 0.2s ease;
+}
+.neu .cal-day:hover { background: var(--neu-bg); border-color: transparent; box-shadow: var(--neu-in); }
+.neu .cal-cell.has-events .cal-day { background: #e1e9f6; }
+.neu .cal-cell.is-today .cal-num { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 5px rgba(61, 116, 201, 0.4); }
+.neu .cal-cell.is-selected .cal-day { background: var(--neu-bg); border-color: #f76b15; box-shadow: var(--neu-in); }
+.neu .cal-chip { border-radius: 6px; }
+.neu .cal-chip-on_campus { background: var(--neu-blue); }
+.neu .cal-toolbar h2,
+.neu .cal-day-events h2 { color: var(--navy); }
+/* Events on the chosen date. */
+.neu .cal-event {
+  background: var(--neu-bg);
+  border: none;
+  border-left: 4px solid var(--neu-blue);
+  border-radius: 14px;
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease;
+}
+.neu .cal-event:hover { box-shadow: var(--neu-out); border-left-color: #f76b15; }
+.neu .cal-event-time { color: var(--neu-blue); }
+.neu .cal-tag { background: rgba(61, 116, 201, 0.12); color: var(--neu-blue); }
+.neu .cal-tag-today { background: linear-gradient(135deg, #f76b15, #d9480f); color: #fff; }
+.neu .cal-tag-plain { background: transparent; color: var(--neu-muted); }
+
+/* ---- Organizations (organizations.php) ---- */
+.neu .org-jump a {
+  background: var(--neu-bg);
+  border: none;
+  color: var(--neu-text);
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease, color 0.2s ease;
+}
+.neu .org-jump a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu .org-card { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .org-logo { box-shadow: var(--neu-out-sm); }
+.neu .org-logo-initials,
+.neu .officer-initials { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); }
+.neu .officer-card {
+  background: var(--neu-bg);
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--neu-out-sm);
+}
+.neu .officer-photo { box-shadow: var(--neu-out-sm); }
+.neu .mini-row { border-bottom-color: rgba(163, 177, 198, 0.4); }
+
+/* ---- My Profile (enduser/profile.php, admin.css) ---- */
+.neu .admin-card { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .admin-label { color: var(--neu-text); }
+.neu .admin-input {
+  background: var(--neu-bg);
+  border: none;
+  border-radius: 12px;
+  box-shadow: var(--neu-in);
+  color: var(--neu-text);
+  transition: box-shadow 0.25s ease;
+}
+.neu .admin-input:focus { border: none; box-shadow: var(--neu-in), 0 0 0 2px rgba(61, 116, 201, 0.35); }
+.neu .admin-input[readonly],
+.neu .admin-input:disabled { color: var(--neu-muted); }
+.neu .admin-note { background: rgba(61, 116, 201, 0.1); border: none; color: var(--navy); box-shadow: var(--neu-in); border-radius: 14px; }
+.neu .profile-head .avatar-lg { box-shadow: var(--neu-out-sm); }
+/* Student / Faculty choice: raised cards, pressed in with a blue edge when chosen. */
+.neu .acct-option span {
+  background: var(--neu-bg);
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease, border-color 0.2s ease;
+}
+.neu .acct-option:hover span { box-shadow: var(--neu-out); }
+.neu .acct-option input:checked + span { background: var(--neu-bg); border-color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu .acct-status input { accent-color: var(--neu-blue); }
+.neu .acct-student { border-top-color: rgba(163, 177, 198, 0.5); }
+.neu .acct-irregular-summary { background: rgba(247, 107, 21, 0.08); border-color: rgba(247, 107, 21, 0.3); }
+.neu .acct-modal { background: #fff; } /* the irregular-student pop-up stays white */
+
+/* ---- Dashboard (enduser/dashboard.php) ---- */
+.neu .dash-greeting h1 { color: var(--navy); }
+.neu .list-card { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu .carousel-dots button { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .carousel-dots button.active { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 5px rgba(61, 116, 201, 0.4); }
+.neu .eval-callout { background: rgba(247, 107, 21, 0.07); border: none; border-radius: 18px; box-shadow: var(--neu-in); }
+.neu .eval-callout-item { background: var(--neu-bg); border-radius: 14px; box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .eval-callout-item:hover { box-shadow: var(--neu-out); }
+.neu .mini-thumb { box-shadow: var(--neu-out-sm); }
+/* Right column: no white panel, raised cards on the soft surface. */
+.neu .right-rail { background: transparent; border-left: none; }
+.neu .rail-card { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; padding: 18px; }
+.neu .cal-head { color: var(--navy); }
+.neu .cal-head button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-out-sm);
+  color: var(--neu-blue);
+  font-weight: 700;
+  transition: box-shadow 0.25s ease;
+}
+.neu .cal-head button:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .cal-grid .day { border-radius: 10px; transition: box-shadow 0.2s ease; }
+.neu .cal-grid a.day.has-event:hover,
+.neu .cal-grid button.day.has-event:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .cal-grid .day.today { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.4); }
+.neu .cal-grid .day.selected { box-shadow: var(--neu-in), inset 0 0 0 2px #f76b15; }
+.neu .marker-blue { background: var(--neu-blue); }
+.neu .cal-day-list { border-top-color: rgba(163, 177, 198, 0.45); }
+.neu .cal-day-list a { border-bottom-color: rgba(163, 177, 198, 0.3); }
+.neu .announcement-item { border-bottom-color: rgba(163, 177, 198, 0.4); }
+.neu .ann-icon { border-radius: 50%; }
+.neu .ann-icon.info { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.4); }
+
+/* ---- Next Event / event details (event-details.php, event-details.css) ---- */
+.neu.event-details-page { background: var(--neu-bg); }
+.neu .ed-topbar { border-bottom: none; }
+.neu .ed-bell {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--neu-bg);
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease;
+}
+.neu .ed-bell img { width: 20px; height: 20px; }
+.neu .ed-bell:hover { box-shadow: var(--neu-out); }
+.neu .ed-bell[aria-expanded="true"] { box-shadow: var(--neu-in); }
+.neu .ed-user-menu summary { padding: 5px 14px 5px 5px; border-radius: 999px; box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .ed-user-menu summary:hover { box-shadow: var(--neu-out); }
+.neu .ed-user-menu[open] summary { box-shadow: var(--neu-in); }
+.neu .ed-avatar { width: 40px; height: 40px; }
+.neu .ed-user-chevron { width: 12px; height: 12px; margin-left: 4px; }
+.neu .ed-user-name { color: var(--neu-text); }
+.neu .ed-user-role { color: var(--neu-muted); }
+.neu .ed-notif-dropdown,
+.neu .ed-user-dropdown { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 16px; }
+.neu .ed-user-dropdown a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+/* "Back to All Events": raised pill. */
+.neu .ed-back {
+  gap: 10px;
+  padding: 9px 18px 9px 14px;
+  border-radius: 999px;
+  color: var(--neu-blue);
+  box-shadow: var(--neu-out-sm);
+  transition: box-shadow 0.25s ease;
+}
+.neu .ed-back img { width: 18px; height: 18px; }
+.neu .ed-back:hover { text-decoration: none; box-shadow: var(--neu-in); }
+/* Cards. */
+.neu .ed-hero,
+.neu .ed-program-card,
+.neu .ed-schedule { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
+.neu a.ed-program-card { transition: box-shadow 0.25s ease; }
+.neu a.ed-program-card:hover { box-shadow: 10px 10px 22px var(--neu-dark), -10px -10px 22px var(--neu-light); }
+.neu .ed-poster { box-shadow: var(--neu-out-sm); }
+.neu .ed-org-logo { box-shadow: var(--neu-out-sm); }
+.neu .ed-category,
+.neu .ed-program-badge,
+.neu .ed-schedule-head { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); border-radius: 999px; }
+.neu .ed-tl-dot::before { background: rgba(61, 116, 201, 0.45); }
+.neu .ed-tl-dot::after { background: var(--neu-blue); box-shadow: 0 0 0 3px var(--neu-bg), 1px 1px 4px var(--neu-dark); }
+/* Buttons: Register (blue), Cancel (red text), Evaluate (orange). */
+.neu .ed-btn {
+  padding: 9px 18px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
+  box-shadow: var(--neu-blue-glow);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.neu .ed-btn:hover:not(:disabled) { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); transform: translateY(-1px); }
+.neu .ed-btn:active:not(:disabled) { transform: none; box-shadow: inset 3px 3px 7px rgba(20, 50, 110, 0.4); }
+.neu .ed-btn:disabled { background: var(--neu-bg); color: var(--neu-muted); box-shadow: var(--neu-in); }
+.neu .ed-btn-outline { background: var(--neu-bg); color: #b42318; border: none; box-shadow: var(--neu-out-sm); }
+.neu .ed-btn-outline:hover:not(:disabled) { background: var(--neu-bg); color: #b42318; box-shadow: var(--neu-in); transform: none; }
+.neu .ed-btn-evaluate { background: linear-gradient(135deg, #f76b15, #d9480f); box-shadow: 0 8px 20px rgba(247, 107, 21, 0.35); }
+.neu .ed-btn-evaluate:hover { background: linear-gradient(135deg, #fb7d2a, #e8550f) !important; }
+.neu .ed-flash { border-radius: 14px; box-shadow: var(--neu-in); }

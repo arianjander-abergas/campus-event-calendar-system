@@ -1,5 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-  <!-- PLACEHOLDER ICON "check" (My events): replace this file with the real icon, keep the name "check.svg" -->
-  <rect x="0.75" y="0.75" width="22.5" height="22.5" rx="4" fill="#e2e2e2" stroke="#9a9a9a" stroke-width="1.2" stroke-dasharray="2.5 2"/>
-  <text x="12" y="12.4" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-size="7.5" font-weight="700" fill="#666">CHK</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3d74c9" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Campus Event Hub UI icon: check. Replace this file to change it everywhere (see README.md). -->
+  <circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9.5"/>
 </svg>
