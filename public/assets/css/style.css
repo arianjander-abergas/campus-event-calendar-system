@@ -28,6 +28,16 @@
 
 * { box-sizing: border-box; }
 
+/* Hidden scrollbars (the area still scrolls with the wheel, touch and keys):
+   the sidebar on every screen size... */
+.sidebar { scrollbar-width: none; }
+.sidebar::-webkit-scrollbar { width: 0; height: 0; }
+/* ...and the main page on tablets, foldables and phones (computers keep it). */
+@media (max-width: 1100px) {
+  html, body { scrollbar-width: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; }
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -77,11 +87,12 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 22px;
+  /* Tighter on phones, full size on computers (see FLUID SIZING). */
+  padding: clamp(9px, 0.35rem + 0.6vw, 12px) clamp(16px, 0.75rem + 1vw, 22px);
   border-radius: 999px;
   border: none;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 0.95rem);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
@@ -373,7 +384,7 @@ button { font-family: inherit; cursor: pointer; }
 .event-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
 .event-card:focus-visible { outline: 3px solid var(--blue-accent); outline-offset: 2px; }
 .event-thumb {
-  height: 130px;
+  aspect-ratio: 16 / 9; /* same shape at every card width */
   background-color: #1f3f8f;
   background-size: cover;
   background-position: center;
@@ -1536,6 +1547,11 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .topbar-brand img { box-shadow: var(--neu-out-sm); }
 .neu .nav-close { background: var(--sb-surface); box-shadow: var(--sb-out); }
 .neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: var(--sb-out); }
+/* Log in: the sidebar's dark shadow instead of the white neumorphic glow,
+   which showed as a halo on the dark blue. */
+.neu .sidebar .side-auth .btn-primary { box-shadow: var(--sb-out); }
+.neu .sidebar .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
+.neu .sidebar .side-auth .btn:active { box-shadow: var(--sb-in); }
 
 @media (max-width: 1100px) {
   .neu .right-rail .rail-card { background: var(--neu-bg); box-shadow: var(--neu-out); }
@@ -1874,6 +1890,12 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   body .dash-topbar .user-menu[open] > summary,
   body .dash-topbar .ed-user-menu[open] summary { box-shadow: var(--tb-in); }
 
+  /* LOG IN: dark shadow like the sidebar's buttons (the white neumorphic
+     glow is meant for light backgrounds and showed as a halo here). */
+  body .dash-topbar .btn-login { box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16); }
+  body .dash-topbar .btn-login:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
+  body .dash-topbar .btn-login:active { box-shadow: inset 3px 3px 7px rgba(2, 8, 24, 0.5); }
+
   /* Search: a darker field pressed into the bar, light text. */
   body .dash-topbar .search-box { background: rgba(2, 8, 24, 0.28); box-shadow: var(--tb-in); color: var(--tb-muted); }
   body .dash-topbar .search-box input { color: #fff; }
@@ -1895,4 +1917,316 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   body .dash-topbar .user-dropdown,
   body .dash-topbar .ed-notif-dropdown,
   body .dash-topbar .ed-user-dropdown { color: var(--text-main); }
+}
+
+/* ============================================================
+   DEVICE FINE-TUNING
+   ============================================================ */
+
+/* Small phones / folded foldables (≤ 400px): the top bar fits on one row. */
+@media (max-width: 400px) {
+  .dash-topbar { gap: 8px 8px; padding-left: 12px; padding-right: 12px; }
+  .topbar-start { gap: 8px; }
+  .nav-toggle, .bell, .neu .bell { width: 38px; height: 38px; }
+  .topbar-right { gap: 8px; }
+  .user-caret, .ed-user-chevron { display: none !important; }
+  .neu .user-chip, .neu .ed-user-menu summary { padding: 4px; }
+  .topbar-brand .brand-text .campus { font-size: 0.85rem; }
+  .topbar-brand .brand-text .hub { font-size: 0.68rem; }
+  .topbar-right .btn-login { padding: 9px 16px; }
+}
+
+/* Unfolded foldables (601–760px): still the phone menu, but use the width. */
+@media (min-width: 601px) and (max-width: 760px) {
+  .dash-events-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .two-col-lists { grid-template-columns: 1fr 1fr; }
+  .feature-item { flex-basis: 25%; }
+  .stats-block { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+}
+
+/* Tablets too narrow for four features in a row: an even 2 × 2. */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .feature-item { flex: 1 1 50%; }
+  .feature-item:nth-child(2n) { border-right: none; }
+}
+
+/* Event details: the poster's size follows the content column's own width
+   (not the screen's), so it fits next to the tablet's schedule column too:
+     ≥ 760px  340px poster beside the text (computers, as before)
+     540–759  240px poster beside the text (tablets, unfolded foldables)
+     < 540    poster above the text, up to 260px (phones) */
+.ed-main { container-type: inline-size; }
+@container (min-width: 540px) and (max-width: 759px) {
+  .event-details-page .ed-hero { grid-template-columns: minmax(0, 240px) 1fr; }
+  .event-details-page .ed-hero-info { padding-top: 8px; }
+}
+@container (max-width: 539px) {
+  .event-details-page .ed-hero { grid-template-columns: 1fr; }
+  .event-details-page .ed-hero-info { padding-top: 0; }
+  .event-details-page .ed-poster { max-width: 260px; justify-self: center; margin-inline: auto; } /* centred above the text */
+}
+
+/* Anchors and "scroll to the day's list" land below the sticky top bar. */
+@media (max-width: 1100px) {
+  .cal-day-panel, .org-card, .about-section { scroll-margin-top: 90px; }
+  .dash-topbar.is-scrolled { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14); }
+}
+@media (max-width: 760px) {
+  .cal-day-panel, .org-card, .about-section { scroll-margin-top: 140px; }
+  body .dashboard-shell > .dash-topbar.is-scrolled { box-shadow: 0 10px 28px rgba(6, 20, 48, 0.5); }
+}
+
+/* ============================================================
+   MOTION — small animations that make the interface feel alive.
+   All of it is off when the device asks for reduced motion.
+   (assets/js/ui.js adds .reveal / .is-visible and the flash ✕.)
+   ============================================================ */
+
+/* Flash messages: room for the ✕ (always, it's a button). */
+.flash, .ed-flash { position: relative; padding-right: 44px; }
+.flash.db-banner { padding-right: 44px; }
+.flash-close {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: transparent; color: inherit; font-size: 1.2rem; line-height: 1;
+  opacity: 0.65; cursor: pointer;
+}
+.flash-close:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+
+/* Back to top (ui.js), bottom-right, above the content but below menus. */
+.back-to-top {
+  position: fixed; z-index: 45;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 44px; height: 44px; border: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, #3d74c9, #1e3f86);
+  box-shadow: 0 8px 20px rgba(6, 20, 48, 0.35);
+  cursor: pointer;
+}
+.back-to-top:hover { background: linear-gradient(145deg, #4a82d8, #24489a); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Smooth fade between pages (browsers that support it; others ignore it). */
+  @view-transition { navigation: auto; }
+
+  @keyframes ui-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes ui-pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ui-slide-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+  @keyframes ui-slide-out { to { opacity: 0; transform: translateY(-8px); height: 0; margin: 0; padding-top: 0; padding-bottom: 0; } }
+  @keyframes ui-hero-zoom { from { transform: scale(1); } to { transform: scale(1.07); } }
+
+  /* Cards fade and slide up as they scroll into view (staggered by ui.js). */
+  .js-ui .reveal { transition: opacity 0.5s ease var(--reveal-delay, 0ms), transform 0.5s ease var(--reveal-delay, 0ms); }
+  .js-ui .reveal:not(.is-visible) { opacity: 0; transform: translateY(18px); }
+
+  /* Menus open with a quick fade + scale. */
+  .notif-dropdown, .user-dropdown, .row-more-menu, .ed-notif-dropdown, .ed-user-dropdown {
+    animation: ui-pop-in 0.16s ease-out;
+    transform-origin: top right;
+  }
+  .nav-backdrop { animation: ui-fade-in 0.25s ease; }
+  .event-submenu { animation: ui-fade-up 0.2s ease; }
+
+  /* The chosen day's events fade in (Event Calendar + dashboard calendar). */
+  .cal-day-events:not([hidden]), .cal-day-list { animation: ui-fade-up 0.25s ease; }
+
+  /* Flash messages slide in, and out when dismissed. */
+  .flash, .ed-flash { animation: ui-slide-in 0.3s ease; }
+  .flash.is-leaving, .ed-flash.is-leaving { animation: ui-slide-out 0.3s ease forwards; overflow: hidden; }
+
+  /* Buttons press in slightly. */
+  .btn, .btn-login, .btn-sm, .ed-btn, .nav-toggle, .bell, .ed-bell, .back-to-top, .cal-step, .view-all {
+    transition: transform 0.12s ease, box-shadow 0.25s ease, background 0.2s ease, color 0.2s ease;
+  }
+  .btn:active, .btn-login:active, .btn-sm:active, .ed-btn:active:not(:disabled),
+  .nav-toggle:active, .bell:active, .ed-bell:active, .back-to-top:active, .cal-step:active { transform: scale(0.96); }
+
+  /* Event cards: the picture brightens a little on hover. */
+  .event-thumb { transition: filter 0.25s ease; }
+  .event-card:hover .event-thumb { filter: brightness(1.12) saturate(1.1); }
+
+  /* Back to top button appears with a fade. */
+  .back-to-top:not([hidden]) { animation: ui-pop-in 0.2s ease-out; }
+  .back-to-top:hover { transform: translateY(-2px); }
+
+  /* Home hero photo: a very slow zoom. */
+  .hero-bg { animation: ui-hero-zoom 22s ease-in-out infinite alternate; }
+
+  /* Top bar shadow eases in when scrolled. */
+  .dash-topbar { transition: box-shadow 0.25s ease; }
+}
+
+/* ============================================================
+   FLUID SIZING — text and buttons follow the screen width.
+   clamp(smallest, grows with the screen, largest): phones get the
+   smallest size, computers the largest, everything between scales
+   smoothly (no jumps at breakpoints).
+   ============================================================ */
+
+/* Base text: 15px on phones → 16px from ~1100px up (every rem follows). */
+:root { font-size: clamp(15px, 14.3px + 0.15vw, 16px); }
+
+/* Headings shrink more than body text on small screens. */
+.hero-title { font-size: clamp(1.7rem, 1.15rem + 2.6vw, 2.6rem); }
+.page-head h1 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.6rem); }
+.page-title { font-size: clamp(1.2rem, 1.05rem + 0.7vw, 1.4rem); }
+.dash-greeting h1 { font-size: clamp(1.25rem, 1.05rem + 0.9vw, 1.5rem); }
+.about-text h2 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.6rem); }
+.section-head-lg h2 { font-size: clamp(1.1rem, 1rem + 0.45vw, 1.25rem); }
+.org-card-head h2 { font-size: clamp(1.1rem, 0.98rem + 0.6vw, 1.3rem); }
+.stat-value { font-size: clamp(1.2rem, 1rem + 0.9vw, 1.5rem); }
+.event-details-page .ed-title { font-size: clamp(1.1rem, 1rem + 0.5vw, 1.25rem); }
+.event-details-page .ed-category { font-size: clamp(0.85rem, 0.78rem + 0.35vw, 1.05rem); min-width: clamp(100px, 18vw, 146px); }
+.event-details-page .ed-section-title { font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.2rem); }
+body .cal-toolbar h2 { font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.2rem); }
+
+/* Buttons (.btn is sized at its own rule near the top). */
+.event-details-page .ed-btn { font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.82rem); }
+
+/* Form inputs a little shorter on phones. */
+body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem + 0.4vw, 14px); }
+
+/* Phones / foldables: form buttons fill the width instead of floating right.
+   With three buttons (Cancel · Save Draft · Publish) the main one goes on
+   top, full width, and the other two share the row below. */
+@media (max-width: 760px) {
+  body .admin-actions { display: flex; justify-content: stretch; gap: 10px; }
+  body .admin-actions > .btn { flex: 1 1 0; }
+  body .admin-actions:has(> .btn:nth-child(3)) { display: grid; grid-template-columns: 1fr 1fr; }
+  body .admin-actions:has(> .btn:nth-child(3)) > .btn-primary { grid-column: 1 / -1; order: -1; }
+}
+
+/* Dashboard calendar: today is a solid blue circle, even while it's the
+   selected day (no gradient, inner shadow or orange ring on top). */
+.neu .cal-grid .day.today,
+.neu .cal-grid .day.today.selected,
+.neu .cal-grid button.day.today:hover {
+  background: var(--neu-blue);
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(47, 95, 168, 0.35);
+}
+
+/* Sidebar "Events" group on its own pages (Event Calendar, My Events, Next
+   Event): the group gets the same orange pill as other current pages, and
+   the current choice inside it a light blue. (An open group on other
+   pages keeps the pressed-in look.) */
+.neu .side-nav .submenu-toggle.is-current,
+.neu .side-nav .submenu-toggle.is-current[aria-expanded="true"],
+.event-details-page.neu .submenu-toggle.is-current {
+  background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
+}
+.neu .side-nav .submenu-toggle.is-current .icon {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 2px 2px 5px rgba(120, 40, 0, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+}
+.neu .side-nav .event-submenu a.active {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.45) 0%, rgba(59, 130, 246, 0.35) 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+.neu .side-nav .event-submenu a.active .icon { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+
+/* Dashboard calendar header: a blue box, "Calendar" on top and
+   "‹  October 2026  ›" centred underneath, in orange. */
+.neu .rail-card .cal-head {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  margin: 0 0 12px; padding: 12px 12px 10px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(37, 99, 235, 0.35), transparent 55%),
+    linear-gradient(170deg, #0e2a6b 0%, #0b2257 60%, #061430 100%);
+  box-shadow: 0 8px 18px rgba(6, 20, 48, 0.28);
+  color: #ff7a21;
+}
+.neu .cal-head .cal-head-title {
+  margin: 0; text-align: center;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #ff7a21;
+}
+.cal-head-month { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cal-head-month #calendar-month { flex: 1; text-align: center; font-size: 1rem; font-weight: 800; color: #fff; }
+.neu .rail-card .cal-head button {
+  width: 30px; height: 30px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, 0.08); color: #fff;
+  font-size: 1.1rem; font-weight: 800; line-height: 1;
+  box-shadow: 3px 3px 8px rgba(2, 8, 24, 0.5), -2px -2px 6px rgba(80, 130, 220, 0.15);
+}
+.neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.neu .rail-card .cal-head button:active { box-shadow: inset 2px 2px 6px rgba(2, 8, 24, 0.55); }
+.neu .rail-card .cal-head :focus-visible { outline-color: #fff; }
+
+/* Dashboard calendar card split like an event card: the blue header fills
+   the top of the card edge to edge, the days sit on the light half below. */
+.neu #dashboard-calendar-card { --cal-pad: 18px; padding: var(--cal-pad); overflow: hidden; }
+.neu #dashboard-calendar-card .cal-head {
+  margin: calc(-1 * var(--cal-pad)) calc(-1 * var(--cal-pad)) 14px;
+  padding: 18px var(--cal-pad) 16px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Profile + notification menus: a soft navy drop shadow instead of the
+   neumorphic white glow, which showed as a halo over blue areas. */
+.neu .notif-dropdown,
+.neu .user-dropdown,
+.neu .ed-notif-dropdown,
+.neu .ed-user-dropdown {
+  box-shadow: 0 14px 32px rgba(14, 42, 94, 0.28), 0 2px 8px rgba(14, 42, 94, 0.14);
+  border: 1px solid rgba(14, 42, 94, 0.08);
+}
+
+/* ============================================================
+   MOTION 2 — hover / press feedback on the things people touch most.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ui-bell-ring {
+    0%, 100% { transform: rotate(0); }
+    20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); }
+    60% { transform: rotate(8deg); }  80% { transform: rotate(-4deg); }
+  }
+  @keyframes ui-badge-pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+  /* Sidebar: links nudge right on hover, the icon circle grows a little. */
+  .side-nav a, .side-nav .submenu-toggle { transition: transform 0.18s ease, background 0.25s ease, box-shadow 0.25s ease, color 0.2s ease; }
+  .side-nav a:hover, .side-nav .submenu-toggle:hover { transform: translateX(3px); }
+  .side-nav .icon { transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease; }
+  .side-nav a:hover .icon, .side-nav .submenu-toggle:hover .icon { transform: scale(1.08); }
+  .submenu-toggle .chevron { transition: transform 0.25s ease; }
+
+  /* Bell rings on hover; the unread count pops in. */
+  .bell:hover .ui-icon, .ed-bell:hover .ui-icon { animation: ui-bell-ring 0.6s ease; transform-origin: 50% 10%; }
+  .bell .dot:not([hidden]), .ed-bell-count:not([hidden]) { animation: ui-badge-pop 0.35s ease-out; }
+
+  /* Cards and list rows lift on hover. */
+  .list-card, .rail-card, .org-card, .upcoming-panel, .cal-ongoing-item, .eval-callout-item,
+  .officer-card, .ed-program-card, .kpi, .admin-panel {
+    transition: transform 0.2s ease, box-shadow 0.25s ease;
+  }
+  .officer-card:hover, .ed-program-card:hover, .cal-ongoing-item:hover, .eval-callout-item:hover, .kpi:hover { transform: translateY(-3px); }
+  .mini-row, .upcoming-item, .announcement-item, .cal-day-list a, .notif-item { transition: background 0.2s ease, padding-left 0.2s ease; }
+  .mini-row:hover, .upcoming-item:hover, .cal-day-list a:hover { padding-left: 6px; }
+
+  /* Calendar days: grow slightly on hover. */
+  .cal-grid button.day, .cal-day { transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease; }
+  .cal-grid button.day:hover { transform: scale(1.12); }
+  .cal-cell:not(.is-outside) .cal-day:hover { transform: translateY(-2px); }
+
+  /* Feature tiles + about points: icon circle bounces up on hover. */
+  .feature-icon, .about-points li > span { transition: transform 0.25s cubic-bezier(.34, 1.56, .64, 1); }
+  .feature-item:hover .feature-icon, .about-points li:hover > span { transform: translateY(-4px) scale(1.06); }
+
+  /* Admin tables: the hovered row is tinted. */
+  .admin-table tbody tr { transition: background 0.15s ease; }
+  .admin-table tbody tr:hover { background: rgba(47, 95, 168, 0.05); }
+
+  /* Inputs: a soft glow grows in on focus. */
+  .admin-input, .search-box, .filter-bar input, .filter-bar select { transition: box-shadow 0.25s ease, border-color 0.2s ease, background 0.2s ease; }
+
+  /* Footer org logos and links. */
+  .site-footer-links a { transition: color 0.2s ease; }
 }

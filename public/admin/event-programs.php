@@ -146,6 +146,7 @@ $breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'eve
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>
