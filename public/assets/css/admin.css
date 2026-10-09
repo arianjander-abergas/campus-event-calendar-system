@@ -60,6 +60,14 @@
 .admin-input[type="file"] { padding: 9px 10px; font-size: 0.82rem; }
 .admin-input-follow { margin-top: 8px; }
 textarea.admin-input { resize: vertical; }
+/* A field that still needs information: red border + the reason under it. */
+body .admin-input.is-invalid,
+body .admin-input.is-invalid:focus {
+  border: 1.5px solid var(--red);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+  scroll-margin: 120px;
+}
+.field-error { margin: 5px 0 0; font-size: 0.78rem; font-weight: 600; color: var(--red); }
 
 .admin-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .admin-four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }

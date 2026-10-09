@@ -292,6 +292,12 @@ function friendly_error(string $fallback): string
     if (str_contains($error, 'duplicate key')) {
         return 'That name is already taken.';
     }
+    if (str_contains($error, 'schema cache') || str_contains($error, 'does not exist')) {
+        return 'The database is missing an update this page needs. An admin can apply it from Admin → Database update.';
+    }
+    if (str_contains($error, 'row-level security')) {
+        return "You don't have permission to do that. (If you're a moderator, the database may need its update — ask an admin.)";
+    }
     return $fallback;
 }
 
@@ -1788,11 +1794,27 @@ function get_event_admin(string $eventId): ?array
     return $rows[0] ?? null;
 }
 
+/**
+ * Write an event row. If the database doesn't have events.year_levels yet
+ * (migration 20260930120000_solis_suggestions.sql not run), the write is
+ * retried without it so events can still be saved and published.
+ */
+function write_event_row(string $query, string $method, array $fields): array
+{
+    $rows = supabase_user_request('events', $query, $method, $fields);
+    if (!$rows && array_key_exists('year_levels', $fields) && str_contains(supabase_last_error(), 'year_levels')) {
+        $GLOBALS['schema_outdated'] = true;
+        unset($fields['year_levels']);
+        $rows = supabase_user_request('events', $query, $method, $fields);
+    }
+    return $rows;
+}
+
 /** @return array{ok:bool, message:string, event?:array} */
 function create_event_admin(array $fields): array
 {
     $fields['created_by'] = current_user()['id'] ?? null;
-    $rows = supabase_user_request('events', '', 'POST', $fields);
+    $rows = write_event_row('', 'POST', $fields);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not create the event. Please check the fields and try again.')];
     }
@@ -1802,7 +1824,7 @@ function create_event_admin(array $fields): array
 /** @return array{ok:bool, message:string} */
 function update_event_admin(string $eventId, array $fields): array
 {
-    $rows = supabase_user_request('events', 'id=eq.' . urlencode($eventId), 'PATCH', $fields);
+    $rows = write_event_row('id=eq.' . urlencode($eventId), 'PATCH', $fields);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not save changes. Please try again.')];
     }

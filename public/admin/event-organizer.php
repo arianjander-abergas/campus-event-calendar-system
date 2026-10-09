@@ -101,38 +101,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // on a database that doesn't have the column yet.
     if (!$fields['year_levels'] && empty($previous['year_levels'])) unset($fields['year_levels']);
 
-    if ($fields['title'] === '') $errors[] = 'Event title is required.';
-    if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors[] = 'Please choose a category.';
-    if (!in_array($fields['organization_id'], array_column($organizations, 'id'), true)) $errors[] = 'Please choose an organization.';
-    if ($fields['description'] === '') $errors[] = 'Description is required.';
-    if (mb_strlen($fields['description']) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
-    if ($fields['start_date'] === '') $errors[] = 'Start date is required.';
-    if ($fields['end_date'] === '') $errors[] = 'End date is required.';
+    if ($fields['title'] === '') $errors['title'] = 'Event title is required.';
+    if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors['category_id'] = 'Please choose a category.';
+    if (!in_array($fields['organization_id'], array_column($organizations, 'id'), true)) $errors['organization_id'] = 'Please choose an organization.';
+    if ($fields['description'] === '') $errors['description'] = 'Description is required.';
+    if (mb_strlen($fields['description']) > 2000) $errors['description'] = 'Description must be 2000 characters or fewer.';
+    if ($fields['start_date'] === '') $errors['start_date'] = 'Start date is required.';
+    if ($fields['end_date'] === '') $errors['end_date'] = 'End date is required.';
     if ($fields['start_date'] !== '' && $fields['end_date'] !== '' && $fields['end_date'] < $fields['start_date']) {
-        $errors[] = "End date can't be before the start date.";
+        $errors['end_date'] = "End date can't be before the start date.";
     }
     if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && $fields['end_time'] <= $fields['start_time']) {
-        $errors[] = 'End time must be after the start time.';
+        $errors['end_time'] = 'End time must be after the start time.';
     }
-    if ($venueType === 'online' && $onlineLink === '') $errors[] = 'Online events need the webinar / meeting link.';
-    if ($venueType !== 'online' && !$fields['venue']) $errors[] = 'On-campus and off-campus events need a venue.';
-    if ($onlineLink !== '' && !preg_match('~^https?://~i', $onlineLink)) $errors[] = 'The online event link must start with http:// or https://.';
-    if ($registrationLimit !== '' && (int) $registrationLimit < 1) $errors[] = 'Registration limit must be at least 1 (or leave it empty for no limit).';
+    if ($venueType === 'online' && $onlineLink === '') $errors['online_event_link'] = 'Online events need the webinar / meeting link.';
+    if ($venueType !== 'online' && !$fields['venue']) $errors['venue'] = 'On-campus and off-campus events need a venue.';
+    if ($onlineLink !== '' && !preg_match('~^https?://~i', $onlineLink)) $errors['online_event_link'] = 'The online event link must start with http:// or https://.';
+    if ($registrationLimit !== '' && (int) $registrationLimit < 1) $errors['registration_limit'] = 'Registration limit must be at least 1 (or leave it empty for no limit).';
     if ($fields['registration_deadline'] && $fields['end_date'] !== '' && $fields['registration_deadline'] > $fields['end_date']) {
-        $errors[] = 'The registration deadline must be on or before the end date.';
+        $errors['registration_deadline'] = 'The registration deadline must be on or before the end date.';
     }
-    if ($fields['contact_email'] && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Contact email is not a valid email address.';
+    if ($fields['contact_email'] && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) $errors['contact_email'] = 'Contact email is not a valid email address.';
 
     // No duplicates: the same title on the same date, or a venue booked twice at once.
     // (The database refuses these too, even for events this user can't see.)
     if (!$errors) {
         $clash = find_schedule_conflicts($fields, $previous['id'] ?? null);
         if ($clash['duplicate']) {
-            $errors[] = '"' . $clash['duplicate']['title'] . '" is already scheduled on ' . format_event_date($clash['duplicate']['start_date']) . '. Change the title or the date — the same event can\'t be entered twice.';
+            $errors['title'] = '"' . $clash['duplicate']['title'] . '" is already scheduled on ' . format_event_date($clash['duplicate']['start_date']) . '. Change the title or the date — the same event can\'t be entered twice.';
         }
         if ($clash['venue_conflict']) {
             $c = $clash['venue_conflict'];
-            $errors[] = $fields['venue'] . ' is already booked for "' . $c['title'] . '" (' . event_when($c) . '). Choose another venue, date or time.';
+            $errors['venue'] = $fields['venue'] . ' is already booked for "' . $c['title'] . '" (' . event_when($c) . '). Choose another venue, date or time.';
         }
     }
 
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         if ($upload['ok']) {
             $fields['poster_url'] = $upload['url'];
         } elseif (!empty($upload['message'])) {
-            $errors[] = $upload['message'];
+            $errors['poster_file'] = $upload['message'];
         }
     }
 
@@ -182,7 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // redirect means refreshing the page doesn't post it again; refreshing
     // or leaving and coming back shows a clean form.
     if (!empty($_FILES['poster_file']['name'])) {
-        $errors[] = 'Choose the poster image again (files can\'t be kept after an error).';
+        $errors['poster_file'] = 'Choose the poster image again (files can\'t be kept after an error).';
     }
     remember_form('event', $fields + ['id' => $previous['id'] ?? null], $errors);
     header('Location: event-organizer.php' . ($previous ? '?edit=' . urlencode($previous['id']) : '') . '#event-form');
@@ -206,6 +206,10 @@ $val = fn(string $key, $default = '') => htmlspecialchars((string) ($f[$key] ?? 
 $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0, 5)); // "13:30:00" -> "13:30"
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 $formLevels = parse_year_levels($f['year_levels'] ?? []);
+// Fields the last save rejected: red border + the reason under the field.
+$bad = fn(string $key) => isset($errors[$key]) ? ' is-invalid" aria-invalid="true" aria-describedby="' . $key . '-error' : '';
+$why = fn(string $key) => isset($errors[$key]) ? '<p class="field-error" id="' . $key . '-error">' . htmlspecialchars($errors[$key]) . '</p>' : '';
+$fieldErrorCount = count(array_filter(array_keys($errors), 'is_string'));
 
 $myOrgName = $organizations[0]['name'] ?? '';
 $activeNav = 'manage-events';
@@ -235,9 +239,14 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
     <?php endif; ?>
 
     <?= render_flashes() ?>
-    <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
+    <?php if ($fieldErrorCount): ?>
+      <div class="flash flash-error" role="alert">The event wasn't saved — <?= $fieldErrorCount === 1 ? '1 field needs' : $fieldErrorCount . ' fields need' ?> your attention (highlighted in red below).</div>
+    <?php endif; ?>
+    <?php foreach ($errors as $key => $err): if (is_string($key)) continue; ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
+    <!-- Filled by the form check below when fields are missing -->
+    <div class="flash flash-error" role="alert" data-form-summary hidden></div>
 
-    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset>
+    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" novalidate enctype="multipart/form-data" autocomplete="off" data-autoreset>
       <input type="hidden" name="action" value="save">
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
@@ -245,17 +254,17 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         <h2 class="admin-card-title">Event Details</h2>
 
         <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
-        <input type="text" id="title" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
+        <input type="text" id="title" name="title" class="admin-input<?= $bad('title') ?>" placeholder="Enter event title" value="<?= $val('title') ?>" required><?= $why('title') ?>
 
         <div class="admin-two-col">
           <div>
             <label class="admin-label" for="category_id">Category <span class="req">*</span></label>
-            <select id="category_id" name="category_id" class="admin-input" required>
+            <select id="category_id" name="category_id" class="admin-input<?= $bad('category_id') ?>" required>
               <option value="">Select a category</option>
               <?php foreach ($categories as $c): ?>
                 <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
               <?php endforeach; ?>
-            </select>
+            </select><?= $why('category_id') ?>
             <?php if (empty($categories)): ?>
               <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> first.</p>
             <?php endif; ?>
@@ -267,12 +276,12 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
               <input type="text" id="organization_id" class="admin-input" value="<?= htmlspecialchars($myOrgName) ?>" readonly>
               <p class="admin-hint">Moderators create events for their own organization.</p>
             <?php else: ?>
-            <select id="organization_id" name="organization_id" class="admin-input" required>
+            <select id="organization_id" name="organization_id" class="admin-input<?= $bad('organization_id') ?>" required>
               <option value="">Select an organization</option>
               <?php foreach ($organizations as $o): ?>
                 <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
               <?php endforeach; ?>
-            </select>
+            </select><?= $why('organization_id') ?>
             <?php if (empty($organizations)): ?>
               <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
             <?php endif; ?>
@@ -305,13 +314,13 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         </div>
 
         <label class="admin-label" for="description">Description <span class="req">*</span></label>
-        <textarea id="description" name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
+        <textarea id="description" name="description" class="admin-input<?= $bad('description') ?>" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea><?= $why('description') ?>
 
         <div class="admin-section-label">Date, Time &amp; Venue</div>
         <div class="admin-four-col">
           <div>
             <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
-            <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" required>
+            <input type="date" id="start_date" name="start_date" class="admin-input<?= $bad('start_date') ?>" value="<?= $val('start_date') ?>" required><?= $why('start_date') ?>
           </div>
           <div>
             <label class="admin-label" for="start_time">Start Time</label>
@@ -319,11 +328,11 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
           </div>
           <div>
             <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
-            <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" required>
+            <input type="date" id="end_date" name="end_date" class="admin-input<?= $bad('end_date') ?>" value="<?= $val('end_date') ?>" required><?= $why('end_date') ?>
           </div>
           <div>
             <label class="admin-label" for="end_time">End Time</label>
-            <input type="time" id="end_time" name="end_time" class="admin-input" value="<?= $time('end_time') ?>">
+            <input type="time" id="end_time" name="end_time" class="admin-input<?= $bad('end_time') ?>" value="<?= $time('end_time') ?>"><?= $why('end_time') ?>
           </div>
         </div>
         <!-- Other events on these dates, and clashes (filled by the script below) -->
@@ -339,11 +348,11 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         <div class="admin-two-col">
           <div>
             <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
-            <input type="text" id="venue" name="venue" class="admin-input" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>">
+            <input type="text" id="venue" name="venue" class="admin-input<?= $bad('venue') ?>" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>"><?= $why('venue') ?>
           </div>
           <div>
             <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
-            <input type="url" id="online_event_link" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
+            <input type="url" id="online_event_link" name="online_event_link" class="admin-input<?= $bad('online_event_link') ?>" placeholder="https://…" value="<?= $val('online_event_link') ?>"><?= $why('online_event_link') ?>
           </div>
         </div>
         <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
@@ -365,7 +374,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             <img src="<?= htmlspecialchars(asset_url($f['poster_url'])) ?>" alt="Current poster" class="admin-image-preview">
           <?php endif; ?>
           <label class="admin-label" for="poster_file">Upload an image</label>
-          <input type="file" id="poster_file" name="poster_file" class="admin-input" accept="image/jpeg,image/png,image/webp,image/gif">
+          <input type="file" id="poster_file" name="poster_file" class="admin-input<?= $bad('poster_file') ?>" accept="image/jpeg,image/png,image/webp,image/gif"><?= $why('poster_file') ?>
           <p class="admin-hint">JPG, PNG, WEBP or GIF, up to 5 MB. Replaces the current poster.</p>
           <label class="admin-label" for="poster_url">…or paste an image URL</label>
           <input type="text" id="poster_url" name="poster_url" class="admin-input" placeholder="https://…" value="<?= $val('poster_url') ?>">
@@ -374,13 +383,13 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         <div class="admin-card">
           <h2 class="admin-card-title">Registration &amp; Contact</h2>
           <label class="admin-label" for="registration_limit">Registration Limit</label>
-          <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>">
+          <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input<?= $bad('registration_limit') ?>" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>"><?= $why('registration_limit') ?>
 
           <label class="admin-label" for="registration_deadline">Registration Deadline</label>
-          <input type="date" id="registration_deadline" name="registration_deadline" class="admin-input" value="<?= $val('registration_deadline') ?>">
+          <input type="date" id="registration_deadline" name="registration_deadline" class="admin-input<?= $bad('registration_deadline') ?>" value="<?= $val('registration_deadline') ?>"><?= $why('registration_deadline') ?>
 
           <label class="admin-label" for="contact_email">Contact Email</label>
-          <input type="email" id="contact_email" name="contact_email" class="admin-input" placeholder="Enter email" value="<?= $val('contact_email') ?>">
+          <input type="email" id="contact_email" name="contact_email" class="admin-input<?= $bad('contact_email') ?>" placeholder="Enter email" value="<?= $val('contact_email') ?>"><?= $why('contact_email') ?>
 
           <label class="admin-label" for="contact_number">Contact Number</label>
           <input type="text" id="contact_number" name="contact_number" class="admin-input" placeholder="Enter no." value="<?= $val('contact_number') ?>">
@@ -568,6 +577,94 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         .catch(function () { hint.hidden = true; });
     }, 350);
   }
+
+  // ---- Fields that still need information ----
+  // Checked before the form is sent (the same rules the server applies):
+  // every field with a problem gets a red border and the reason under it,
+  // and the page scrolls to the first one.
+  var summary = document.querySelector('[data-form-summary]');
+  function byId(id) { return document.getElementById(id); }
+  function markInvalid(el, message) {
+    el.classList.add('is-invalid');
+    el.setAttribute('aria-invalid', 'true');
+    var note = byId(el.id + '-error');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'field-error';
+      note.id = el.id + '-error';
+      el.insertAdjacentElement('afterend', note);
+    }
+    note.textContent = message;
+    el.setAttribute('aria-describedby', note.id);
+  }
+  function clearInvalid(el) {
+    el.classList.remove('is-invalid');
+    el.removeAttribute('aria-invalid');
+    el.removeAttribute('aria-describedby');
+    var note = byId(el.id + '-error');
+    if (note) note.remove();
+    if (summary && !form.querySelector('.is-invalid')) summary.hidden = true;
+  }
+  function findProblems() {
+    var problems = [];
+    function add(id, message) {
+      var el = byId(id);
+      if (el && !problems.some(function (p) { return p[0] === el; })) problems.push([el, message]);
+    }
+    function empty(id) { var el = byId(id); return el && !el.readOnly && el.value.trim() === ''; }
+    var v = function (id) { return (byId(id) && byId(id).value.trim()) || ''; };
+
+    if (empty('title')) add('title', 'Enter the event title.');
+    if (empty('category_id')) add('category_id', 'Choose a category.');
+    if (empty('organization_id')) add('organization_id', 'Choose an organization.');
+    if (empty('description')) add('description', 'Write a short description of the event.');
+    else if (v('description').length > 2000) add('description', 'Description must be 2000 characters or fewer.');
+    if (empty('start_date')) add('start_date', 'Choose the start date.');
+    if (empty('end_date')) add('end_date', 'Choose the end date.');
+    else if (v('start_date') && v('end_date') < v('start_date')) add('end_date', "End date can't be before the start date.");
+    if (v('start_date') && v('start_date') === v('end_date') && v('start_time') && v('end_time') && v('end_time') <= v('start_time')) {
+      add('end_time', 'End time must be after the start time.');
+    }
+    var type = document.querySelector('input[name="venue_type"]:checked');
+    if (type && type.value === 'online') {
+      if (empty('online_event_link')) add('online_event_link', 'Online events need the webinar / meeting link.');
+    } else if (empty('venue')) {
+      add('venue', 'Enter where the event will be held.');
+    }
+    if (v('online_event_link') && !/^https?:\/\//i.test(v('online_event_link'))) add('online_event_link', 'The link must start with http:// or https://.');
+    if (v('registration_limit') && !(parseInt(v('registration_limit'), 10) >= 1)) add('registration_limit', 'Must be at least 1 (or leave it empty for no limit).');
+    if (v('registration_deadline') && v('end_date') && v('registration_deadline') > v('end_date')) add('registration_deadline', 'Must be on or before the end date.');
+    if (v('contact_email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('contact_email'))) add('contact_email', 'Enter a valid email address.');
+    return problems;
+  }
+  function focusFirstInvalid() {
+    var first = form.querySelector('.is-invalid');
+    if (!first) return;
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    first.focus({ preventScroll: true });
+  }
+  form.addEventListener('submit', function (e) {
+    form.querySelectorAll('.is-invalid').forEach(clearInvalid);
+    var problems = findProblems();
+    if (!problems.length) return;
+    e.preventDefault();
+    problems.forEach(function (p) { markInvalid(p[0], p[1]); });
+    if (summary) {
+      summary.textContent = problems.length === 1
+        ? '1 field needs your attention before the event can be saved (highlighted in red below).'
+        : problems.length + ' fields need your attention before the event can be saved (highlighted in red below).';
+      summary.hidden = false;
+    }
+    focusFirstInvalid();
+  });
+  // Fixing a field takes its red border away.
+  ['input', 'change'].forEach(function (type) {
+    form.addEventListener(type, function (e) {
+      if (e.target.classList && e.target.classList.contains('is-invalid')) clearInvalid(e.target);
+    });
+  });
+  // Back from the server with errors: go straight to the first highlighted field.
+  if (form.querySelector('.is-invalid')) focusFirstInvalid();
 
   form.addEventListener('change', function () { syncVenue(); syncAudience(); checkSchedule(); });
   ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
