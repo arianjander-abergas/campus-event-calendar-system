@@ -133,6 +133,8 @@ function wireCarousel() {
 /* ---------------- Home page stats: refresh live every 30s ---------------- */
 // Numbers come from api/stats.php (the site_stats() database function);
 // Active Users goes up/down as logged-in people open or close the site.
+// A stat that is 0 is hidden ("0 Active Users" puts people off) and comes
+// back as soon as it goes up.
 function wireLiveStats() {
   const block = document.querySelector("[data-stats-url]");
   if (!block) return;
@@ -143,7 +145,10 @@ function wireLiveStats() {
       if (!res.ok) return;
       const stats = await res.json();
       block.querySelectorAll("[data-stat]").forEach((el) => {
-        if (stats[el.dataset.stat] !== undefined) el.textContent = stats[el.dataset.stat];
+        const value = stats[el.dataset.stat];
+        if (value === undefined) return;
+        el.textContent = value;
+        el.closest(".stat").hidden = String(value) === "0";
       });
     } catch (e) {
       /* offline — keep the last numbers */

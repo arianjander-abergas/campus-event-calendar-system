@@ -42,7 +42,7 @@ $topbarSearch = true;
         <div class="eval-callout-list">
           <?php foreach (array_slice($toEvaluate, 0, 4) as $ev): ?>
             <a href="evaluate.php?event=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
-              <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(format_event_date($ev['start_date'])) ?></small></span>
+              <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(event_date_range($ev)) ?></small></span>
               <strong>Evaluate ›</strong>
             </a>
           <?php endforeach; ?>
@@ -87,7 +87,7 @@ $topbarSearch = true;
             <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
             </div>
             <?php if ($toEvaluate): ?>
               <span class="mini-badge badge-evaluate">Evaluate</span>
@@ -118,7 +118,7 @@ $topbarSearch = true;
             <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
+              <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
             </div>
             <span class="mini-going"><?= icon('people', 13) ?> <?= (int) $ev['going'] ?> going</span>
           </a>
@@ -162,6 +162,8 @@ $topbarSearch = true;
   </aside>
 
 </div>
+
+<?php include __DIR__ . '/../../includes/footer.php'; ?>
 
 <script src="../assets/js/sidebar.js"></script>
 <script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>

@@ -12,6 +12,7 @@ $notifications = $topUser ? ($notifications ?? get_my_notifications()) : [];
 $unreadCount = unread_count($notifications);
 ?>
 <header class="dash-topbar">
+  <?php include __DIR__ . '/topbar-start.php'; ?>
   <?php if (!empty($topbarSearch)): ?>
     <form class="search-box" action="<?= BASE_URL ?>/events.php" method="get" role="search">
       <?= icon('search', 16) ?>
