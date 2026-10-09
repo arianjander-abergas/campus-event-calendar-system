@@ -625,7 +625,7 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 }
 .dashboard-shell { background: linear-gradient(to right, var(--navy) 240px, transparent 240px); }
 .sidebar .brand { color: #fff; }
-.sidebar .brand-text .campus { color: #fff; }
+.sidebar .brand-text .campus { color: var(--orange); }
 .sidebar .brand-text .hub { color: #9fb4de; }
 .sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
