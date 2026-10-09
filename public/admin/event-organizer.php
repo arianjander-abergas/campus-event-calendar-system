@@ -419,7 +419,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
       <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= count($events) ?>)</h2>
     </div>
     <p class="admin-hint admin-hint-block">Published events become <strong>Completed</strong> automatically once they end. Use Mark Completed to close one early.</p>
-    <div class="admin-table-wrap admin-table-scroll">
+    <div class="admin-table-wrap admin-table-scroll" data-visible-rows="5">
       <table class="admin-table admin-table-compact">
         <thead>
           <tr>
@@ -674,12 +674,38 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 })();
 </script>
 <script>
+// Events table: show the first five events; more than that scroll inside the card.
+(function () {
+  var box = document.querySelector('[data-visible-rows]');
+  if (!box) return;
+  var limit = parseInt(box.getAttribute('data-visible-rows'), 10) || 5;
+  function fit() {
+    var rows = box.querySelectorAll('tbody tr');
+    if (rows.length <= limit) { box.style.maxHeight = 'none'; return; }
+    var head = box.querySelector('thead');
+    var height = head ? head.offsetHeight : 0;
+    for (var i = 0; i < limit; i++) height += rows[i].offsetHeight;
+    box.style.maxHeight = height + 'px';
+  }
+  fit();
+  window.addEventListener('resize', fit);
+})();
+</script>
+<script>
 // Events table "Edit ▾" / "Manage ▾" menus: one open at a time; a click outside or Escape closes it.
 (function () {
   var menus = document.querySelectorAll('details.row-more');
   menus.forEach(function (menu) {
     menu.addEventListener('toggle', function () {
-      if (menu.open) menus.forEach(function (m) { if (m !== menu) m.open = false; });
+      if (!menu.open) return;
+      menus.forEach(function (m) { if (m !== menu) m.open = false; });
+      // Near the bottom of the scrolling table, open the menu upward so it isn't cut off.
+      menu.classList.remove('row-more-up');
+      var box = menu.closest('.admin-table-scroll');
+      var list = menu.querySelector('.row-more-menu');
+      if (box && list && list.getBoundingClientRect().bottom > box.getBoundingClientRect().bottom) {
+        menu.classList.add('row-more-up');
+      }
     });
   });
   document.addEventListener('click', function (e) {
