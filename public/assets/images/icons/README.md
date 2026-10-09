@@ -1,6 +1,6 @@
-# UI icons (placeholders)
+# UI icons
 
-Every small icon on the site is an image from this folder. They are **placeholders** for now: a grey dashed box with a 3-letter label, so you can see in the browser which file is which.
+Every small icon on the site is an image from this folder: simple line icons drawn in blue (`#3d74c9`, 24×24, stroke 1.9). On dark backgrounds (the navy sidebar, blue buttons and circles) `style.css` shows them white, so one file works everywhere. The "Label" column below is the short name the old placeholder boxes showed.
 
 ## How to replace an icon
 
@@ -46,5 +46,6 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `view.svg` | VEW | View page | Manage Events "View the event page" |
 | `register.svg` | REG | Register | Home About "Register", sidebar "Sign up" (logged out) |
 | `import.svg` | IMP | Import & Verify (Excel upload) | Sidebar (admin + moderator) |
+| `arrow-left.svg` | — | Back | Event details "Back to All Events" |
 
 The login page (`../login/`) and the event details page (`../event-details/`) have their own numbered image slots — see the `IMAGE SLOT` comments in those pages.
