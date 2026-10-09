@@ -131,9 +131,12 @@ $topbarSearch = true;
   <aside class="right-rail">
     <div class="rail-card" id="dashboard-calendar-card">
       <div class="cal-head">
-        <span>Calendar</span>
-        <span id="calendar-month"></span>
-        <span class="cal-nav"><button type="button" id="calPrev" aria-label="Previous month">‹</button><button type="button" id="calNext" aria-label="Next month">›</button></span>
+        <h3 class="cal-head-title">Calendar</h3>
+        <div class="cal-head-month">
+          <button type="button" id="calPrev" aria-label="Previous month">‹</button>
+          <span id="calendar-month" aria-live="polite"></span>
+          <button type="button" id="calNext" aria-label="Next month">›</button>
+        </div>
       </div>
       <div class="cal-grid" id="calendar-grid" data-event-url="../event-details.php?id=" data-calendar-url="../events.php">
         <!-- filled by assets/js/main.js -->
@@ -166,6 +169,7 @@ $topbarSearch = true;
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>
 <script src="../assets/js/main.js"></script>
 <?= presence_script_tag() ?>

@@ -513,3 +513,18 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 }
 .row-more-menu form { display: flex; margin: 0; }
 .row-more-menu .btn-sm { width: 100%; text-align: left; justify-content: flex-start; }
+/* Edit ▾ menu: Delete sits apart from the safe choices, under a thin line. */
+.row-more-menu .row-more-danger { border-top: 1px solid var(--border); padding-top: 6px; margin-top: 2px; }
+
+/* Action buttons inside a table row: the cell stays a real table cell
+   (display: flex on a <td> broke the row lines and heights), and the
+   buttons line up inside it, wrapping onto a second line if needed. */
+td.admin-row-actions { display: table-cell; vertical-align: middle; }
+td.admin-row-actions > :not([hidden]) { display: inline-flex; align-items: center; vertical-align: middle; margin: 3px 6px 3px 0; }
+td.admin-row-actions > form { gap: 6px; }
+
+/* Users & Roles: every role dropdown is the same width (the long
+   "Moderator (needs an organization)" choice was stretching some of them
+   and pushing Save out of view). */
+.role-form { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.role-form .role-select { width: 130px; min-width: 0; text-overflow: ellipsis; }

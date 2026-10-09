@@ -193,6 +193,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>

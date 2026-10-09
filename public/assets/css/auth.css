@@ -800,3 +800,107 @@ button.login-field-icon { cursor: pointer; }
   .forgot-reveal { animation: none; }
   .login-glass .login-submit.is-loading::after { animation-duration: 2s; }
 }
+
+/* ============================================================
+   Phones / foldables (≤ 760px): the side photo strip doesn't fit, so each
+   page's photo becomes a banner across the top of the card, fading into
+   the dark form, with the school logo overlapping its bottom edge.
+   Same photos as on computers (IMAGE SLOTS 9–12).
+   ============================================================ */
+@media (max-width: 760px) {
+  .login-glass .login-card::before {
+    content: "";
+    display: block;
+    grid-column: 1;
+    grid-row: 1;
+    height: clamp(130px, 38vw, 200px);
+    background-color: #0e2a6b;
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+  .login-glass .login-card > .login-pane { grid-row: 2; padding-top: 0; }
+  /* Logo sits half on the photo, half on the card. */
+  .login-glass .login-card .login-logo { margin-top: -44px; position: relative; z-index: 1; }
+
+  .login-glass .signin-card::before {
+    background-image:
+      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      url("../images/login/lcup.jpg");
+    background-position: center, center 40%;
+  }
+  /* Admin Login: the photo of the school president, as on computers. */
+  .login-glass .signin-card.is-admin::before {
+    background-image:
+      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      url("../images/login/sister-president.jpg");
+    background-position: center, center 25%;
+  }
+  .login-glass .register-card::before {
+    background-image:
+      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      url("../images/login/festival.jpg");
+    background-position: center, center 45%;
+  }
+  /* The forgot-password drawing is on white: blended onto light blue as on computers. */
+  .login-glass .forgot-card::before {
+    background-image:
+      linear-gradient(180deg, rgba(12, 32, 80, 0) 45%, rgba(12, 32, 80, 0.95) 100%),
+      url("../images/login/forgot-password.jpg"),
+      linear-gradient(160deg, #e6f0ff 0%, #c7dbfb 100%);
+    background-blend-mode: normal, multiply, normal;
+    background-size: cover, contain, cover;
+    background-position: center, center, center;
+  }
+  /* The ✕ sits on the photo: darker backing so it stays visible. */
+  .login-glass .login-card .login-close { background: rgba(8, 24, 70, 0.6); border-color: rgba(255, 255, 255, 0.35); }
+  .login-glass .login-card .login-close img { filter: brightness(1.9); }
+}
+
+/* ---- Phones / foldables: compact, so the whole login (fields, Login,
+   Google, Admin Login, Sign up) fits on one screen without scrolling. ---- */
+@media (max-width: 760px) {
+  .login-page.login-glass { padding: 10px 10px; justify-content: center; min-height: 100dvh; }
+  .login-glass .login-card::before { height: clamp(78px, 22vw, 120px); }
+  .login-glass .login-card > .login-pane { padding: 0 20px 14px; }
+  .login-glass .login-card .login-logo { margin: -30px 0 10px; gap: 6px; }
+  .login-glass .login-logo-mark { width: 46px; height: 46px; padding: 4px; }
+  .login-glass .login-logo-text .campus,
+  .login-glass .login-logo-text .hub { font-size: 0.95rem; }
+  .login-glass .login-card h1 { font-size: 1.2rem; margin-bottom: 2px; }
+  .login-subtitle { font-size: 0.78rem; margin-bottom: 12px; }
+  .login-glass .login-alert, .login-glass .login-notice, .login-glass .login-card .flash { margin-bottom: 10px; padding: 8px 12px; font-size: 0.8rem; }
+  .login-glass .login-form label { margin-bottom: 5px; font-size: 0.78rem; }
+  .login-glass .login-field { height: 44px; margin-bottom: 10px; border-radius: 12px; }
+  .login-glass .login-field-icon img { width: 20px; height: 20px; }
+  .login-glass .login-forgot { margin: -2px 0 12px auto; font-size: 0.8rem; }
+  .login-glass .login-btn { height: 44px; font-size: 0.9rem; border-radius: 12px; }
+  .login-glass .login-divider { margin: 14px 0 10px; font-size: 0.75rem; }
+  /* Google + Admin Login side by side again (saves a row). */
+  .login-glass .login-socials { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .login-glass .login-socials .login-btn { gap: 8px; font-size: 0.85rem; }
+  .login-glass .login-socials .login-btn img { width: 18px; height: 18px; }
+  .login-glass .login-signup { margin: 12px 0 0; font-size: 0.8rem; }
+  .login-glass .login-close { top: 10px; right: 10px; width: 34px; height: 34px; }
+  /* Sign-up fields too (that form is long, so it still scrolls, but less). */
+  .login-glass .login-input { height: 44px; }
+}
+
+/* ---- Sign up on phones / foldables: pairs of fields side by side
+   (Password + Confirm, Student + Faculty, Department + Organization)
+   and tighter spacing, so the form is about half as tall. ---- */
+@media (max-width: 760px) {
+  .login-glass .register-card { max-width: 480px; }
+  .login-glass .register-grid { grid-template-columns: 1fr 1fr; column-gap: 10px; }
+  .login-glass .register-form label,
+  .login-glass .register-form .acct-label,
+  .login-glass .register-form .acct-type legend { margin-bottom: 5px; font-size: 0.78rem; }
+  .login-glass .login-input { height: 42px; font-size: 0.85rem; padding-left: 12px; padding-right: 12px; }
+  .login-glass .register-form .login-input,
+  .login-glass .register-form .admin-input { margin-bottom: 10px; }
+  .login-glass .register-form .acct-type { margin-bottom: 8px; }
+  .login-glass .register-form .acct-choice,
+  .login-glass .register-form .acct-grid { grid-template-columns: 1fr 1fr; gap: 10px; column-gap: 10px; }
+  .login-glass .register-form .acct-option span { padding: 8px 10px; }
+  .login-glass .register-form .acct-option small { font-size: 0.7rem; line-height: 1.25; }
+  .login-glass .register-form .login-submit { margin-top: 4px; }
+}

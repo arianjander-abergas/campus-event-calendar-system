@@ -119,6 +119,7 @@ $breadcrumbs = [['Dashboard', 'dashboard.php'], [$event['title'], '../event-deta
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>

@@ -330,6 +330,7 @@ function calendar_time_line(array $ev): string
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
 <script src="assets/js/sidebar.js"></script>
+<script src="assets/js/ui.js"></script>
 <script src="assets/js/calendar.js"></script>
 <?= presence_script_tag() ?>
 </body>

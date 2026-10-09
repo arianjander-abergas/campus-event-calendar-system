@@ -103,6 +103,7 @@ document.querySelector('[data-copy-sql]')?.addEventListener('click', function ()
 });
 </script>
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>
