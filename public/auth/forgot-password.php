@@ -27,39 +27,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&display=swap">
 <link rel="stylesheet" href="../assets/css/style.css">
-<link rel="stylesheet" href="../assets/css/auth.css">
+<link rel="stylesheet" href="../assets/css/auth.css?v=<?= filemtime(__DIR__ . '/../assets/css/auth.css') ?>">
 </head>
-<body class="login-page">
+<body class="login-page login-glass">
 
-<a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
-  <span class="login-logo-text">
-    <span class="campus">CAMPUS</span>
-    <span class="hub">EVENT HUB</span>
-  </span>
-</a>
+<!-- Decorative blurred "dashboard" behind the glass card (pure CSS, no images). -->
+<div class="glass-backdrop" aria-hidden="true">
+  <div class="gb-sidebar"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="gb-main">
+    <div class="gb-topbar"></div>
+    <div class="gb-hero"></div>
+    <div class="gb-cards"><i></i><i></i><i></i><i></i></div>
+    <div class="gb-rows"><i></i><i></i><i></i></div>
+  </div>
+</div>
 
-<main class="login-card">
+<main class="login-card forgot-card">
   <a href="login.php" class="login-close" aria-label="Back to login">
     <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
+  </a>
+
+  <!-- Solid panel strip on the left, same as the login page. -->
+  <div class="login-slide-panel" aria-hidden="true"></div>
+
+  <div class="login-pane">
+  <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="88" height="88">
+    <span class="login-logo-text">
+      <span class="campus">CAMPUS</span>
+      <span class="hub">EVENT HUB</span>
+    </span>
   </a>
 
   <h1>Reset your password</h1>
 
   <?php if ($error): ?>
-    <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
+    <div class="login-alert forgot-reveal" role="alert"><?= htmlspecialchars($error) ?></div>
   <?php endif; ?>
 
   <?php if ($success): ?>
-    <div class="login-notice"><?= htmlspecialchars($success) ?></div>
-    <p class="login-help">The link opens a page where you can choose a new password.</p>
+    <div class="login-notice forgot-reveal"><?= htmlspecialchars($success) ?></div>
+    <p class="login-subtitle forgot-reveal forgot-reveal-2">The link opens a page where you can choose a new password.</p>
   <?php else: ?>
-    <p class="login-help">Enter your email and we'll send you a link to choose a new password.</p>
-    <form method="POST" class="login-form">
+    <p class="login-subtitle">Enter your email and we'll send you a link to choose a new password.</p>
+    <form method="POST" class="login-form" data-loading-form>
       <label for="email">Email Address</label>
       <div class="login-field">
         <span class="login-field-icon" aria-hidden="true">
-          <img src="../assets/images/login/icon-email.svg" alt="" width="28" height="28">
+          <img src="../assets/images/login/icon-user.png" alt="" width="28" height="28">
         </span>
         <input type="email" id="email" name="email" required autocomplete="email"
                placeholder="name@email.lcup.edu.ph" value="<?= htmlspecialchars(post_param('email')) ?>">
@@ -67,9 +82,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <button type="submit" class="login-btn login-submit">Send reset link</button>
     </form>
   <?php endif; ?>
+
+  <p class="login-signup">Remembered it? <a href="login.php">Back to login</a></p>
+  </div>
 </main>
 
-<p class="login-signup">Remembered it? <a href="login.php">Back to login</a></p>
-
+<script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
 </body>
 </html>

@@ -90,6 +90,29 @@ window.addEventListener("pageshow", (e) => {
 });
 
 /**
+ * Forms marked data-loading-form (Forgot Password): while the request is on
+ * its way, the submit button shows a spinner and can't be pressed twice.
+ */
+document.querySelectorAll("form[data-loading-form]").forEach((form) => {
+  form.addEventListener("submit", () => {
+    const btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+    btn.classList.add("is-loading");
+    btn.setAttribute("aria-busy", "true");
+    setTimeout(() => { btn.disabled = true; }, 0); // after the submit has started
+  });
+});
+// Back button after sending: the button works again.
+window.addEventListener("pageshow", (e) => {
+  if (!e.persisted) return;
+  document.querySelectorAll("form[data-loading-form] .is-loading").forEach((btn) => {
+    btn.classList.remove("is-loading");
+    btn.removeAttribute("aria-busy");
+    btn.disabled = false;
+  });
+});
+
+/**
  * Smooth show / hide for what the options reveal on the glass login and
  * sign-up cards: the student-only fields (Student / Faculty), the irregular
  * summary (Regular / Irregular) and the admin / Google messages. Other

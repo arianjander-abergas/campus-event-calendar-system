@@ -268,14 +268,14 @@ button.login-field-icon { cursor: pointer; }
    Tweak: --panel-rest (strip position) and the 38fr/62fr split.
    ============================================================ */
 .login-glass {
-  --glass-text: #f5f3ff;
-  --glass-muted: rgba(221, 214, 254, 0.72);
+  --glass-text: #f0f6ff;
+  --glass-muted: rgba(219, 234, 254, 0.72);
   --glass-field: rgba(255, 255, 255, 0.06);
-  --glass-field-border: rgba(165, 180, 252, 0.18);
-  --glass-placeholder: rgba(165, 190, 255, 0.62);
-  --glass-link: #a5b4fc;
-  --glass-gold: #f5b942;
-  --glass-gold-ring: rgba(245, 185, 66, 0.28);
+  --glass-field-border: rgba(147, 197, 253, 0.18);
+  --glass-placeholder: rgba(147, 197, 253, 0.62);
+  --glass-link: #93c5fd;
+  --glass-gold: #fb923c;
+  --glass-gold-ring: rgba(251, 146, 60, 0.28);
 
   position: relative;
   justify-content: center;
@@ -283,9 +283,9 @@ button.login-field-icon { cursor: pointer; }
   overflow-x: hidden;
   color: var(--glass-text);
   background:
-    radial-gradient(circle at 15% 20%, rgba(139, 92, 246, 0.30), transparent 40%),
+    radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.30), transparent 40%),
     radial-gradient(circle at 85% 80%, rgba(59, 91, 219, 0.32), transparent 45%),
-    linear-gradient(160deg, #0b0a24 0%, #17134a 55%, #0b0a24 100%);
+    linear-gradient(160deg, #061430 0%, #0e2a6b 55%, #061430 100%);
   background-attachment: fixed;
 }
 
@@ -307,8 +307,8 @@ button.login-field-icon { cursor: pointer; }
 .gb-hero {
   display: block;
   border-radius: 14px;
-  background: rgba(196, 181, 253, 0.07);
-  border: 1px solid rgba(196, 181, 253, 0.06);
+  background: rgba(147, 197, 253, 0.07);
+  border: 1px solid rgba(147, 197, 253, 0.06);
 }
 .gb-sidebar {
   display: flex;
@@ -316,13 +316,13 @@ button.login-field-icon { cursor: pointer; }
   gap: 14px;
   padding: 22px 16px;
   border-radius: 20px;
-  background: rgba(196, 181, 253, 0.05);
+  background: rgba(147, 197, 253, 0.05);
 }
 .gb-sidebar i { height: 38px; }
-.gb-sidebar i:first-child { height: 56px; margin-bottom: 18px; background: rgba(139, 92, 246, 0.25); }
+.gb-sidebar i:first-child { height: 56px; margin-bottom: 18px; background: rgba(37, 99, 235, 0.25); }
 .gb-main { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .gb-topbar { height: 54px; }
-.gb-hero { height: 34vh; background: linear-gradient(120deg, rgba(139, 92, 246, 0.2), rgba(59, 91, 219, 0.18)); }
+.gb-hero { height: 34vh; background: linear-gradient(120deg, rgba(37, 99, 235, 0.2), rgba(59, 91, 219, 0.18)); }
 .gb-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
 .gb-cards i { height: 150px; }
 .gb-rows { display: flex; flex-direction: column; gap: 12px; }
@@ -338,17 +338,17 @@ button.login-field-icon { cursor: pointer; }
   padding: 0;
   overflow: hidden;
   border-radius: 26px;
-  background: rgba(24, 20, 70, 0.62);
-  border: 1px solid rgba(165, 180, 252, 0.16);
+  background: rgba(12, 32, 80, 0.62);
+  border: 1px solid rgba(147, 197, 253, 0.16);
   box-shadow:
-    0 40px 100px rgba(4, 3, 20, 0.65),
-    0 0 80px rgba(124, 92, 255, 0.12),
+    0 40px 100px rgba(2, 8, 24, 0.65),
+    0 0 80px rgba(59, 130, 246, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
   backdrop-filter: blur(22px) saturate(140%);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .login-glass .login-card { background: rgba(24, 20, 70, 0.95); }
+  .login-glass .login-card { background: rgba(12, 32, 80, 0.95); }
 }
 
 /* The empty panel: full card width, slid left so only a strip stays visible. */
@@ -357,12 +357,12 @@ button.login-field-icon { cursor: pointer; }
   inset: 0;
   z-index: 2;
   background:
-    radial-gradient(circle at 28% 18%, rgba(139, 92, 246, 0.35), transparent 55%),
+    radial-gradient(circle at 28% 18%, rgba(37, 99, 235, 0.35), transparent 55%),
     radial-gradient(circle at 20% 90%, rgba(59, 91, 219, 0.25), transparent 50%),
-    linear-gradient(155deg, #2a2373 0%, #1d1960 55%, #141149 100%);
+    linear-gradient(155deg, #1a3f8f 0%, #133074 55%, #0c2160 100%);
   box-shadow:
-    inset -1px 0 0 rgba(196, 181, 253, 0.35),
-    18px 0 60px rgba(124, 92, 255, 0.32);
+    inset -1px 0 0 rgba(147, 197, 253, 0.35),
+    18px 0 60px rgba(59, 130, 246, 0.32);
   transform: translateX(var(--panel-rest));
   /* Only the visible strip is drawn (the glow on its edge is kept), so when it
      moves between sides it travels as one solid block. */
@@ -397,14 +397,22 @@ button.login-field-icon { cursor: pointer; }
 
 /* ---- Logo + heading ---- */
 .login-glass .login-logo { flex-direction: column; gap: 10px; margin: 0 0 20px; }
+/* Logo on a white circle that hugs the seal, so it stands out on the dark card. */
 .login-glass .login-logo-mark {
+  box-sizing: content-box;
   width: 64px;
   height: 64px;
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.4));
+  padding: 5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.18),
+    0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .login-glass .login-logo-text { flex-direction: row; align-items: baseline; gap: 6px; line-height: 1; }
 .login-glass .login-logo-text .campus,
 .login-glass .login-logo-text .hub { font-size: 1.15rem; letter-spacing: 1px; color: #fff; }
+.login-glass .login-logo-text .campus { color: #ff7a21; } /* "CAMPUS" in the brand orange */
 
 .login-glass .login-card h1 { margin: 0 0 6px; text-align: center; font-size: 1.45rem; color: #fff; }
 .login-subtitle { margin: 0 0 24px; text-align: center; font-size: 0.86rem; color: var(--glass-muted); }
@@ -414,7 +422,7 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-notice,
 .login-glass .login-card .flash { margin: 0 0 18px; border-radius: 12px; }
 .login-glass .login-alert { background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.35); color: #fecaca; }
-.login-glass .login-notice { background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(129, 140, 248, 0.4); color: #c7d2fe; }
+.login-glass .login-notice { background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(96, 165, 250, 0.4); color: #bfdbfe; }
 
 /* ---- Form ---- */
 .login-glass .login-form { padding-left: 0; }
@@ -448,7 +456,7 @@ button.login-field-icon { cursor: pointer; }
 /* Keep Chrome autofill from painting the field yellow/blue. */
 .login-glass .login-field input:-webkit-autofill {
   -webkit-text-fill-color: var(--glass-text);
-  -webkit-box-shadow: 0 0 0 1000px rgba(30, 26, 82, 0.98) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(14, 36, 88, 0.98) inset;
   caret-color: var(--glass-text);
   transition: background-color 9999s;
 }
@@ -480,34 +488,34 @@ button.login-field-icon { cursor: pointer; }
 /* The one splash of orange-red on the page. */
 .login-glass .login-submit {
   width: 100%;
-  background: linear-gradient(135deg, #f25a2c 0%, #c8321a 100%);
-  box-shadow: 0 10px 30px rgba(242, 90, 44, 0.4);
+  background: linear-gradient(135deg, #f76b15 0%, #d9480f 100%);
+  box-shadow: 0 10px 30px rgba(247, 107, 21, 0.4);
   letter-spacing: 0.3px;
 }
 .login-glass .login-submit:hover {
-  background: linear-gradient(135deg, #ff6a3a 0%, #d63b1f 100%);
+  background: linear-gradient(135deg, #fb7d2a 0%, #e8550f 100%);
   transform: translateY(-1px);
-  box-shadow: 0 14px 36px rgba(242, 90, 44, 0.5);
+  box-shadow: 0 14px 36px rgba(247, 107, 21, 0.5);
 }
 .login-glass .login-btn:focus-visible { outline: 3px solid var(--glass-gold); outline-offset: 3px; }
 
 .login-glass .login-divider { margin: 26px 0 16px; color: var(--glass-muted); }
 .login-glass .login-divider::before,
-.login-glass .login-divider::after { background: rgba(165, 180, 252, 0.18); }
+.login-glass .login-divider::after { background: rgba(147, 197, 253, 0.18); }
 
 .login-glass .login-socials { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .login-glass .login-socials .login-btn {
   width: auto;
   gap: 10px;
-  background: rgba(30, 41, 110, 0.6);
-  border: 1px solid rgba(129, 140, 248, 0.25);
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(251, 146, 60, 0.55);
 }
-.login-glass .login-socials .login-btn:hover { background: rgba(43, 56, 140, 0.75); transform: translateY(-1px); }
+.login-glass .login-socials .login-btn:hover { background: rgba(249, 115, 22, 0.24); transform: translateY(-1px); }
 /* IMAGE SLOTS 6, 7 — Google + Admin icons */
 .login-glass .login-socials .login-btn img { width: 22px; height: 22px; }
 /* Admin Login stays lit while admin mode is on (fades in/out with the slide). */
 .login-glass .login-socials .login-btn[aria-pressed="true"] {
-  background: rgba(245, 185, 66, 0.12);
+  background: rgba(251, 146, 60, 0.12);
   border-color: var(--glass-gold);
   box-shadow: 0 0 0 3px var(--glass-gold-ring);
 }
@@ -588,8 +596,8 @@ button.login-field-icon { cursor: pointer; }
 .register-card .login-slide-panel {
   clip-path: none;
   box-shadow:
-    inset 1px 0 0 rgba(196, 181, 253, 0.35),
-    -18px 0 60px rgba(124, 92, 255, 0.32);
+    inset 1px 0 0 rgba(147, 197, 253, 0.35),
+    -18px 0 60px rgba(59, 130, 246, 0.32);
 }
 
 /* "Log in": panel and form move LEFT together. */
@@ -627,10 +635,10 @@ button.login-field-icon { cursor: pointer; }
   box-shadow: 0 0 0 4px var(--glass-gold-ring);
 }
 .login-glass select.login-input option,
-.login-glass select.login-input optgroup { background: #1e1a52; color: var(--glass-text); }
+.login-glass select.login-input optgroup { background: #0e2458; color: var(--glass-text); }
 .login-glass .login-input:-webkit-autofill {
   -webkit-text-fill-color: var(--glass-text);
-  -webkit-box-shadow: 0 0 0 1000px rgba(30, 26, 82, 0.98) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(14, 36, 88, 0.98) inset;
   caret-color: var(--glass-text);
   transition: background-color 9999s;
 }
@@ -642,17 +650,17 @@ button.login-field-icon { cursor: pointer; }
   border-radius: 14px;
   transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
-.login-glass .register-form .acct-option:hover span { border-color: rgba(245, 185, 66, 0.5); transform: translateY(-1px); }
+.login-glass .register-form .acct-option:hover span { border-color: rgba(251, 146, 60, 0.5); transform: translateY(-1px); }
 .login-glass .register-form .acct-option strong { color: var(--glass-text); }
 .login-glass .register-form .acct-option small { color: var(--glass-muted); font-weight: 400; }
 .login-glass .register-form .acct-option input:checked + span {
-  background: rgba(245, 185, 66, 0.1);
+  background: rgba(251, 146, 60, 0.1);
   border-color: var(--glass-gold);
   box-shadow: 0 0 0 3px var(--glass-gold-ring);
 }
 .login-glass .register-form .acct-option input:focus-visible + span { outline: 3px solid var(--glass-gold); }
 .login-glass .register-form .req { color: #fca5a5; }
-.login-glass .register-form .acct-student { border-top-color: rgba(165, 180, 252, 0.2); }
+.login-glass .register-form .acct-student { border-top-color: rgba(147, 197, 253, 0.2); }
 .login-glass .register-form .acct-label {
   margin-bottom: 8px;
   font-size: 0.85rem;
@@ -663,9 +671,9 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .acct-status label { font-weight: 400; color: var(--glass-text); }
 .login-glass .acct-status input { accent-color: var(--glass-gold); }
 .login-glass .acct-irregular-summary {
-  background: rgba(245, 185, 66, 0.1);
-  border-color: rgba(245, 185, 66, 0.35);
-  color: #fde68a;
+  background: rgba(251, 146, 60, 0.1);
+  border-color: rgba(251, 146, 60, 0.35);
+  color: #fed7aa;
 }
 .login-glass .acct-link { color: var(--glass-link); }
 /* The irregular-student pop-up keeps its light look (dark text on white). */
@@ -695,4 +703,44 @@ button.login-field-icon { cursor: pointer; }
     grid-template-columns: 1fr;
     max-width: 560px;
   }
+}
+
+/* ============================================================
+   FORGOT PASSWORD — same glass card as the login page (panel strip on
+   the left), plus small animations:
+   - the email icon pops slightly when the field is in use
+   - "Send reset link" shows a spinner while the email is being sent
+   - the success / error message slides in after sending
+   Moving to / from the login page cross-fades (view transition above).
+   ============================================================ */
+.login-glass .forgot-card { max-width: 820px; }
+
+.forgot-card .login-field-icon img { transition: transform 0.25s ease; }
+.forgot-card .login-field:focus-within .login-field-icon img { transform: scale(1.12); }
+
+.login-glass .login-submit.is-loading { pointer-events: none; filter: saturate(0.9); }
+.login-glass .login-submit.is-loading::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: login-btn-spin 0.7s linear infinite;
+}
+@keyframes login-btn-spin { to { transform: rotate(360deg); } }
+
+.forgot-reveal { animation: forgot-reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.forgot-reveal-2 { animation-delay: 0.12s; }
+@keyframes forgot-reveal {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forgot-card .login-field-icon img { transition: none; }
+  .forgot-card .login-field:focus-within .login-field-icon img { transform: none; }
+  .forgot-reveal { animation: none; }
+  .login-glass .login-submit.is-loading::after { animation-duration: 2s; }
 }
