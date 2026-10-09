@@ -532,24 +532,46 @@ button.login-field-icon { cursor: pointer; }
   --panel-clip: inset(0 -120px 0 62%); /* draw only the 38% strip (+ its glow) */
   --panel-admin: 0%;                   /* panel's strip on the right side */
   --pane-admin: -61.3%;                /* form moves left by the strip width (38/62 of itself) */
-  --panel-swap: 0%;
-  --pane-out-right: 100%;
+}
+/* IMAGE SLOT 10 — LCUP campus photo in the login panel strip | file:
+   assets/images/login/lcup.jpg. The strip is the panel's right 38% (in every
+   position: resting left, admin right, sliding), so the photo sits there and
+   moves with it. Blue gradients blend it in; the edge facing the form fades. */
+.signin-card .login-slide-panel::before,
+.signin-card .login-slide-panel::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 38%;
+  box-shadow: inset -1px 0 0 rgba(147, 197, 253, 0.35);
+  transition: opacity 0.6s ease-in-out; /* in step with the panel slide */
+}
+.signin-card .login-slide-panel::before {
+  background:
+    linear-gradient(270deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
+    linear-gradient(180deg, rgba(14, 42, 107, 0.5) 0%, rgba(19, 48, 116, 0.2) 45%, rgba(8, 24, 70, 0.85) 100%),
+    url("../images/login/lcup.jpg") 16% center / cover no-repeat; /* framed on the cross */
+}
+/* IMAGE SLOT 11 — admin view photo | file: assets/images/login/sister-president.jpg.
+   Cross-fades in while the panel slides right for Admin Login (and back out
+   for Google). Here the strip is on the right, so the fade faces left. */
+.signin-card .login-slide-panel::after {
+  background:
+    linear-gradient(90deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
+    linear-gradient(180deg, rgba(14, 42, 107, 0.45) 0%, rgba(19, 48, 116, 0.15) 45%, rgba(8, 24, 70, 0.85) 100%),
+    url("../images/login/sister-president.jpg") 53% center / cover no-repeat; /* framed on her */
+  opacity: 0;
+}
+.signin-card.is-admin .login-slide-panel::before { opacity: 0; }
+.signin-card.is-admin .login-slide-panel::after  { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .signin-card .login-slide-panel::before,
+  .signin-card .login-slide-panel::after { transition: none; }
 }
 .login-card.is-admin .login-slide-panel { transform: translateX(var(--panel-admin)); }
 .login-card.is-admin .login-pane        { transform: translateX(var(--pane-admin)); }
-
-/* ---- Sign up: panel and form move RIGHT together, then sign-up opens ---- */
-.login-card.slide-right .login-slide-panel { animation: login-panel-to-right 0.6s ease-in-out both; }
-.login-card.slide-right .login-pane        { animation: login-pane-to-right 0.6s ease-in-out both; }
-
-@keyframes login-panel-to-right {
-  from { transform: translateX(var(--panel-rest)); }
-  to   { transform: translateX(var(--panel-swap)); }
-}
-@keyframes login-pane-to-right {
-  from { transform: none; }
-  to   { transform: translateX(var(--pane-out-right)); }
-}
 
 @media (max-width: 860px) {
   .glass-backdrop { grid-template-columns: 1fr; }
@@ -560,7 +582,6 @@ button.login-field-icon { cursor: pointer; }
 @media (max-width: 760px) {
   .login-glass .login-card {
     --panel-rest: -101%;
-    --panel-swap: 0%;     /* right: panel follows the form in from the left */
     --panel-clip: none;
     --panel-admin: 101%;  /* admin toggle: panel wipes across the form to the right */
     --pane-admin: 0%;     /* form stays full width */
@@ -582,13 +603,11 @@ button.login-field-icon { cursor: pointer; }
 
 /* ============================================================
    SIGN-UP — same glass card, mirrored: form on the LEFT, panel strip
-   on the RIGHT (where the login page's "Sign up" slide leaves it).
-   "Log in" slides panel + form LEFT, then the login page opens with
-   its panel on the left.
+   on the RIGHT. Moving to / from the login page uses the cross-page
+   view transition below (the card morphs, no waiting).
    ============================================================ */
 .login-glass .register-card {
   --panel-rest: 62%;                         /* panel shifted right: its left 38% shows */
-  --reg-panel-clip: inset(0 62% 0 -120px);   /* while sliding: only that 38% block (+ glow) */
   grid-template-columns: 62fr 38fr;
   max-width: 980px;
 }
@@ -599,21 +618,31 @@ button.login-field-icon { cursor: pointer; }
     inset 1px 0 0 rgba(147, 197, 253, 0.35),
     -18px 0 60px rgba(59, 130, 246, 0.32);
 }
-
-/* "Log in": panel and form move LEFT together. */
-.register-card.slide-left .login-slide-panel {
-  clip-path: var(--reg-panel-clip);
-  animation: reg-panel-to-left 0.6s ease-in-out both;
+/* IMAGE SLOT 9 — campus festival photo in the panel strip | file:
+   assets/images/login/festival.jpg. Covers only the visible 38% of the panel
+   (the strip on the right). Blue gradients on
+   top blend it into the page colours; the left edge fades into the form. */
+.register-card .login-slide-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  background:
+    linear-gradient(90deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
+    linear-gradient(180deg, rgba(14, 42, 107, 0.55) 0%, rgba(19, 48, 116, 0.25) 45%, rgba(8, 24, 70, 0.85) 100%),
+    url("../images/login/festival.jpg") 55% center / cover no-repeat;
+  box-shadow: inset 1px 0 0 rgba(147, 197, 253, 0.35);
 }
-.register-card.slide-left .login-pane { animation: reg-pane-to-left 0.6s ease-in-out both; }
-@keyframes reg-panel-to-left {
-  from { transform: translateX(var(--panel-rest)); }
-  to   { transform: translateX(0); }
+/* Close (✕) sits on the photo here: darker backing so it stays visible. */
+.login-glass .register-card .login-close,
+.login-glass .signin-card.is-admin .login-close {
+  background: rgba(8, 24, 70, 0.6);
+  border-color: rgba(255, 255, 255, 0.35);
 }
-@keyframes reg-pane-to-left {
-  from { transform: none; }
-  to   { transform: translateX(-100%); }
-}
+.login-glass .register-card .login-close img,
+.login-glass .signin-card.is-admin .login-close img { filter: brightness(1.9); }
 
 /* ---- Sign-up fields on dark glass ---- */
 .login-glass { color-scheme: dark; } /* dark native select arrows, radios, dropdown lists */
@@ -680,17 +709,25 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .acct-modal { color-scheme: light; background: #fff; }
 .login-glass .register-form .login-submit { margin-top: 8px; }
 
-/* ---- Smooth page change between login and sign-up ----
-   Browsers that support cross-page view transitions cross-fade the pages
-   and morph the card from one size/layout to the other instead of flashing. */
+/* ---- Smooth page change between login, sign-up and forgot password ----
+   The link opens the next page immediately (no waiting animation first);
+   browsers with cross-page view transitions then morph the card from one
+   size/layout to the other while its contents cross-fade. */
 @view-transition { navigation: auto; }
 .login-glass .login-card { view-transition-name: auth-card; }
 ::view-transition-group(auth-card) {
-  animation-duration: 0.45s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-duration: 0.38s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); /* quick start, soft landing */
+}
+::view-transition-old(auth-card),
+::view-transition-new(auth-card) {
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+  height: 100%;              /* stretch snapshots with the morph instead of letterboxing */
+  object-fit: cover;
 }
 ::view-transition-old(root),
-::view-transition-new(root) { animation-duration: 0.3s; }
+::view-transition-new(root) { animation-duration: 0.25s; }
 @media (prefers-reduced-motion: reduce) {
   @view-transition { navigation: none; }
   .login-glass .register-form .acct-option span { transition: none; }
@@ -699,7 +736,6 @@ button.login-field-icon { cursor: pointer; }
 @media (max-width: 760px) {
   .login-glass .register-card {
     --panel-rest: 101%;       /* no strip on phones: panel waits off to the right */
-    --reg-panel-clip: none;   /* "Log in": panel follows the form in from the right */
     grid-template-columns: 1fr;
     max-width: 560px;
   }
@@ -714,6 +750,26 @@ button.login-field-icon { cursor: pointer; }
    Moving to / from the login page cross-fades (view transition above).
    ============================================================ */
 .login-glass .forgot-card { max-width: 820px; }
+
+/* IMAGE SLOT 12 — "forgot password" illustration in the panel strip | file:
+   assets/images/login/forgot-password.jpg. It's a drawing on white, so it is
+   multiplied onto a light-blue wash (the white turns soft blue, the drawing
+   keeps its colours); the top layer fades the edges into the dark card. */
+.forgot-card .login-slide-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;                 /* the visible strip is the panel's right 38% */
+  width: 38%;
+  background:
+    linear-gradient(270deg, rgba(12, 32, 80, 0.85) 0%, rgba(12, 32, 80, 0) 22%),
+    linear-gradient(180deg, rgba(12, 32, 80, 0.35) 0%, rgba(12, 32, 80, 0) 22%, rgba(12, 32, 80, 0) 72%, rgba(8, 24, 70, 0.8) 100%),
+    url("../images/login/forgot-password.jpg") 52% center / cover no-repeat,
+    linear-gradient(160deg, #e6f0ff 0%, #c7dbfb 100%);
+  background-blend-mode: normal, normal, multiply, normal;
+  box-shadow: inset -1px 0 0 rgba(147, 197, 253, 0.35);
+}
 
 .forgot-card .login-field-icon img { transition: transform 0.25s ease; }
 .forgot-card .login-field:focus-within .login-field-icon img { transform: scale(1.12); }

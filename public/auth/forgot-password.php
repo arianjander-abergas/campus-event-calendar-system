@@ -88,5 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </main>
 
 <script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
+<!-- Chrome/Edge get the login page ready while the pointer rests on "Back to login", so it opens instantly. -->
+<script type="speculationrules">{"prerender": [{"source": "list", "urls": ["login.php"], "eagerness": "moderate"}]}</script>
 </body>
 </html>

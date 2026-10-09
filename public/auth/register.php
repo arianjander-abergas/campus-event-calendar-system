@@ -161,12 +161,14 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
   </form>
   <?php endif; ?>
 
-  <p class="login-signup">Already have an account? <a href="login.php" data-slide="left">Log in</a></p>
+  <p class="login-signup">Already have an account? <a href="login.php">Log in</a></p>
   </div>
 </main>
 
 <script src="../assets/js/account.js"></script>
 <script src="../assets/js/forms.js"></script>
 <script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
+<!-- Chrome/Edge get the login page ready while the pointer rests on "Log in", so it opens instantly. -->
+<script type="speculationrules">{"prerender": [{"source": "list", "urls": ["login.php"], "eagerness": "moderate"}]}</script>
 </body>
 </html>
