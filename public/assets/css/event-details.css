@@ -11,12 +11,9 @@
      SLOT 3   Program 1 image ........ program-1.svg          225×200
      SLOT 4   Program 2 image ........ program-2.svg          225×200
      SLOT 5   Program 3 image ........ program-3.svg          225×200
-     SLOT 6   Back arrow ............. icon-back.svg          30×18
-     SLOT 7   Location icon .......... icon-location.svg      12×12
-     SLOT 8   Calendar icon .......... icon-calendar.svg      12×12
-     SLOT 9   Notification bell ...... icon-bell.svg          26×26
-     SLOT 10  User avatar ............ avatar.svg             50×50 (shown round)
-     SLOT 11  User menu arrow ........ icon-chevron-down.svg  18×18
+     Slots 6–11 (back arrow, location, calendar, bell, avatar, menu arrow)
+     now use the shared icons in assets/images/icons/ (icon() in PHP) and
+     the initials avatar, like every other page.
    * Only used when the event / organization in Supabase has no
      poster_url / logo_url of its own.
    Any image size works; the rules marked "IMAGE SLOT" below scale it to fit.
