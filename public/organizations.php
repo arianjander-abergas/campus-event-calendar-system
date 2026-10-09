@@ -109,7 +109,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
                 <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
                 <div class="mini-info">
                   <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
-                  <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(format_event_date($ev['start_date'])) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
+                  <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
                 </div>
               </a>
             <?php endforeach; ?>
@@ -120,12 +120,13 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
   <?php endforeach; ?>
   <?php endforeach; ?>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
 </main>
-
 </div>
 
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+
 <script src="assets/js/sidebar.js"></script>
+<script src="assets/js/ui.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

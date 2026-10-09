@@ -397,18 +397,38 @@ function format_event_time(?string $time): string
     return $ts ? date('g:i A', $ts) : $time;
 }
 
-/** "Sep 20, 2026 | 1:00 PM - 3:00 PM" (multi-day: "Sep 20 - Sep 22, 2026"). */
+/** "Sep 20, 2026 | 1:00 PM – 3:00 PM" (multi-day: "Sep 20 – Sep 22, 2026"). */
 function event_when(array $ev): string
 {
-    $date = format_event_date($ev['start_date'] ?? null);
-    if (!empty($ev['end_date']) && $ev['end_date'] !== ($ev['start_date'] ?? null)) {
-        $date .= ' - ' . format_event_date($ev['end_date']);
-    }
-    $time = format_event_time($ev['start_time'] ?? null);
-    if ($time !== '' && !empty($ev['end_time'])) {
-        $time .= ' - ' . format_event_time($ev['end_time']);
-    }
-    return $date . ($time !== '' ? ' | ' . $time : '');
+    $time = event_time_range($ev);
+    return event_date_range($ev) . ($time !== '' ? ' | ' . $time : '');
+}
+
+/** "Sep 20, 2026"; multi-day: "Sep 1 – Dec 31, 2026" or "Dec 30, 2026 – Jan 2, 2027". */
+function event_date_range(array $ev): string
+{
+    $start = $ev['start_date'] ?? null;
+    $end = $ev['end_date'] ?? null;
+    $s = $start ? strtotime($start) : false;
+    $e = $end ? strtotime($end) : false;
+    if (!$s || !$e || $end === $start) return format_event_date($start);
+    return (date('Y', $s) === date('Y', $e) ? date('M j', $s) : date('M j, Y', $s)) . ' – ' . date('M j, Y', $e);
+}
+
+/** "1:00 PM – 3:00 PM"; just "1:00 PM" when there's no end time (or it's the same); '' without a time. */
+function event_time_range(array $ev): string
+{
+    $start = format_event_time($ev['start_time'] ?? null);
+    $end = format_event_time($ev['end_time'] ?? null);
+    return $start !== '' && $end !== '' && $end !== $start ? $start . ' – ' . $end : $start;
+}
+
+/** Runs a week or longer — the Event Calendar lists it once as "Ongoing" instead of on every day. */
+function is_long_event(array $ev): bool
+{
+    $s = strtotime($ev['start_date'] ?? '');
+    $e = strtotime($ev['end_date'] ?? '');
+    return $s && $e && ($e - $s) / 86400 >= 7;
 }
 
 /** Venue, or "Online" for online events. */
@@ -1536,7 +1556,7 @@ function is_registered(string $eventId): bool
 
 /**
  * Live landing-page counters from the site_stats() database function.
- * @return array<array{key:string,label:string,value:string}> [] if Supabase is unreachable
+ * @return array<int, array<string, string>> each row has key, label, value; [] if Supabase is unreachable
  */
 function get_site_stats(): array
 {

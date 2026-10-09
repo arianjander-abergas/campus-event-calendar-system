@@ -89,6 +89,7 @@ if ($event) {
 
   <!-- Top bar -->
   <header class="dash-topbar ed-topbar">
+    <?php include __DIR__ . '/../includes/topbar-start.php'; ?>
     <nav class="ed-breadcrumb" aria-label="Breadcrumb">
       <a href="enduser/dashboard.php">Dashboard</a>
       <span class="ed-crumb-sep">&gt;</span>
@@ -274,8 +275,11 @@ if ($event) {
 
 </div>
 
+<?php include __DIR__ . '/../includes/footer.php'; ?>
+
 <?= notifications_bootstrap($notifications) ?>
 <script src="assets/js/sidebar.js"></script>
+<script src="assets/js/ui.js"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

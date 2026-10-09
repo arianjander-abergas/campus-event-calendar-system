@@ -162,7 +162,10 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
 
 </div>
 
+<?php include __DIR__ . '/../../includes/footer.php'; ?>
+
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/account.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
