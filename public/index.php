@@ -15,9 +15,9 @@ $topbarSearch = true;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Campus Event Hub — La Consolacion University Philippines</title>
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 </head>
-<body>
+<body class="neu">
 
 <div class="dashboard-shell no-rail">
 

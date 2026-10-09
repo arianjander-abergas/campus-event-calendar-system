@@ -359,7 +359,14 @@ const ICON_EXT = 'svg';
  */
 function icon(string $name, int $size = 18, string $class = ''): string
 {
-    return '<img src="' . htmlspecialchars(BASE_URL . '/assets/images/icons/' . $name . '.' . ICON_EXT) . '"'
+    // ?v=<last change> so browsers load a replaced icon right away instead of an old cached copy.
+    static $versions = [];
+    $file = $name . '.' . ICON_EXT;
+    if (!isset($versions[$file])) {
+        $path = __DIR__ . '/../public/assets/images/icons/' . $file;
+        $versions[$file] = is_file($path) ? '?v=' . filemtime($path) : '';
+    }
+    return '<img src="' . htmlspecialchars(BASE_URL . '/assets/images/icons/' . $file . $versions[$file]) . '"'
         . ' alt="" class="ui-icon' . ($class !== '' ? ' ' . htmlspecialchars($class) : '') . '"'
         . ' width="' . $size . '" height="' . $size . '" data-icon="' . htmlspecialchars($name) . '">';
 }

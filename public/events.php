@@ -109,10 +109,10 @@ function calendar_time_line(array $ev): string
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= htmlspecialchars($heading) ?> — Campus Event Hub</title>
-<link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/calendar.css">
+<link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
+<link rel="stylesheet" href="assets/css/calendar.css?v=<?= filemtime(__DIR__ . '/assets/css/calendar.css') ?>">
 </head>
-<body>
+<body class="neu">
 
 <div class="dashboard-shell no-rail">
 

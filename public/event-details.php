@@ -78,10 +78,10 @@ if ($event) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/event-details.css">
+<link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
+<link rel="stylesheet" href="assets/css/event-details.css?v=<?= filemtime(__DIR__ . '/assets/css/event-details.css') ?>">
 </head>
-<body class="event-details-page">
+<body class="event-details-page neu">
 
 <div class="dashboard-shell">
 
@@ -100,8 +100,7 @@ if ($event) {
     <div class="ed-topbar-right">
       <div class="ed-notif" data-notifications>
         <button class="ed-bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
-          <!-- IMAGE SLOT 9: Notification bell | file: assets/images/event-details/icon-bell.svg | 26×26 -->
-          <img src="<?= $img ?>icon-bell.svg" alt="" width="26" height="26">
+          <?= icon('bell', 20) ?>
           <span class="ed-bell-count" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
         </button>
         <div class="ed-notif-dropdown" data-notif-dropdown hidden>
@@ -112,14 +111,12 @@ if ($event) {
 
       <details class="ed-user-menu">
         <summary>
-          <!-- IMAGE SLOT 10: User avatar | file: assets/images/event-details/avatar.svg | 50×50 -->
-          <img src="<?= $img ?>avatar.svg" alt="" class="ed-avatar" width="50" height="50">
+          <span class="avatar ed-avatar"><?= htmlspecialchars(initials($user['full_name'] ?? '')) ?></span>
           <span class="ed-user-text">
             <span class="ed-user-name"><?= htmlspecialchars($user['full_name']) ?></span>
             <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></span>
           </span>
-          <!-- IMAGE SLOT 11: User menu arrow | file: assets/images/event-details/icon-chevron-down.svg | 18×18 -->
-          <img src="<?= $img ?>icon-chevron-down.svg" alt="" class="ed-user-chevron" width="18" height="18">
+          <?= icon('chevron-down', 12, 'ed-user-chevron') ?>
         </summary>
         <div class="ed-user-dropdown">
           <a href="enduser/profile.php">My Profile</a>
@@ -133,8 +130,7 @@ if ($event) {
   <!-- Main content -->
   <main class="dash-main ed-main">
     <a href="events.php" class="ed-back">
-      <!-- IMAGE SLOT 6: Back arrow | file: assets/images/event-details/icon-back.svg | 30×18 -->
-      <img src="<?= $img ?>icon-back.svg" alt="" width="30" height="18">
+      <?= icon('arrow-left', 18) ?>
       Back to All Events
     </a>
 
@@ -164,13 +160,11 @@ if ($event) {
 
         <div class="ed-meta">
           <div class="ed-meta-row">
-            <!-- IMAGE SLOT 7: Location icon | file: assets/images/event-details/icon-location.svg | 12×12 -->
-            <img src="<?= $img ?>icon-location.svg" alt="" width="12" height="12">
+            <?= icon('location', 12) ?>
             <?= htmlspecialchars(event_place($event)) ?><?= !empty($event['address']) ? ' — ' . htmlspecialchars($event['address']) : '' ?>
           </div>
           <div class="ed-meta-row">
-            <!-- IMAGE SLOT 8: Calendar icon | file: assets/images/event-details/icon-calendar.svg | 12×12 -->
-            <img src="<?= $img ?>icon-calendar.svg" alt="" width="12" height="12">
+            <?= icon('calendar', 12) ?>
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
           <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
