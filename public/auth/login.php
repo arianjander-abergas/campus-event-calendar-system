@@ -77,7 +77,7 @@ $flashes = render_flashes();
   </div>
 </div>
 
-<main class="login-card<?= $adminMode ? ' is-admin' : '' ?>"
+<main class="login-card signin-card<?= $adminMode ? ' is-admin' : '' ?>"
       data-admin-redirect="<?= htmlspecialchars($adminTarget) ?>"
       data-user-redirect="<?= htmlspecialchars($adminMode ? $defaultTarget : $redirectTo) ?>">
   <a href="../index.php" class="login-close" aria-label="Close and go back home">
@@ -160,10 +160,12 @@ $flashes = render_flashes();
     </a>
   </div>
 
-  <p class="login-signup">Don't have an account? <a href="register.php" data-slide="right">Sign up</a></p>
+  <p class="login-signup">Don't have an account? <a href="register.php">Sign up</a></p>
   </div>
 </main>
 
 <script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
+<!-- Chrome/Edge get Sign up / Forgot Password ready while the pointer rests on the link, so they open instantly. -->
+<script type="speculationrules">{"prerender": [{"source": "list", "urls": ["register.php", "forgot-password.php"], "eagerness": "moderate"}]}</script>
 </body>
 </html>
