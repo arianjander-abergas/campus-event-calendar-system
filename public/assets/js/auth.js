@@ -26,10 +26,9 @@ document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
  *   Google [data-google]: panel slides back LEFT, form slides RIGHT and they
  *     stay there (no page reload). If Google sign-in is switched on, Google
  *     opens after the slide; otherwise its message shows in the card.
- *   Sign up [data-slide="right"]: panel and form slide RIGHT, then sign-up opens.
- *   Log in on the sign-up page [data-slide="left"]: panel and form slide LEFT,
- *     then the login page opens (its panel is on the left).
  * New-tab clicks just follow the link.
+ * Sign up / Log in / Forgot Password open their page right away; the
+ * cross-page view transition in auth.css makes that change smooth.
  */
 const slideCard = document.querySelector(".login-glass .login-card");
 const SLIDE_MS = 600; // keep in step with the 0.6s slides in auth.css
@@ -70,24 +69,6 @@ document.querySelectorAll("[data-google]").forEach((link) => {
   });
 });
 
-// Links that leave the page with a slide: Sign up (right, login page) and
-// Log in (left, sign-up page).
-document.querySelectorAll("a[data-slide]").forEach((link) => {
-  link.addEventListener("click", (e) => {
-    if (!slideCard || !isPlainClick(e) || reducedMotion()) return;
-    if (slideCard.classList.contains("is-admin")) return; // just open the page
-    e.preventDefault();
-    slideCard.classList.remove("slide-left", "slide-right");
-    void slideCard.offsetWidth; // restart the animation if clicked twice
-    slideCard.classList.add(link.dataset.slide === "left" ? "slide-left" : "slide-right");
-    setTimeout(() => { window.location.href = link.href; }, SLIDE_MS);
-  });
-});
-
-// Coming back with the browser's Back button: show the form again.
-window.addEventListener("pageshow", (e) => {
-  if (e.persisted && slideCard) slideCard.classList.remove("slide-left", "slide-right");
-});
 
 /**
  * Forms marked data-loading-form (Forgot Password): while the request is on
