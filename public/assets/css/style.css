@@ -7,16 +7,19 @@
 :root {
   --navy: #0e2a5e;
   --navy-dark: #0a1f47;
-  --orange: #f4622c;
+  --orange: #f4622c;          /* brand orange: big headings, on dark backgrounds */
   --orange-dark: #d94f1e;
-  --blue-accent: #2f7de1;
+  --orange-strong: #c2410c;   /* behind white text (pills, badges) — readable contrast */
+  --orange-text: #b53b0a;     /* small orange text on light backgrounds */
+  --blue-accent: #1d4ed8;
   --bg: #f2f3f5;
   --card-bg: #ffffff;
   --text-main: #1c2333;
-  --text-muted: #6b7280;
+  --text-muted: #4b5563;
   --border: #e5e7eb;
-  --green: #22c55e;
-  --red: #ef4444;
+  --green: #15803d;
+  --red: #dc2626;
+  --focus: #1d4ed8;
   --radius: 12px;
   --shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
   --shadow-hover: 0 8px 24px rgba(15, 23, 42, 0.12);
@@ -24,6 +27,16 @@
 }
 
 * { box-sizing: border-box; }
+
+/* Hidden scrollbars (the area still scrolls with the wheel, touch and keys):
+   the sidebar on every screen size... */
+.sidebar { scrollbar-width: none; }
+.sidebar::-webkit-scrollbar { width: 0; height: 0; }
+/* ...and the main page on tablets, foldables and phones (computers keep it). */
+@media (max-width: 1100px) {
+  html, body { scrollbar-width: none; }
+  html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; }
+}
 
 body {
   margin: 0;
@@ -50,6 +63,13 @@ button { font-family: inherit; cursor: pointer; }
 .user-caret, .side-nav .chevron { display: inline-flex; line-height: 0; }
 [hidden] { display: none !important; }
 
+/* Keyboard focus: always visible (Tab through any page). Mouse clicks don't show it. */
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sidebar :focus-visible,
+.feature-strip :focus-visible,
+.site-footer :focus-visible,
+.hero :focus-visible { outline-color: #fff; }
+
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -67,18 +87,19 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 22px;
+  /* Tighter on phones, full size on computers (see FLUID SIZING). */
+  padding: clamp(9px, 0.35rem + 0.6vw, 12px) clamp(16px, 0.75rem + 1vw, 22px);
   border-radius: 999px;
   border: none;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: clamp(0.85rem, 0.8rem + 0.2vw, 0.95rem);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 .btn-primary { background: var(--navy); color: #fff; }
 .btn-primary:hover { background: var(--navy-dark); transform: translateY(-1px); }
 .btn-accent { background: var(--blue-accent); color: #fff; border-radius: 8px; }
-.btn-accent:hover { background: #2566bd; }
+.btn-accent:hover { background: #1e40af; }
 .btn-outline { background: transparent; border: 1.5px solid var(--navy); color: var(--navy); }
 .btn-outline:hover { background: rgba(14, 42, 94, 0.06); }
 .btn-muted { background: #e5e7eb; color: var(--text-main); }
@@ -244,7 +265,6 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 800;
   color: var(--orange);
   margin: 0 0 18px;
-  text-transform: uppercase;
 }
 .hero-desc {
   font-size: 0.98rem;
@@ -268,7 +288,9 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 700;
   color: var(--navy);
   font-size: 0.85rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
+.hero-badge:hover { transform: translateY(-2px); }
 .hero-badge .circle {
   width: 40px;
   height: 40px;
@@ -286,7 +308,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   gap: 0;
   background: #fff;
-  margin-top: -34px;
+  margin-top: 20px;
   position: relative;
   z-index: 5;
   border-radius: var(--radius);
@@ -318,16 +340,21 @@ button { font-family: inherit; cursor: pointer; }
 .feature-title { font-weight: 700; font-size: 0.88rem; }
 .feature-sub { font-size: 0.78rem; color: var(--text-muted); }
 
+/* Its own full-width row under the four features, numbers spread evenly. */
 .stats-block {
+  flex: 1 1 100%;
   display: flex;
-  gap: 28px;
-  padding: 22px 28px;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 16px 28px;
+  padding: 18px 28px;
   align-items: center;
   background: #fff;
+  border-top: 1px solid var(--border);
 }
 .stat { text-align: center; }
-.stat-value { font-weight: 800; font-size: 1.3rem; color: var(--navy); }
-.stat-label { font-size: 0.72rem; color: var(--text-muted); }
+.stat-value { font-weight: 800; font-size: 1.5rem; color: var(--navy); }
+.stat-label { font-size: 0.8rem; color: var(--text-muted); }
 
 /* ---- Events grid + today panel ---- */
 .events-section {
@@ -336,13 +363,14 @@ button { font-family: inherit; cursor: pointer; }
   gap: 24px;
 }
 
+/* As many 210px+ columns as fit: 3–4 on a computer, 2 on a tablet, 1 on a phone. */
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 20px;
   align-content: start;
 }
-.events-grid-page { grid-template-columns: repeat(4, 1fr); margin-top: 18px; }
+.events-grid-page { margin-top: 18px; }
 
 .event-card {
   display: block;
@@ -356,7 +384,7 @@ button { font-family: inherit; cursor: pointer; }
 .event-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
 .event-card:focus-visible { outline: 3px solid var(--blue-accent); outline-offset: 2px; }
 .event-thumb {
-  height: 130px;
+  aspect-ratio: 16 / 9; /* same shape at every card width */
   background-color: #1f3f8f;
   background-size: cover;
   background-position: center;
@@ -368,7 +396,7 @@ button { font-family: inherit; cursor: pointer; }
   left: 10px;
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
   text-transform: uppercase;
@@ -383,11 +411,11 @@ button { font-family: inherit; cursor: pointer; }
   top: 10px; right: 10px;
   padding: 3px 10px;
   border-radius: 999px;
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
 }
-.status-today { background: var(--orange); }
+.status-today { background: var(--orange-strong); }
 .status-ended { background: #6b7280; }
 .event-body { padding: 14px 16px 16px; }
 .event-name {
@@ -414,7 +442,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-main);
   min-width: 0;
@@ -454,7 +482,7 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
   flex-shrink: 0;
 }
 .upcoming-info .u-title { font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; }
-.upcoming-info .u-meta, .upcoming-panel .u-meta { font-size: 0.72rem; color: var(--text-muted); margin: 0; }
+.upcoming-info .u-meta, .upcoming-panel .u-meta { font-size: 0.75rem; color: var(--text-muted); margin: 0; }
 
 .events-empty { grid-column: 1 / -1; margin: 0; padding: 24px; color: var(--text-muted); }
 .events-empty a { color: var(--blue-accent); font-weight: 600; }
@@ -484,7 +512,7 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
   box-shadow: var(--shadow);
   scroll-margin-top: 90px;
 }
-.about-eyebrow { margin: 0 0 6px; font-weight: 800; font-size: 0.78rem; letter-spacing: 1px; color: var(--orange); }
+.about-eyebrow { margin: 0 0 6px; font-weight: 800; font-size: 0.78rem; letter-spacing: 1px; color: var(--orange-text); }
 .about-text h2 { margin: 0 0 14px; font-size: 1.6rem; color: var(--navy); }
 .about-text p { margin: 0 0 12px; line-height: 1.65; color: #374151; font-size: 0.95rem; }
 .about-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
@@ -497,44 +525,70 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 .about-points strong { display: block; color: var(--navy); margin-bottom: 2px; }
 .about-points div { font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; }
 
-/* ---- Trusted by ---- */
-.trusted-strip {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  padding: 40px 0 20px;
-  border-top: 1px solid var(--border);
-  margin-top: 40px;
-  flex-wrap: wrap;
+/* ---- Footer (includes/footer.php) — user-facing pages only ----
+   One navy block (same deep blue as the sidebar) across the full page width,
+   under the sidebar too. It comes AFTER .dashboard-shell (not inside it), so the
+   sticky sidebar stops at the end of the page content and scrolls up with it —
+   the footer never covers it. Inside: the organizations strip on top, then
+   brand · links · copyright. Same side-by-side layout on every screen; sizes
+   shrink smoothly with clamp(min, preferred, max) instead of stacking. */
+.site-footer {
+  padding: 0 clamp(14px, 3vw, 28px);
+  color: #cdd8ef;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.3), transparent 40%),
+    linear-gradient(170deg, #0e2a6b 0%, #0b2257 55%, #061430 100%);
+  position: relative;
+  z-index: 3; /* above the sidebar's shadow */
 }
-.trusted-logos { display: flex; gap: 14px; }
-.trusted-logos a {
-  width: 46px; height: 46px;
-  border-radius: 50%;
-  background: #eef1f6;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.85rem;
-  color: var(--navy);
-  font-weight: 800;
-}
-.trusted-logos a:hover { background: var(--navy); color: #fff; }
-.trusted-title { font-weight: 800; color: var(--orange); letter-spacing: 0.4px; flex: 1; }
-.trusted-copy { color: var(--text-muted); font-size: 0.82rem; max-width: 340px; text-align: right; }
-.trusted-copy a { color: var(--blue-accent); font-weight: 600; }
 
-/* ---- Footer ---- */
-.site-footer { margin-top: 48px; background: var(--navy); color: #cdd8ef; }
-.site-footer-inner {
-  display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
-  padding-top: 26px; padding-bottom: 26px; font-size: 0.85rem;
+.trusted-strip {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: clamp(12px, 3vw, 32px);
+  padding: clamp(16px, 3.5vw, 28px) 0;
+  border-bottom: 1px solid rgba(147, 197, 253, 0.18);
 }
-.site-footer-brand { display: flex; align-items: center; gap: 12px; }
-.site-footer-brand > div { display: flex; flex-direction: column; }
-.site-footer-brand strong { color: #fff; font-size: 1rem; }
-.site-footer-logo { width: 48px; height: 48px; object-fit: contain; border-radius: 50%; background: #fff; padding: 2px; flex-shrink: 0; }
-.site-footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.trusted-text { flex: 1 1 auto; min-width: 0; }
+.trusted-title {
+  margin: 0 0 6px;
+  font-size: clamp(0.72rem, 0.62rem + 0.5vw, 0.95rem);
+  font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #ff7a21;
+}
+.trusted-copy { margin: 0; max-width: 560px; font-size: clamp(0.7rem, 0.64rem + 0.35vw, 0.88rem); line-height: 1.5; color: #cdd8ef; }
+.trusted-copy a { color: #fff; font-weight: 700; white-space: nowrap; }
+.trusted-copy a:hover { text-decoration: underline; }
+.trusted-logos { display: flex; flex-shrink: 0; gap: clamp(6px, 1.5vw, 12px); }
+.trusted-logos a {
+  width: clamp(32px, 7vw, 48px); height: clamp(32px, 7vw, 48px);
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: clamp(0.62rem, 0.55rem + 0.4vw, 0.85rem); font-weight: 800;
+  box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.trusted-logos a:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.16); }
+.trusted-logos img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #fff; }
+
+/* brand | links | © — one row, like on a computer. */
+.site-footer-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: clamp(10px, 2.5vw, 24px);
+  padding: clamp(14px, 3vw, 20px) 0;
+  font-size: clamp(0.68rem, 0.62rem + 0.3vw, 0.85rem);
+}
+.site-footer-brand { display: flex; align-items: center; gap: clamp(8px, 1.5vw, 12px); color: inherit; min-width: 0; }
+.site-footer-brand > span { display: flex; flex-direction: column; min-width: 0; }
+.site-footer-brand strong { color: #fff; font-size: clamp(0.8rem, 0.7rem + 0.45vw, 1rem); }
+.site-footer-logo { width: clamp(34px, 7vw, 48px); height: clamp(34px, 7vw, 48px); object-fit: contain; border-radius: 50%; background: #fff; padding: 2px; flex-shrink: 0; }
+.site-footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px clamp(10px, 2vw, 20px); }
+.site-footer-links a { color: #cdd8ef; white-space: nowrap; }
 .site-footer-links a:hover { color: #fff; text-decoration: underline; }
-.site-footer-copy { color: #9fb4de; }
+.site-footer-copy { margin: 0; color: #9fb4de; text-align: right; }
+@media (prefers-reduced-motion: reduce) {
+  .trusted-logos a:hover { transform: none; }
+}
 
 /* ---- Events list page (events.php) ---- */
 .page-main { padding-top: 28px; padding-bottom: 12px; }
@@ -597,7 +651,7 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 .officer-photo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 6px; }
 .officer-initials { font-size: 1.1rem; }
 .officer-card strong { font-size: 0.85rem; }
-.officer-card span { font-size: 0.72rem; color: var(--text-muted); }
+.officer-card span { font-size: 0.75rem; color: var(--text-muted); }
 
 /* ============================================================
    DASHBOARD LAYOUT (dashboard, event details, profile, admin pages)
@@ -734,7 +788,7 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
   top: -3px; right: -4px;
   background: var(--red);
   color: #fff;
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 700;
   min-width: 17px; height: 17px;
   padding: 0 4px;
@@ -761,7 +815,7 @@ a.notif-item:hover { background: #f8fafc; }
 .notif-item.unread { background: #f3f6fd; }
 .notif-title { margin: 0 0 2px; font-weight: 700; font-size: 0.83rem; }
 .notif-message { margin: 0; font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
-.notif-time { margin: 4px 0 0; font-size: 0.7rem; color: #9ca3af; }
+.notif-time { margin: 4px 0 0; font-size: 0.75rem; color: var(--text-muted); }
 
 /* User menu */
 .user-menu { position: relative; }
@@ -789,7 +843,7 @@ a.notif-item:hover { background: #f8fafc; }
 }
 .avatar-lg { width: 56px; height: 56px; font-size: 1.1rem; }
 .user-name { font-weight: 700; font-size: 0.88rem; line-height: 1.1; }
-.user-role { font-size: 0.72rem; color: var(--text-muted); }
+.user-role { font-size: 0.75rem; color: var(--text-muted); }
 
 /* ---- Main column ---- */
 .dash-main { grid-column: 2; grid-row: 2; padding: 26px 28px; min-width: 0; }
@@ -843,7 +897,7 @@ a.mini-row:hover .mini-title { color: var(--blue-accent); }
 .mini-meta { font-size: 0.7rem; color: var(--text-muted); }
 .mini-meta a { color: var(--blue-accent); font-weight: 600; }
 .mini-badge {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 700;
   padding: 3px 9px;
   border-radius: 999px;
@@ -852,7 +906,7 @@ a.mini-row:hover .mini-title { color: var(--blue-accent); }
 }
 .badge-registered { background: var(--green); }
 .badge-unavailable { background: var(--red); }
-.badge-muted { background: #9ca3af; }
+.badge-muted { background: #6b7280; }
 .mini-going { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; }
 
 /* ---- Right rail: calendar / filters / announcements ---- */
@@ -891,7 +945,7 @@ a.mini-row:hover .mini-title { color: var(--blue-accent); }
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 .cal-grid .dow { color: var(--text-muted); font-weight: 700; padding-bottom: 4px; }
 .cal-grid .day {
@@ -900,7 +954,7 @@ a.mini-row:hover .mini-title { color: var(--blue-accent); }
   position: relative;
   color: var(--text-main);
 }
-.cal-grid .day.muted { color: #c7cbd4; }
+.cal-grid .day.muted { color: #8a919e; }
 .cal-grid a.day.has-event { font-weight: 700; color: var(--blue-accent); }
 .cal-grid a.day.has-event:hover { background: #e8f0fe; }
 .cal-grid .day.today { background: var(--navy); color: #fff; }
@@ -948,59 +1002,170 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 }
 .ann-icon.info { background: var(--blue-accent); }
 .ann-title { font-weight: 700; font-size: 0.78rem; margin-bottom: 3px; }
-.ann-date { font-size: 0.68rem; color: var(--text-muted); }
+.ann-date { font-size: 0.75rem; color: var(--text-muted); }
 
-/* ---- Responsive ---- */
+/* ============================================================
+   RESPONSIVE — one layout, three sizes (same colours, cards and order):
+     computer  > 1100px   full sidebar | content | right column
+     tablet  761–1100px   slim icon sidebar (expands over the page while the
+                          mouse is on it) | content | right column
+     phone /   ≤ 760px    sticky top bar with a menu button; the sidebar
+     foldable             slides in from the left (assets/js/sidebar.js)
+   ============================================================ */
+
+/* Menu button + brand in the top bar, ✕ button, Log in / Sign up in the
+   sidebar and the dark backdrop exist only on phones / foldables. */
+.topbar-start, .nav-close, .side-auth { display: none; }
+.topbar-start { align-items: center; gap: 10px; flex-shrink: 0; }
+.nav-toggle, .nav-close {
+  width: 42px; height: 42px;
+  align-items: center; justify-content: center;
+  border: none; border-radius: 12px;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+.nav-toggle { display: inline-flex; }
+.nav-toggle:hover { background: #e5e7eb; }
+.nav-close { margin-left: auto; background: rgba(255, 255, 255, 0.08); }
+.nav-close:hover { background: rgba(255, 255, 255, 0.16); }
+/* Phone top bar brand: logo + CAMPUS / EVENT HUB in the sidebar's brand font. */
+.topbar-brand { gap: 8px; }
+/* Same as the sidebar logo: on a white circle so it never blends into the blue. */
+.topbar-brand img { width: 36px; height: 36px; border-radius: 50%; object-fit: contain; flex-shrink: 0; background: #fff; padding: 2px; }
+.topbar-brand .brand-text .campus { font-size: 0.95rem; }
+.topbar-brand .brand-text .hub { font-size: 0.75rem; }
+.side-auth { flex-direction: column; gap: 10px; }
+.side-auth .btn { width: 100%; }
+.nav-backdrop {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(6, 20, 48, 0.55);
+}
+
 @media (max-width: 1180px) {
-  .events-grid, .events-grid-page { grid-template-columns: repeat(3, 1fr); }
   .site-header { flex-wrap: wrap; }
   .main-nav { gap: 20px; }
 }
+
+/* ---- Tablets and phones ---- */
 @media (max-width: 1100px) {
   .events-section { grid-template-columns: 1fr; }
-  .events-grid, .events-grid-page { grid-template-columns: repeat(2, 1fr); }
-  .dashboard-shell, .dashboard-shell.no-rail { grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto auto 1fr; background: linear-gradient(to right, var(--navy) 220px, transparent 220px); }
-  .dash-topbar { grid-column: 2; }
-  /* The right rail moves below the main content instead of disappearing. */
-  .right-rail { grid-column: 2; grid-row: 3; border-left: none; background: transparent; padding: 0 28px 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-  .right-rail .rail-card { background: #fff; padding: 16px; box-shadow: var(--shadow); }
-  .dash-topbar .search-box { min-width: 0; flex: 1; }
   .about-section { grid-template-columns: 1fr; }
   .org-card-body { grid-template-columns: 1fr; }
+
+  /* The top bar stays at the top while scrolling. */
+  .dash-topbar { position: sticky; top: 0; z-index: 40; }
+  .dash-topbar .search-box { min-width: 0; flex: 1; }
+  .dash-topbar > .breadcrumb, .dash-topbar > .ed-breadcrumb { flex: 1; }
 }
+
+/* ---- Tablet: slim icon sidebar | content | right column ---- */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .dashboard-shell {
+    grid-template-columns: 76px minmax(0, 1fr) 260px;
+    background: linear-gradient(to right, var(--navy) 76px, transparent 76px);
+  }
+  .dashboard-shell.no-rail { grid-template-columns: 76px minmax(0, 1fr); }
+  .dash-topbar { grid-column: 2 / -1; }
+  .dash-main { padding: 22px 20px; }
+  /* Right column stays on the right, a little narrower than on a computer. */
+  .right-rail { grid-column: 3; grid-row: 2; padding: 22px 16px 22px 0; border-left: none; background: transparent; gap: 18px; }
+  .right-rail .rail-card { background: #fff; padding: 14px; box-shadow: var(--shadow); }
+
+  /* Sidebar: icons only; while the mouse is on it (or keyboard focus is in
+     it) it widens over the page and shows the labels. */
+  .sidebar {
+    position: sticky; z-index: 50;
+    width: 76px;
+    padding: 18px 10px;
+    transition: width 0.2s ease, box-shadow 0.2s ease;
+  }
+  .sidebar:hover, .sidebar:focus-within {
+    width: 260px;
+    padding: 18px 14px;
+    box-shadow: 12px 0 40px rgba(6, 20, 48, 0.45);
+  }
+  .sidebar:not(:hover):not(:focus-within) { align-items: center; }
+  .sidebar:not(:hover):not(:focus-within) .brand-logo { width: 46px; height: 46px; }
+  .sidebar:not(:hover):not(:focus-within) .brand-text,
+  .sidebar:not(:hover):not(:focus-within) .nav-label,
+  .sidebar:not(:hover):not(:focus-within) .side-group-label,
+  .sidebar:not(:hover):not(:focus-within) .submenu-toggle .chevron { display: none; }
+  .sidebar:not(:hover):not(:focus-within) .side-nav,
+  .sidebar:not(:hover):not(:focus-within) .side-nav-item.has-submenu { width: 100%; align-items: center; }
+  .sidebar:not(:hover):not(:focus-within) .side-nav a,
+  .sidebar:not(:hover):not(:focus-within) .side-nav .submenu-toggle,
+  .sidebar:not(:hover):not(:focus-within) .side-nav .event-submenu a { width: auto; justify-content: center; padding: 8px; }
+  .sidebar:not(:hover):not(:focus-within) .side-nav .event-submenu { padding-left: 0; align-items: center; }
+  .sidebar:not(:hover):not(:focus-within) .side-admin { padding-top: 12px; }
+  .sidebar .nav-label { white-space: nowrap; }
+  /* Dashboard: as many card columns as fit the narrower content area. */
+  .dash-events-row { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .two-col-lists { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  /* Above the sticky top bar while expanded (beats .neu .sidebar's z-index). */
+  body .dashboard-shell > .sidebar { z-index: 50; }
+}
+
+/* ---- Phone ---- */
 @media (max-width: 760px) {
   .site-header { padding: 12px 16px; gap: 12px; }
   .main-nav { order: 3; width: 100%; overflow-x: auto; gap: 18px; }
   .header-right { flex: 1; justify-content: flex-end; }
   .search-box { min-width: 0; flex: 1; }
   .header-user-name { display: none; }
-  .hero-content { padding: 40px 24px; }
-  .hero-title { font-size: 2rem; }
+  .hero-content { padding: 36px 22px; }
+  .hero-title { font-size: 1.9rem; }
   .hero-badge { display: none; }
-  .stats-block { flex-wrap: wrap; justify-content: center; }
-  .events-grid, .events-grid-page { grid-template-columns: 1fr; }
-  .trusted-copy { text-align: left; }
   .about-section { padding: 22px; }
   .org-card-head { flex-wrap: wrap; }
 
-  /* Dashboard pages stack: sidebar, top bar, content, rail. */
-  .dashboard-shell, .dashboard-shell.no-rail { grid-template-columns: 1fr; grid-template-rows: none; background: none; }
-  .sidebar { grid-row: auto; padding: 14px 16px; gap: 10px; position: static; height: auto; overflow: visible; }
-  .side-nav { margin-top: 0; flex-direction: row; flex-wrap: wrap; }
-  .side-nav a, .side-nav .submenu-toggle { padding: 8px 10px; }
-  .side-nav-item.has-submenu { flex-basis: 100%; }
-  .side-admin { margin-top: 0; }
+  /* One column: top bar, content, then the right column's cards. */
+  .dashboard-shell, .dashboard-shell.no-rail { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; background: none; }
   .dash-topbar, .dash-main, .right-rail { grid-column: 1; grid-row: auto; }
-  .dash-topbar { flex-wrap: wrap; padding: 12px 16px; }
+
+  /* The sidebar becomes a drawer that slides in from the left. */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: min(290px, 86vw); height: 100%;
+    z-index: 60;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+  }
+  body.nav-open .sidebar { transform: none; visibility: visible; transition: transform 0.25s ease; }
+  /* Drawer above the sticky top bar (40) and the dark backdrop (55) — beats
+     .neu .sidebar's z-index: 2, which otherwise put it underneath both. */
+  body .dashboard-shell > .sidebar { z-index: 60; }
+  .side-auth { display: flex; }
+  .topbar-start { display: flex; }
+  .topbar-brand { display: inline-flex; }
+
+  /* Drawer open (menu button): ✕ shows, the page behind can't scroll. */
+  body.nav-open { overflow: hidden; }
+  body.nav-open .sidebar { box-shadow: 12px 0 40px rgba(6, 20, 48, 0.45); }
+  body.nav-open .nav-close { display: inline-flex; }
+
+  /* The right column's cards follow the content. */
+  .right-rail { border-left: none; background: transparent; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+  .right-rail .rail-card { background: #fff; padding: 16px; box-shadow: var(--shadow); }
+
+  /* Top bar: [menu][logo] ........ [bell][you]  — search / breadcrumb on its own row. */
+  .dash-topbar { flex-wrap: wrap; padding: 10px 16px; gap: 10px 12px; }
+  .dash-topbar > .search-box,
+  .dash-topbar > .breadcrumb,
+  .dash-topbar > .ed-breadcrumb { order: 3; flex: 1 1 100%; }
+  .topbar-right { margin-left: auto; gap: 12px; }
   .user-text { display: none; }
   .dash-main { padding: 20px 16px; }
   .right-rail { padding: 0 16px 24px; }
   .dash-events-row, .two-col-lists { grid-template-columns: 1fr; }
   .notif-dropdown { right: -60px; width: min(320px, 92vw); }
 }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none !important; }
+}
 
 /* Attended, not yet evaluated (dashboard "Your registered events"). */
-.badge-evaluate { background: var(--orange); }
+.badge-evaluate { background: var(--orange-strong); }
 .org-dept { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin: -2px 0 8px; }
 
 /* "Please evaluate" reminder on the student dashboard. */
@@ -1009,8 +1174,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .eval-callout-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
 .eval-callout-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); }
 .eval-callout-item span { font-weight: 700; font-size: 0.82rem; min-width: 0; overflow-wrap: anywhere; }
-.eval-callout-item small { display: block; font-weight: 500; color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; }
-.eval-callout-item strong { color: var(--orange); font-size: 0.8rem; white-space: nowrap; }
+.eval-callout-item small { display: block; font-weight: 500; color: var(--text-muted); font-size: 0.75rem; margin-top: 2px; }
+.eval-callout-item strong { color: var(--orange-text); font-size: 0.8rem; white-space: nowrap; }
 .eval-callout-item:hover { box-shadow: var(--shadow-hover); }
 
 /* ============================================================
@@ -1020,17 +1185,15 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .public-main { display: flex; flex-direction: column; }
 .public-main > .container, .public-main .container { max-width: none; margin: 0; padding: 0; }
 .public-main .hero { border-radius: var(--radius); min-height: 380px; }
-.public-main .feature-strip { margin: -34px 24px 0; }
-/* The footer runs edge to edge under the page content. */
-.public-main .site-footer { margin: 40px -28px -26px; }
-.public-main .site-footer .container { padding: 0 28px; }
+/* Sits below the hero (no overlap), same width as the hero so their edges line up. */
+.public-main .feature-strip { margin: 20px 0 0; }
 .topbar-signup { padding: 9px 18px; font-size: 0.82rem; }
 .topbar-right .btn-login { padding: 10px 22px; }
 
 /* Card pills: Completed (event over / your participation done), My Events labels. */
 .status-completed { background: #4f46e5; }
 .status-registered { background: var(--green); }
-.status-evaluate { background: var(--orange); }
+.status-evaluate { background: var(--orange-strong); }
 .status-cancelled { background: var(--red); }
 
 /* Dashboard calendar: all events of the clicked day. */
@@ -1051,10 +1214,25 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 /* "Completed" on the dashboard lists (attended + evaluated). */
 .badge-completed { background: #4f46e5; }
 
+/* Footer on tablets, foldables and phones: the links get their own row on
+   top, then [brand ........ ©] underneath, split by a thin line. */
+@media (max-width: 1100px) {
+  .site-footer-bar { grid-template-columns: 1fr auto; row-gap: 0; }
+  .site-footer-links {
+    grid-column: 1 / -1; grid-row: 1;
+    justify-content: flex-start;
+    padding-bottom: clamp(12px, 2.5vw, 16px);
+    margin-bottom: clamp(12px, 2.5vw, 16px);
+    border-bottom: 1px solid rgba(147, 197, 253, 0.18);
+  }
+  .site-footer-brand { grid-column: 1; grid-row: 2; }
+  .site-footer-copy { grid-column: 2; grid-row: 2; }
+}
+
 @media (max-width: 760px) {
-  .public-main .site-footer { margin: 32px -16px -20px; }
-  .public-main .site-footer .container { padding: 0 16px; }
-  .public-main .feature-strip { margin: -24px 10px 0; }
+  .site-footer-copy { max-width: 9.5em; }
+  .trusted-logos a:nth-child(n+4) { display: none; } /* three logos fit next to the text */
+  .public-main .feature-strip { margin: 16px 0 0; }
   .topbar-signup { display: none; }
 }
 
@@ -1074,7 +1252,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   border: 1.5px solid var(--border);
   background: #fff;
 }
-.acct-option small { font-size: 0.74rem; color: var(--text-muted); font-weight: 400; }
+.acct-option small { font-size: 0.75rem; color: var(--text-muted); font-weight: 400; }
 .acct-option input:checked + span { border-color: var(--orange); background: #fff7f2; box-shadow: 0 0 0 2px rgba(244, 98, 44, 0.15); }
 .acct-option input:focus-visible + span { outline: 3px solid var(--blue-accent); outline-offset: 2px; }
 .acct-locked { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
@@ -1083,7 +1261,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .acct-status { display: flex; gap: 18px; align-items: center; min-height: 40px; margin-bottom: 14px; }
 .acct-status label { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; font-size: 0.9rem; cursor: pointer; }
 .acct-label { display: block; }
-.acct-verified { margin: -10px 0 12px; font-size: 0.74rem; color: #166534; font-weight: 600; }
+.acct-verified { margin: -10px 0 12px; font-size: 0.75rem; color: #166534; font-weight: 600; }
 .acct-irregular-summary {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin: 0 0 12px; padding: 9px 12px;
@@ -1124,7 +1302,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 /* School ID verification badge (profile, users, registrations, import). */
 .verify-badge {
   display: inline-block; margin-left: 4px; padding: 1px 8px; border-radius: 999px;
-  background: #f3f4f6; color: #6b7280; font-size: 0.66rem; font-weight: 700; vertical-align: middle;
+  background: #f3f4f6; color: #6b7280; font-size: 0.75rem; font-weight: 700; vertical-align: middle;
 }
 .verify-badge.is-verified { background: #dcfce7; color: #166534; }
 .text-warn { color: #b45309; font-weight: 600; }
@@ -1134,7 +1312,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 }
 
 /* Organizations page: grouped by department. */
-.org-jump-dept { align-self: center; font-size: 0.74rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-left: 6px; }
+.org-jump-dept { align-self: center; font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-left: 6px; }
 .org-jump-dept:first-child { margin-left: 0; }
 .org-dept-heading { margin: 26px 0 12px; font-size: 1.05rem; color: var(--navy); display: flex; align-items: baseline; gap: 10px; }
 .org-dept-heading span { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
@@ -1158,11 +1336,11 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   --neu-out: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light);
   --neu-out-sm: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
   --neu-in: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light);
-  --neu-blue: #3d74c9;
-  --neu-blue-hi: #5b8fdc;
+  --neu-blue: #2f5fa8;      /* darker than before so white text / blue text stay readable */
+  --neu-blue-hi: #3d74c9;
   --neu-blue-glow: 4px 4px 12px rgba(61, 116, 201, 0.35), -4px -4px 12px var(--neu-light);
   --neu-text: #3b4a63;
-  --neu-muted: #6b7a92;
+  --neu-muted: #4f5d75;
   background: var(--neu-bg);
 }
 .neu .dashboard-shell { background: none; }
@@ -1217,9 +1395,9 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 }
 /* Current page: orange raised pill (login page's button colour), icon well pressed in. */
 .neu .side-nav a.active {
-  background: linear-gradient(135deg, #f76b15 0%, #d9480f 100%);
+  background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
   color: #fff;
-  box-shadow: 0 8px 20px rgba(247, 107, 21, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
+  box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
 }
 .neu .side-nav a.active .icon {
   background: rgba(255, 255, 255, 0.16);
@@ -1272,7 +1450,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .user-dropdown { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 16px; }
 .neu .user-dropdown a { color: var(--neu-text); }
 .neu .user-dropdown a:hover,
-.neu a.notif-item:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu a.notif-item:hover { background: rgba(47, 95, 168, 0.08); color: var(--neu-blue); }
 .neu .notif-head { border-bottom-color: rgba(163, 177, 198, 0.45); }
 .neu .notif-item { border-bottom-color: rgba(163, 177, 198, 0.3); }
 .neu .notif-item.unread { background: rgba(61, 116, 201, 0.08); }
@@ -1305,13 +1483,10 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 }
 .neu .btn-outline:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
 .neu .btn-outline:active { box-shadow: var(--neu-in); }
-.neu .view-all {
-  padding: 7px 16px;
-  border-radius: 999px;
-  box-shadow: var(--neu-out-sm);
-  transition: box-shadow 0.25s ease;
-}
-.neu .view-all:hover { text-decoration: none; box-shadow: var(--neu-in); }
+/* "View All": a plain link (not a raised pill) so it does not compete with real buttons. */
+.neu .view-all { color: var(--neu-blue); }
+.neu .view-all::after { content: " ›"; }
+.neu .view-all:hover { text-decoration: underline; }
 
 /* ---- Icons in raised circles ---- */
 .neu .feature-icon,
@@ -1327,8 +1502,6 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue));
   box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.4);
 }
-.neu .trusted-logos a { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
-.neu .trusted-logos a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
 
 /* ---- Cards sit on the same soft surface ---- */
 .neu .feature-strip,
@@ -1343,7 +1516,6 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .feature-item { border-right-color: rgba(163, 177, 198, 0.4); }
 .neu .event-org,
 .neu .upcoming-item { border-color: rgba(163, 177, 198, 0.4); }
-.neu .trusted-strip { border-top-color: rgba(163, 177, 198, 0.45); }
 .neu .stat-value { color: var(--neu-blue); }
 
 /* Feature strip + stats under the hero: same deep blue as the sidebar
@@ -1361,14 +1533,30 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .feature-sub,
 .neu .stat-label { color: rgba(191, 210, 245, 0.72); }
 .neu .stat-value { color: #ff7a21; } /* brand orange, like "CAMPUS" */
+.neu .stats-block { border-top-color: rgba(147, 197, 253, 0.18); }
 .neu .feature-strip .feature-icon {
   background: rgba(255, 255, 255, 0.05);
   box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
 }
 .neu .feature-strip .ui-icon { filter: brightness(0) invert(1); }
 
+/* Menu button (tablets / phones): raised round button, pressed while the menu is open. */
+.neu .nav-toggle { background: var(--neu-bg); box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .nav-toggle:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .nav-toggle[aria-expanded="true"] { box-shadow: var(--neu-in); }
+.neu .topbar-brand img { box-shadow: var(--neu-out-sm); }
+.neu .nav-close { background: var(--sb-surface); box-shadow: var(--sb-out); }
+.neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: var(--sb-out); }
+/* Log in: the sidebar's dark shadow instead of the white neumorphic glow,
+   which showed as a halo on the dark blue. */
+.neu .sidebar .side-auth .btn-primary { box-shadow: var(--sb-out); }
+.neu .sidebar .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
+.neu .sidebar .side-auth .btn:active { box-shadow: var(--sb-in); }
+
+@media (max-width: 1100px) {
+  .neu .right-rail .rail-card { background: var(--neu-bg); box-shadow: var(--neu-out); }
+}
 @media (max-width: 760px) {
-  .neu .sidebar { box-shadow: 0 6px 14px -8px var(--neu-dark); }
   .neu .side-nav .icon { width: 30px; height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1402,16 +1590,17 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .btn-accent:hover { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); transform: translateY(-1px); }
 .neu .btn-accent:active { transform: none; box-shadow: inset 3px 3px 7px rgba(20, 50, 110, 0.4); }
 .neu .btn-muted { background: var(--neu-bg); color: var(--neu-text); box-shadow: var(--neu-out-sm); }
-.neu .btn-muted:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .btn-muted:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .btn-muted:active { box-shadow: var(--neu-in); }
 .neu .filter-clear { padding: 8px 14px; border-radius: 999px; box-shadow: var(--neu-out-sm); }
-.neu .filter-clear:hover { box-shadow: var(--neu-in); }
+.neu .filter-clear:hover { box-shadow: var(--neu-out); color: var(--red); }
 .neu .pagination .btn-outline { padding: 8px 18px; }
 
 /* ---- Event Calendar (events.php, calendar.css) ---- */
 .neu .cal-card,
 .neu .cal-day-panel { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
 .neu .cal-matches a { background: var(--neu-bg); border: none; box-shadow: var(--neu-out-sm); color: var(--neu-text); }
-.neu .cal-matches a:hover { box-shadow: var(--neu-in); color: var(--neu-blue); }
+.neu .cal-matches a:hover { box-shadow: var(--neu-out); color: var(--neu-blue); }
 /* ‹ › month arrows: raised round buttons. */
 .neu .cal-step {
   border-radius: 50%;
@@ -1420,7 +1609,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   color: var(--neu-blue);
   transition: box-shadow 0.25s ease;
 }
-.neu .cal-step:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .cal-step:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .cal-step:active { box-shadow: var(--neu-in); }
 /* Day cells: softly raised, pressed in on hover / when selected. */
 .neu .cal-day {
   background: var(--neu-bg);
@@ -1429,10 +1619,11 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   box-shadow: 2px 2px 5px var(--neu-dark), -2px -2px 5px var(--neu-light);
   transition: box-shadow 0.2s ease;
 }
-.neu .cal-day:hover { background: var(--neu-bg); border-color: transparent; box-shadow: var(--neu-in); }
+/* Hover lifts the day; pressed in (inset) is kept for the selected day. */
+.neu .cal-day:hover { border-color: rgba(47, 95, 168, 0.35); box-shadow: 4px 4px 10px var(--neu-dark), -4px -4px 10px var(--neu-light); }
 .neu .cal-cell.has-events .cal-day { background: #e1e9f6; }
 .neu .cal-cell.is-today .cal-num { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 5px rgba(61, 116, 201, 0.4); }
-.neu .cal-cell.is-selected .cal-day { background: var(--neu-bg); border-color: #f76b15; box-shadow: var(--neu-in); }
+.neu .cal-cell.is-selected .cal-day { background: var(--neu-bg); border-color: var(--orange-strong); box-shadow: var(--neu-in); }
 .neu .cal-chip { border-radius: 6px; }
 .neu .cal-chip-on_campus { background: var(--neu-blue); }
 .neu .cal-toolbar h2,
@@ -1449,7 +1640,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .cal-event:hover { box-shadow: var(--neu-out); border-left-color: #f76b15; }
 .neu .cal-event-time { color: var(--neu-blue); }
 .neu .cal-tag { background: rgba(61, 116, 201, 0.12); color: var(--neu-blue); }
-.neu .cal-tag-today { background: linear-gradient(135deg, #f76b15, #d9480f); color: #fff; }
+.neu .cal-tag-today { background: linear-gradient(135deg, #c2410c, #9a3412); color: #fff; }
 .neu .cal-tag-plain { background: transparent; color: var(--neu-muted); }
 
 /* ---- Organizations (organizations.php) ---- */
@@ -1460,7 +1651,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   box-shadow: var(--neu-out-sm);
   transition: box-shadow 0.25s ease, color 0.2s ease;
 }
-.neu .org-jump a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu .org-jump a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-out); }
 .neu .org-card { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 18px; }
 .neu .org-logo { box-shadow: var(--neu-out-sm); }
 .neu .org-logo-initials,
@@ -1528,12 +1719,13 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   font-weight: 700;
   transition: box-shadow 0.25s ease;
 }
-.neu .cal-head button:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .cal-head button:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .cal-head button:active { box-shadow: var(--neu-in); }
 .neu .cal-grid .day { border-radius: 10px; transition: box-shadow 0.2s ease; }
 .neu .cal-grid a.day.has-event:hover,
-.neu .cal-grid button.day.has-event:hover { background: var(--neu-bg); box-shadow: var(--neu-in); }
+.neu .cal-grid button.day.has-event:hover { background: rgba(47, 95, 168, 0.1); }
 .neu .cal-grid .day.today { background: linear-gradient(145deg, var(--neu-blue-hi), var(--neu-blue)); box-shadow: 2px 2px 6px rgba(61, 116, 201, 0.4); }
-.neu .cal-grid .day.selected { box-shadow: var(--neu-in), inset 0 0 0 2px #f76b15; }
+.neu .cal-grid .day.selected { box-shadow: var(--neu-in), inset 0 0 0 2px var(--orange-strong); }
 .neu .marker-blue { background: var(--neu-blue); }
 .neu .cal-day-list { border-top-color: rgba(163, 177, 198, 0.45); }
 .neu .cal-day-list a { border-bottom-color: rgba(163, 177, 198, 0.3); }
@@ -1567,7 +1759,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .ed-user-role { color: var(--neu-muted); }
 .neu .ed-notif-dropdown,
 .neu .ed-user-dropdown { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 16px; }
-.neu .ed-user-dropdown a:hover { background: var(--neu-bg); color: var(--neu-blue); box-shadow: var(--neu-in); }
+.neu .ed-user-dropdown a:hover { background: rgba(47, 95, 168, 0.08); color: var(--neu-blue); }
 /* "Back to All Events": raised pill. */
 .neu .ed-back {
   gap: 10px;
@@ -1578,7 +1770,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   transition: box-shadow 0.25s ease;
 }
 .neu .ed-back img { width: 18px; height: 18px; }
-.neu .ed-back:hover { text-decoration: none; box-shadow: var(--neu-in); }
+.neu .ed-back:hover { text-decoration: none; box-shadow: var(--neu-out); }
+.neu .ed-back:active { box-shadow: var(--neu-in); }
 /* Cards. */
 .neu .ed-hero,
 .neu .ed-program-card,
@@ -1605,6 +1798,435 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .ed-btn:disabled { background: var(--neu-bg); color: var(--neu-muted); box-shadow: var(--neu-in); }
 .neu .ed-btn-outline { background: var(--neu-bg); color: #b42318; border: none; box-shadow: var(--neu-out-sm); }
 .neu .ed-btn-outline:hover:not(:disabled) { background: var(--neu-bg); color: #b42318; box-shadow: var(--neu-in); transform: none; }
-.neu .ed-btn-evaluate { background: linear-gradient(135deg, #f76b15, #d9480f); box-shadow: 0 8px 20px rgba(247, 107, 21, 0.35); }
-.neu .ed-btn-evaluate:hover { background: linear-gradient(135deg, #fb7d2a, #e8550f) !important; }
+.neu .ed-btn-evaluate { background: linear-gradient(135deg, #c2410c, #9a3412); box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35); }
+.neu .ed-btn-evaluate:hover { background: linear-gradient(135deg, #d9480f, #b03a0a) !important; }
 .neu .ed-flash { border-radius: 14px; box-shadow: var(--neu-in); }
+
+/* Event Calendar "Ongoing" strip on neumorphic pages. */
+.neu .cal-ongoing-item { background: var(--neu-bg); box-shadow: var(--neu-out-sm); border-left-color: var(--neu-blue); transition: box-shadow 0.25s ease; }
+.neu .cal-ongoing-item:hover { box-shadow: var(--neu-out); }
+.neu .cal-ongoing-item:hover strong { color: var(--neu-blue); }
+
+/* ---- Phone tidy-ups: filter bar, stats, feature strip ---- */
+.neu .cal-ongoing-more summary { color: var(--neu-blue); }
+@media (max-width: 760px) {
+  /* Filters: search on its own row, dropdowns two per row, full-width Apply. */
+  .filter-bar { display: grid; grid-template-columns: 1fr 1fr; }
+  .filter-bar input[type="search"], .filter-bar .btn, .filter-bar .filter-clear { grid-column: 1 / -1; }
+  .filter-bar select { width: 100%; min-width: 0; }
+  .filter-bar .filter-clear { text-align: center; }
+  /* Stats: a neat 2 × 2. */
+  .stats-block { display: grid; grid-template-columns: repeat(2, 1fr); }
+  /* Features: 2 × 2 compact tiles (icon + title) instead of four tall rows. */
+  .feature-item { flex: 1 1 50%; flex-direction: column; text-align: center; gap: 8px; padding: 16px 10px; border-right: none; }
+  .feature-sub { display: none; }
+}
+
+/* Today on the dashboard calendar stays white even when it has events
+   (.has-event's blue text was invisible on the blue circle). */
+.cal-grid .day.today,
+.cal-grid .day.today.has-event { color: #fff; }
+
+@media (max-width: 760px) {
+  /* Pages with a right column (dashboard, event details): it follows the
+     content directly instead of leaving a gap above it. */
+  .dashboard-shell:not(.no-rail) { grid-template-rows: auto auto 1fr; }
+}
+
+/* ============================================================
+   Phones / foldables (≤ 760px): the top bar uses the sidebar's deep blue,
+   since the sidebar itself is hidden there. Computers and tablets keep the
+   light top bar. ("body" in front of each selector so these win over the
+   .neu and event-details top bar styles.)
+   ============================================================ */
+@media (max-width: 760px) {
+  /* .dashboard-shell > so it also beats .neu .dash-topbar's light background. */
+  body .dashboard-shell > .dash-topbar {
+    --tb-text: #dbe7ff;
+    --tb-muted: rgba(191, 210, 245, 0.75);
+    --tb-surface: rgba(255, 255, 255, 0.07);
+    --tb-out: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
+    --tb-in: inset 3px 3px 7px rgba(2, 8, 24, 0.6), inset -3px -3px 7px rgba(80, 130, 220, 0.14);
+    background:
+      radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.35), transparent 55%),
+      linear-gradient(170deg, #0e2a6b 0%, #0b2257 60%, #061430 100%);
+    border-bottom: none;
+    box-shadow: 0 8px 22px rgba(6, 20, 48, 0.35);
+    color: var(--tb-text);
+  }
+  body .dash-topbar :focus-visible { outline-color: #fff; }
+
+  /* Icons white, as in the sidebar. */
+  body .dash-topbar .topbar-start .ui-icon,
+  body .dash-topbar .search-box .ui-icon,
+  body .dash-topbar .bell .ui-icon,
+  body .dash-topbar .ed-bell .ui-icon,
+  body .dash-topbar .user-caret .ui-icon,
+  body .dash-topbar .ed-user-chevron { filter: brightness(0) invert(1); }
+
+  /* Brand: same colours as the sidebar's. */
+  body .dash-topbar .topbar-brand .brand-text .campus { color: #ff7a21; }
+  body .dash-topbar .topbar-brand .brand-text .hub { color: #fff; }
+  /* Same ring + shadow as the sidebar logo (.neu .sidebar .brand-logo). */
+  body .dash-topbar .topbar-brand img { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.4); }
+
+  /* Menu button, bell, profile chip: raised dark circles, pressed while open. */
+  body .dash-topbar .nav-toggle,
+  body .dash-topbar .bell,
+  body .dash-topbar .ed-bell,
+  body .dash-topbar .user-chip,
+  body .dash-topbar .ed-user-menu summary {
+    background: var(--tb-surface);
+    box-shadow: var(--tb-out);
+  }
+  body .dash-topbar .nav-toggle:hover,
+  body .dash-topbar .bell:hover,
+  body .dash-topbar .ed-bell:hover,
+  body .dash-topbar .user-menu > summary:hover,
+  body .dash-topbar .ed-user-menu summary:hover { background: rgba(255, 255, 255, 0.13); box-shadow: var(--tb-out); }
+  body .dash-topbar .nav-toggle[aria-expanded="true"],
+  body .dash-topbar .bell[aria-expanded="true"],
+  body .dash-topbar .ed-bell[aria-expanded="true"],
+  body .dash-topbar .user-menu[open] > summary,
+  body .dash-topbar .ed-user-menu[open] summary { box-shadow: var(--tb-in); }
+
+  /* LOG IN: dark shadow like the sidebar's buttons (the white neumorphic
+     glow is meant for light backgrounds and showed as a halo here). */
+  body .dash-topbar .btn-login { box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16); }
+  body .dash-topbar .btn-login:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
+  body .dash-topbar .btn-login:active { box-shadow: inset 3px 3px 7px rgba(2, 8, 24, 0.5); }
+
+  /* Search: a darker field pressed into the bar, light text. */
+  body .dash-topbar .search-box { background: rgba(2, 8, 24, 0.28); box-shadow: var(--tb-in); color: var(--tb-muted); }
+  body .dash-topbar .search-box input { color: #fff; }
+  body .dash-topbar .search-box input::placeholder { color: var(--tb-muted); }
+  body .dash-topbar .search-box:focus-within { box-shadow: var(--tb-in), 0 0 0 2px rgba(147, 197, 253, 0.6); }
+
+  /* Breadcrumbs. */
+  body .dash-topbar .breadcrumb a,
+  body .dash-topbar .ed-breadcrumb a,
+  body .dash-topbar .ed-crumb-sep,
+  body .dash-topbar .crumb-sep { color: var(--tb-muted); }
+  body .dash-topbar .breadcrumb a:hover,
+  body .dash-topbar .ed-breadcrumb a:hover { color: #fff; }
+  body .dash-topbar .crumb-current,
+  body .dash-topbar .ed-crumb-current { color: #fff; }
+
+  /* Dropdowns opened from the bar stay light and readable. */
+  body .dash-topbar .notif-dropdown,
+  body .dash-topbar .user-dropdown,
+  body .dash-topbar .ed-notif-dropdown,
+  body .dash-topbar .ed-user-dropdown { color: var(--text-main); }
+}
+
+/* ============================================================
+   DEVICE FINE-TUNING
+   ============================================================ */
+
+/* Small phones / folded foldables (≤ 400px): the top bar fits on one row. */
+@media (max-width: 400px) {
+  .dash-topbar { gap: 8px 8px; padding-left: 12px; padding-right: 12px; }
+  .topbar-start { gap: 8px; }
+  .nav-toggle, .bell, .neu .bell { width: 38px; height: 38px; }
+  .topbar-right { gap: 8px; }
+  .user-caret, .ed-user-chevron { display: none !important; }
+  .neu .user-chip, .neu .ed-user-menu summary { padding: 4px; }
+  .topbar-brand .brand-text .campus { font-size: 0.85rem; }
+  .topbar-brand .brand-text .hub { font-size: 0.68rem; }
+  .topbar-right .btn-login { padding: 9px 16px; }
+}
+
+/* Unfolded foldables (601–760px): still the phone menu, but use the width. */
+@media (min-width: 601px) and (max-width: 760px) {
+  .dash-events-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .two-col-lists { grid-template-columns: 1fr 1fr; }
+  .feature-item { flex-basis: 25%; }
+  .stats-block { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+}
+
+/* Tablets too narrow for four features in a row: an even 2 × 2. */
+@media (min-width: 761px) and (max-width: 1023px) {
+  .feature-item { flex: 1 1 50%; }
+  .feature-item:nth-child(2n) { border-right: none; }
+}
+
+/* Event details: the poster's size follows the content column's own width
+   (not the screen's), so it fits next to the tablet's schedule column too:
+     ≥ 760px  340px poster beside the text (computers, as before)
+     540–759  240px poster beside the text (tablets, unfolded foldables)
+     < 540    poster above the text, up to 260px (phones) */
+.ed-main { container-type: inline-size; }
+@container (min-width: 540px) and (max-width: 759px) {
+  .event-details-page .ed-hero { grid-template-columns: minmax(0, 240px) 1fr; }
+  .event-details-page .ed-hero-info { padding-top: 8px; }
+}
+@container (max-width: 539px) {
+  .event-details-page .ed-hero { grid-template-columns: 1fr; }
+  .event-details-page .ed-hero-info { padding-top: 0; }
+  .event-details-page .ed-poster { max-width: 260px; justify-self: center; margin-inline: auto; } /* centred above the text */
+}
+
+/* Anchors and "scroll to the day's list" land below the sticky top bar. */
+@media (max-width: 1100px) {
+  .cal-day-panel, .org-card, .about-section { scroll-margin-top: 90px; }
+  .dash-topbar.is-scrolled { box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14); }
+}
+@media (max-width: 760px) {
+  .cal-day-panel, .org-card, .about-section { scroll-margin-top: 140px; }
+  body .dashboard-shell > .dash-topbar.is-scrolled { box-shadow: 0 10px 28px rgba(6, 20, 48, 0.5); }
+}
+
+/* ============================================================
+   MOTION — small animations that make the interface feel alive.
+   All of it is off when the device asks for reduced motion.
+   (assets/js/ui.js adds .reveal / .is-visible and the flash ✕.)
+   ============================================================ */
+
+/* Flash messages: room for the ✕ (always, it's a button). */
+.flash, .ed-flash { position: relative; padding-right: 44px; }
+.flash.db-banner { padding-right: 44px; }
+.flash-close {
+  position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: transparent; color: inherit; font-size: 1.2rem; line-height: 1;
+  opacity: 0.65; cursor: pointer;
+}
+.flash-close:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+
+/* Back to top (ui.js), bottom-right, above the content but below menus. */
+.back-to-top {
+  position: fixed; z-index: 45;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 44px; height: 44px; border: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, #3d74c9, #1e3f86);
+  box-shadow: 0 8px 20px rgba(6, 20, 48, 0.35);
+  cursor: pointer;
+}
+.back-to-top:hover { background: linear-gradient(145deg, #4a82d8, #24489a); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Smooth fade between pages (browsers that support it; others ignore it). */
+  @view-transition { navigation: auto; }
+
+  @keyframes ui-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes ui-pop-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes ui-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ui-slide-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+  @keyframes ui-slide-out { to { opacity: 0; transform: translateY(-8px); height: 0; margin: 0; padding-top: 0; padding-bottom: 0; } }
+  @keyframes ui-hero-zoom { from { transform: scale(1); } to { transform: scale(1.07); } }
+
+  /* Cards fade and slide up as they scroll into view (staggered by ui.js). */
+  .js-ui .reveal { transition: opacity 0.5s ease var(--reveal-delay, 0ms), transform 0.5s ease var(--reveal-delay, 0ms); }
+  .js-ui .reveal:not(.is-visible) { opacity: 0; transform: translateY(18px); }
+
+  /* Menus open with a quick fade + scale. */
+  .notif-dropdown, .user-dropdown, .row-more-menu, .ed-notif-dropdown, .ed-user-dropdown {
+    animation: ui-pop-in 0.16s ease-out;
+    transform-origin: top right;
+  }
+  .nav-backdrop { animation: ui-fade-in 0.25s ease; }
+  .event-submenu { animation: ui-fade-up 0.2s ease; }
+
+  /* The chosen day's events fade in (Event Calendar + dashboard calendar). */
+  .cal-day-events:not([hidden]), .cal-day-list { animation: ui-fade-up 0.25s ease; }
+
+  /* Flash messages slide in, and out when dismissed. */
+  .flash, .ed-flash { animation: ui-slide-in 0.3s ease; }
+  .flash.is-leaving, .ed-flash.is-leaving { animation: ui-slide-out 0.3s ease forwards; overflow: hidden; }
+
+  /* Buttons press in slightly. */
+  .btn, .btn-login, .btn-sm, .ed-btn, .nav-toggle, .bell, .ed-bell, .back-to-top, .cal-step, .view-all {
+    transition: transform 0.12s ease, box-shadow 0.25s ease, background 0.2s ease, color 0.2s ease;
+  }
+  .btn:active, .btn-login:active, .btn-sm:active, .ed-btn:active:not(:disabled),
+  .nav-toggle:active, .bell:active, .ed-bell:active, .back-to-top:active, .cal-step:active { transform: scale(0.96); }
+
+  /* Event cards: the picture brightens a little on hover. */
+  .event-thumb { transition: filter 0.25s ease; }
+  .event-card:hover .event-thumb { filter: brightness(1.12) saturate(1.1); }
+
+  /* Back to top button appears with a fade. */
+  .back-to-top:not([hidden]) { animation: ui-pop-in 0.2s ease-out; }
+  .back-to-top:hover { transform: translateY(-2px); }
+
+  /* Home hero photo: a very slow zoom. */
+  .hero-bg { animation: ui-hero-zoom 22s ease-in-out infinite alternate; }
+
+  /* Top bar shadow eases in when scrolled. */
+  .dash-topbar { transition: box-shadow 0.25s ease; }
+}
+
+/* ============================================================
+   FLUID SIZING — text and buttons follow the screen width.
+   clamp(smallest, grows with the screen, largest): phones get the
+   smallest size, computers the largest, everything between scales
+   smoothly (no jumps at breakpoints).
+   ============================================================ */
+
+/* Base text: 15px on phones → 16px from ~1100px up (every rem follows). */
+:root { font-size: clamp(15px, 14.3px + 0.15vw, 16px); }
+
+/* Headings shrink more than body text on small screens. */
+.hero-title { font-size: clamp(1.7rem, 1.15rem + 2.6vw, 2.6rem); }
+.page-head h1 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.6rem); }
+.page-title { font-size: clamp(1.2rem, 1.05rem + 0.7vw, 1.4rem); }
+.dash-greeting h1 { font-size: clamp(1.25rem, 1.05rem + 0.9vw, 1.5rem); }
+.about-text h2 { font-size: clamp(1.3rem, 1.1rem + 0.9vw, 1.6rem); }
+.section-head-lg h2 { font-size: clamp(1.1rem, 1rem + 0.45vw, 1.25rem); }
+.org-card-head h2 { font-size: clamp(1.1rem, 0.98rem + 0.6vw, 1.3rem); }
+.stat-value { font-size: clamp(1.2rem, 1rem + 0.9vw, 1.5rem); }
+.event-details-page .ed-title { font-size: clamp(1.1rem, 1rem + 0.5vw, 1.25rem); }
+.event-details-page .ed-category { font-size: clamp(0.85rem, 0.78rem + 0.35vw, 1.05rem); min-width: clamp(100px, 18vw, 146px); }
+.event-details-page .ed-section-title { font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.2rem); }
+body .cal-toolbar h2 { font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.2rem); }
+
+/* Buttons (.btn is sized at its own rule near the top). */
+.event-details-page .ed-btn { font-size: clamp(0.78rem, 0.74rem + 0.15vw, 0.82rem); }
+
+/* Form inputs a little shorter on phones. */
+body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem + 0.4vw, 14px); }
+
+/* Phones / foldables: form buttons fill the width instead of floating right.
+   With three buttons (Cancel · Save Draft · Publish) the main one goes on
+   top, full width, and the other two share the row below. */
+@media (max-width: 760px) {
+  body .admin-actions { display: flex; justify-content: stretch; gap: 10px; }
+  body .admin-actions > .btn { flex: 1 1 0; }
+  body .admin-actions:has(> .btn:nth-child(3)) { display: grid; grid-template-columns: 1fr 1fr; }
+  body .admin-actions:has(> .btn:nth-child(3)) > .btn-primary { grid-column: 1 / -1; order: -1; }
+}
+
+/* Dashboard calendar: today is a solid blue circle, even while it's the
+   selected day (no gradient, inner shadow or orange ring on top). */
+.neu .cal-grid .day.today,
+.neu .cal-grid .day.today.selected,
+.neu .cal-grid button.day.today:hover {
+  background: var(--neu-blue);
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(47, 95, 168, 0.35);
+}
+
+/* Sidebar "Events" group on its own pages (Event Calendar, My Events, Next
+   Event): the group gets the same orange pill as other current pages, and
+   the current choice inside it a light blue. (An open group on other
+   pages keeps the pressed-in look.) */
+.neu .side-nav .submenu-toggle.is-current,
+.neu .side-nav .submenu-toggle.is-current[aria-expanded="true"],
+.event-details-page.neu .submenu-toggle.is-current {
+  background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
+}
+.neu .side-nav .submenu-toggle.is-current .icon {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 2px 2px 5px rgba(120, 40, 0, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+}
+.neu .side-nav .event-submenu a.active {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.45) 0%, rgba(59, 130, 246, 0.35) 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+.neu .side-nav .event-submenu a.active .icon { background: rgba(255, 255, 255, 0.14); box-shadow: none; }
+
+/* Dashboard calendar header: a blue box, "Calendar" on top and
+   "‹  October 2026  ›" centred underneath, in orange. */
+.neu .rail-card .cal-head {
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+  margin: 0 0 12px; padding: 12px 12px 10px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(37, 99, 235, 0.35), transparent 55%),
+    linear-gradient(170deg, #0e2a6b 0%, #0b2257 60%, #061430 100%);
+  box-shadow: 0 8px 18px rgba(6, 20, 48, 0.28);
+  color: #ff7a21;
+}
+.neu .cal-head .cal-head-title {
+  margin: 0; text-align: center;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #ff7a21;
+}
+.cal-head-month { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cal-head-month #calendar-month { flex: 1; text-align: center; font-size: 1rem; font-weight: 800; color: #fff; }
+.neu .rail-card .cal-head button {
+  width: 30px; height: 30px; border-radius: 50%; border: none;
+  background: rgba(255, 255, 255, 0.08); color: #fff;
+  font-size: 1.1rem; font-weight: 800; line-height: 1;
+  box-shadow: 3px 3px 8px rgba(2, 8, 24, 0.5), -2px -2px 6px rgba(80, 130, 220, 0.15);
+}
+.neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.neu .rail-card .cal-head button:active { box-shadow: inset 2px 2px 6px rgba(2, 8, 24, 0.55); }
+.neu .rail-card .cal-head :focus-visible { outline-color: #fff; }
+
+/* Dashboard calendar card split like an event card: the blue header fills
+   the top of the card edge to edge, the days sit on the light half below. */
+.neu #dashboard-calendar-card { --cal-pad: 18px; padding: var(--cal-pad); overflow: hidden; }
+.neu #dashboard-calendar-card .cal-head {
+  margin: calc(-1 * var(--cal-pad)) calc(-1 * var(--cal-pad)) 14px;
+  padding: 18px var(--cal-pad) 16px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Profile + notification menus: a soft navy drop shadow instead of the
+   neumorphic white glow, which showed as a halo over blue areas. */
+.neu .notif-dropdown,
+.neu .user-dropdown,
+.neu .ed-notif-dropdown,
+.neu .ed-user-dropdown {
+  box-shadow: 0 14px 32px rgba(14, 42, 94, 0.28), 0 2px 8px rgba(14, 42, 94, 0.14);
+  border: 1px solid rgba(14, 42, 94, 0.08);
+}
+
+/* ============================================================
+   MOTION 2 — hover / press feedback on the things people touch most.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ui-bell-ring {
+    0%, 100% { transform: rotate(0); }
+    20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); }
+    60% { transform: rotate(8deg); }  80% { transform: rotate(-4deg); }
+  }
+  @keyframes ui-badge-pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+  /* Sidebar: links nudge right on hover, the icon circle grows a little. */
+  .side-nav a, .side-nav .submenu-toggle { transition: transform 0.18s ease, background 0.25s ease, box-shadow 0.25s ease, color 0.2s ease; }
+  .side-nav a:hover, .side-nav .submenu-toggle:hover { transform: translateX(3px); }
+  .side-nav .icon { transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease; }
+  .side-nav a:hover .icon, .side-nav .submenu-toggle:hover .icon { transform: scale(1.08); }
+  .submenu-toggle .chevron { transition: transform 0.25s ease; }
+
+  /* Bell rings on hover; the unread count pops in. */
+  .bell:hover .ui-icon, .ed-bell:hover .ui-icon { animation: ui-bell-ring 0.6s ease; transform-origin: 50% 10%; }
+  .bell .dot:not([hidden]), .ed-bell-count:not([hidden]) { animation: ui-badge-pop 0.35s ease-out; }
+
+  /* Cards and list rows lift on hover. */
+  .list-card, .rail-card, .org-card, .upcoming-panel, .cal-ongoing-item, .eval-callout-item,
+  .officer-card, .ed-program-card, .kpi, .admin-panel {
+    transition: transform 0.2s ease, box-shadow 0.25s ease;
+  }
+  .officer-card:hover, .ed-program-card:hover, .cal-ongoing-item:hover, .eval-callout-item:hover, .kpi:hover { transform: translateY(-3px); }
+  .mini-row, .upcoming-item, .announcement-item, .cal-day-list a, .notif-item { transition: background 0.2s ease, padding-left 0.2s ease; }
+  .mini-row:hover, .upcoming-item:hover, .cal-day-list a:hover { padding-left: 6px; }
+
+  /* Calendar days: grow slightly on hover. */
+  .cal-grid button.day, .cal-day { transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease; }
+  .cal-grid button.day:hover { transform: scale(1.12); }
+  .cal-cell:not(.is-outside) .cal-day:hover { transform: translateY(-2px); }
+
+  /* Feature tiles + about points: icon circle bounces up on hover. */
+  .feature-icon, .about-points li > span { transition: transform 0.25s cubic-bezier(.34, 1.56, .64, 1); }
+  .feature-item:hover .feature-icon, .about-points li:hover > span { transform: translateY(-4px) scale(1.06); }
+
+  /* Admin tables: the hovered row is tinted. */
+  .admin-table tbody tr { transition: background 0.15s ease; }
+  .admin-table tbody tr:hover { background: rgba(47, 95, 168, 0.05); }
+
+  /* Inputs: a soft glow grows in on focus. */
+  .admin-input, .search-box, .filter-bar input, .filter-bar select { transition: box-shadow 0.25s ease, border-color 0.2s ease, background 0.2s ease; }
+
+  /* Footer org logos and links. */
+  .site-footer-links a { transition: color 0.2s ease; }
+}

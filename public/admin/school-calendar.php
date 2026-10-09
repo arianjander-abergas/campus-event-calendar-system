@@ -94,8 +94,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Calendar — Campus Event Hub</title>
-<link rel="stylesheet" href="../assets/css/style.css">
-<link rel="stylesheet" href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
+<link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
 <body>
 
@@ -193,6 +193,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
 </div>
 
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>

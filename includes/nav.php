@@ -7,15 +7,24 @@
  *   'manage-events' | 'import' | 'my-officers'           (moderators and admins)
  *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-taxonomy'
  *   'admin-calendar' | 'admin-users'                      (admins)
- * Logged-out visitors see the public links plus Log in / Sign up.
+ * Logged-out visitors see the public links (Log in / Sign up are in the top
+ * bar; on phones they're also at the bottom of this menu).
+ *
+ * Screen sizes (style.css, assets/js/sidebar.js):
+ *   computer  full sidebar with labels
+ *   tablet    slim icon-only sidebar; the top bar's menu button opens the full one
+ *   phone     hidden; the top bar's menu button slides it in
  */
 $activeNav = $activeNav ?? '';
 $navUser = current_user();
 $navRole = $navUser['role'] ?? '';
 $navActive = fn(string $key): string => $activeNav === $key ? ' class="active" aria-current="page"' : '';
+/** One sidebar link: icon + label (the label is hidden on the slim tablet sidebar, so it's also the tooltip). */
+$navLink = fn(string $href, string $key, string $icon, string $label, int $size = 18): string =>
+    '<a href="' . BASE_URL . $href . '"' . $navActive($key) . ' title="' . $label . '"><span class="icon">' . icon($icon, $size) . '</span><span class="nav-label">' . $label . '</span></a>';
 $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
 ?>
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
       <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
@@ -24,58 +33,65 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
         <span class="hub">EVENT HUB</span>
       </span>
     </a>
+    <button type="button" class="nav-close" data-nav-close aria-label="Close menu"><?= icon('close', 20) ?></button>
   </div>
 
   <nav class="side-nav" aria-label="Main">
-    <a href="<?= BASE_URL ?>/index.php"<?= $navActive('home') ?>><span class="icon"><?= icon('home') ?></span> Home</a>
+    <?= $navLink('/index.php', 'home', 'home', 'Home') ?>
     <?php if ($navUser): ?>
-      <a href="<?= BASE_URL ?>/enduser/dashboard.php"<?= $navActive('dashboard') ?>><span class="icon"><?= icon('dashboard') ?></span> Dashboard</a>
+      <?= $navLink('/enduser/dashboard.php', 'dashboard', 'dashboard', 'Dashboard') ?>
+
+      <div class="side-nav-item has-submenu">
+        <button type="button" class="submenu-toggle<?= $eventsOpen ? ' is-current' : '' ?>" id="eventDropdownBtn" aria-expanded="<?= $eventsOpen ? 'true' : 'false' ?>" aria-controls="eventSubmenu" title="Events">
+          <span class="icon"><?= icon('ticket') ?></span>
+          <span class="nav-label">Events</span>
+          <span class="chevron" aria-hidden="true"><?= icon('chevron-down', 14) ?></span>
+        </button>
+        <div class="event-submenu" id="eventSubmenu"<?= $eventsOpen ? '' : ' hidden' ?>>
+          <?= $navLink('/events.php', 'events', 'calendar', 'Event Calendar', 16) ?>
+          <?= $navLink('/events.php?mine=1', 'my-events', 'check', 'My Events', 16) ?>
+          <?= $navLink('/event-details.php', 'event', 'list', 'Next Event', 16) ?>
+        </div>
+      </div>
+    <?php else: ?>
+      <?php /* Visitors only have the calendar, so "Events" is a plain link instead of a one-item dropdown. */ ?>
+      <?= $navLink('/events.php', 'events', 'calendar', 'Event Calendar') ?>
     <?php endif; ?>
 
-    <div class="side-nav-item has-submenu">
-      <button type="button" class="submenu-toggle<?= $eventsOpen ? ' is-current' : '' ?>" id="eventDropdownBtn" aria-expanded="<?= $eventsOpen ? 'true' : 'false' ?>" aria-controls="eventSubmenu">
-        <span class="icon"><?= icon('ticket') ?></span>
-        <span>Events</span>
-        <span class="chevron" aria-hidden="true"><?= icon('chevron-down', 14) ?></span>
-      </button>
-      <div class="event-submenu" id="eventSubmenu"<?= $eventsOpen ? '' : ' hidden' ?>>
-        <a href="<?= BASE_URL ?>/events.php"<?= $navActive('events') ?>><span class="icon"><?= icon('calendar', 16) ?></span> Event Calendar</a>
-        <?php if ($navUser): ?>
-          <a href="<?= BASE_URL ?>/events.php?mine=1"<?= $navActive('my-events') ?>><span class="icon"><?= icon('check', 16) ?></span> My Events</a>
-          <a href="<?= BASE_URL ?>/event-details.php"<?= $navActive('event') ?>><span class="icon"><?= icon('list', 16) ?></span> Next Event</a>
-        <?php endif; ?>
-      </div>
-    </div>
-
-    <a href="<?= BASE_URL ?>/organizations.php"<?= $navActive('organizations') ?>><span class="icon"><?= icon('organizations') ?></span> Organizations</a>
+    <?= $navLink('/organizations.php', 'organizations', 'organizations', 'Organizations') ?>
     <?php if ($navUser): ?>
-      <a href="<?= BASE_URL ?>/enduser/profile.php"<?= $navActive('profile') ?>><span class="icon"><?= icon('profile') ?></span> My Profile</a>
-    <?php else: ?>
-      <a href="<?= BASE_URL ?>/auth/login.php"><span class="icon"><?= icon('profile') ?></span> Log in</a>
-      <a href="<?= BASE_URL ?>/auth/register.php"><span class="icon"><?= icon('register') ?></span> Sign up</a>
+      <?= $navLink('/enduser/profile.php', 'profile', 'profile', 'My Profile') ?>
     <?php endif; ?>
   </nav>
+
+  <?php if (!$navUser): ?>
+    <div class="side-auth">
+      <a href="<?= BASE_URL ?>/auth/login.php" class="btn btn-primary">Log in</a>
+      <a href="<?= BASE_URL ?>/auth/register.php" class="btn btn-outline">Sign up</a>
+    </div>
+  <?php endif; ?>
 
   <?php if ($navRole === 'moderator'): ?>
     <nav class="side-nav side-admin" aria-label="Moderator">
       <div class="side-group-label">Moderator</div>
-      <a href="<?= BASE_URL ?>/admin/event-organizer.php"<?= $navActive('manage-events') ?>><span class="icon"><?= icon('tools') ?></span> Manage Events</a>
-      <a href="<?= BASE_URL ?>/admin/import.php"<?= $navActive('import') ?>><span class="icon"><?= icon('import') ?></span> Import &amp; Verify</a>
+      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+      <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?php if (!empty($navUser['organization_id'])): ?>
-        <a href="<?= BASE_URL ?>/admin/organization-officers.php?org=<?= urlencode($navUser['organization_id']) ?>"<?= $navActive('my-officers') ?>><span class="icon"><?= icon('people') ?></span> Our Officers</a>
+        <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>
       <?php endif; ?>
     </nav>
   <?php elseif ($navRole === 'admin'): ?>
     <nav class="side-nav side-admin" aria-label="Admin">
       <div class="side-group-label">Admin</div>
-      <a href="<?= BASE_URL ?>/admin/dashboard.php"<?= $navActive('admin-dashboard') ?>><span class="icon"><?= icon('chart') ?></span> Admin Dashboard</a>
-      <a href="<?= BASE_URL ?>/admin/event-organizer.php"<?= $navActive('manage-events') ?>><span class="icon"><?= icon('tools') ?></span> Manage Events</a>
-      <a href="<?= BASE_URL ?>/admin/reports.php"<?= $navActive('admin-reports') ?>><span class="icon"><?= icon('reports') ?></span> Reports</a>
-      <a href="<?= BASE_URL ?>/admin/import.php"<?= $navActive('import') ?>><span class="icon"><?= icon('import') ?></span> Import &amp; Verify</a>
-      <a href="<?= BASE_URL ?>/admin/evaluation-form.php"<?= $navActive('admin-evaluation') ?>><span class="icon"><?= icon('evaluation') ?></span> Evaluation Form</a>
-      <a href="<?= BASE_URL ?>/admin/admin-taxonomy.php"<?= $navActive('admin-taxonomy') ?>><span class="icon"><?= icon('tag') ?></span> Categories &amp; Orgs</a>
-      <a href="<?= BASE_URL ?>/admin/school-calendar.php"<?= $navActive('admin-calendar') ?>><span class="icon"><?= icon('schedule') ?></span> School Calendar</a>
-      <a href="<?= BASE_URL ?>/admin/users.php"<?= $navActive('admin-users') ?>><span class="icon"><?= icon('people') ?></span> Users &amp; Roles</a>
+      <?= $navLink('/admin/dashboard.php', 'admin-dashboard', 'chart', 'Admin Dashboard') ?>
+      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+      <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
+      <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
+      <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
+      <?= $navLink('/admin/admin-taxonomy.php', 'admin-taxonomy', 'tag', 'Categories &amp; Orgs') ?>
+      <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
+      <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users &amp; Roles') ?>
     </nav>
   <?php endif; ?>
 </aside>
+<div class="nav-backdrop" data-nav-close hidden></div>

@@ -218,8 +218,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= $editId ? 'Edit Event' : 'Manage Events' ?> — Campus Event Hub</title>
-<link rel="stylesheet" href="../assets/css/style.css">
-<link rel="stylesheet" href="../assets/css/admin.css">
+<link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
+<link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
 <body>
 
@@ -410,8 +410,8 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
       <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= count($events) ?>)</h2>
     </div>
     <p class="admin-hint admin-hint-block">Published events become <strong>Completed</strong> automatically once they end. Use Mark Completed to close one early.</p>
-    <div class="admin-table-wrap">
-      <table class="admin-table">
+    <div class="admin-table-wrap admin-table-scroll">
+      <table class="admin-table admin-table-compact">
         <thead>
           <tr>
             <th>Title</th>
@@ -443,49 +443,67 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                   </span>
                 <?php else: ?>—<?php endif; ?>
               </td>
-              <td><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
+              <td class="admin-nowrap"><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
               <td><?= (int) ($counts[$ev['id']] ?? 0) ?><?= !empty($ev['registration_limit']) ? ' / ' . (int) $ev['registration_limit'] : '' ?></td>
               <td><span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span></td>
-              <td class="admin-row-actions">
-                <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Edit</a>
-                <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
-                <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
-                <?php if ($status !== 'draft'): ?><a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a><?php endif; ?>
+              <td>
+                <div class="admin-row-actions admin-row-actions-nowrap">
+                <?php /* Two menus keep every row on one line:
+                         Edit ▾   — change the event itself (details, status, delete)
+                         Manage ▾ — what happens around it (schedule, registrations, evaluations) */ ?>
+                <details class="row-more">
+                  <summary class="btn-sm">Edit <span aria-hidden="true">▾</span></summary>
+                  <div class="row-more-menu" role="group" aria-label="Edit <?= htmlspecialchars($ev['title']) ?>">
+                    <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Update</a>
 
-                <?php if (in_array($status, ['draft', 'published'], true)): ?>
-                  <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
-                    <input type="hidden" name="action" value="set_status">
-                    <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
-                    <input type="hidden" name="status" value="cancelled">
-                    <button type="submit" class="btn-sm btn-sm-danger">Cancel</button>
-                  </form>
-                <?php endif; ?>
+                    <?php if (in_array($status, ['draft', 'published'], true)): ?>
+                      <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
+                        <input type="hidden" name="action" value="set_status">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="status" value="cancelled">
+                        <button type="submit" class="btn-sm btn-sm-danger">Mark Cancelled</button>
+                      </form>
+                    <?php endif; ?>
 
-                <?php if ($status === 'published'): ?>
-                  <form method="POST" action="event-organizer.php">
-                    <input type="hidden" name="action" value="set_status">
-                    <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
-                    <input type="hidden" name="status" value="completed">
-                    <button type="submit" class="btn-sm btn-sm-accent">Mark Completed</button>
-                  </form>
-                <?php endif; ?>
+                    <?php if ($status === 'published'): ?>
+                      <form method="POST" action="event-organizer.php">
+                        <input type="hidden" name="action" value="set_status">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="status" value="completed">
+                        <button type="submit" class="btn-sm btn-sm-accent">Mark Completed</button>
+                      </form>
+                    <?php endif; ?>
 
-                <?php if (in_array($status, ['cancelled', 'completed'], true)): ?>
-                  <form method="POST" action="event-organizer.php">
-                    <input type="hidden" name="action" value="set_status">
-                    <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
-                    <input type="hidden" name="status" value="draft">
-                    <button type="submit" class="btn-sm">Reopen as Draft</button>
-                  </form>
-                <?php endif; ?>
+                    <?php if (in_array($status, ['cancelled', 'completed'], true)): ?>
+                      <form method="POST" action="event-organizer.php">
+                        <input type="hidden" name="action" value="set_status">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="status" value="draft">
+                        <button type="submit" class="btn-sm">Reopen as Draft</button>
+                      </form>
+                    <?php endif; ?>
 
-                <?php if ($isAdmin): ?>
-                <form method="POST" action="event-organizer.php" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
-                  <input type="hidden" name="action" value="delete">
-                  <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
-                  <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
-                </form>
-                <?php endif; ?>
+                    <?php if ($isAdmin): ?>
+                      <form method="POST" action="event-organizer.php" class="row-more-danger" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
+                      </form>
+                    <?php endif; ?>
+                  </div>
+                </details>
+
+                <details class="row-more">
+                  <summary class="btn-sm">Manage <span aria-hidden="true">▾</span></summary>
+                  <div class="row-more-menu" role="group" aria-label="Manage <?= htmlspecialchars($ev['title']) ?>">
+                    <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
+                    <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
+                    <?php if ($status !== 'draft'): ?>
+                      <a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a>
+                    <?php endif; ?>
+                  </div>
+                </details>
+                </div>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -558,7 +576,28 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
   checkSchedule();
 })();
 </script>
+<script>
+// Events table "Edit ▾" / "Manage ▾" menus: one open at a time; a click outside or Escape closes it.
+(function () {
+  var menus = document.querySelectorAll('details.row-more');
+  menus.forEach(function (menu) {
+    menu.addEventListener('toggle', function () {
+      if (menu.open) menus.forEach(function (m) { if (m !== menu) m.open = false; });
+    });
+  });
+  document.addEventListener('click', function (e) {
+    menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    menus.forEach(function (m) {
+      if (m.open) { m.open = false; m.querySelector('summary').focus(); }
+    });
+  });
+})();
+</script>
 <script src="../assets/js/sidebar.js"></script>
+<script src="../assets/js/ui.js"></script>
 <script src="../assets/js/forms.js"></script>
 <?= presence_script_tag() ?>
 </body>

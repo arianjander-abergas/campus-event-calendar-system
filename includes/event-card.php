@@ -6,6 +6,7 @@
  * "Registered", "Completed"), where and for whom the event is (with its year
  * levels), the live "N going" count and the organizing organization.
  */
+/** @var array $ev set by the page that includes this card */
 $cardToday = date('Y-m-d');
 $cardLive = ($ev['start_date'] ?? '') <= $cardToday && ($ev['end_date'] ?? '') >= $cardToday;
 $cardEnded = ($ev['end_date'] ?? $cardToday) < $cardToday || ($ev['status'] ?? '') === 'completed';
@@ -28,7 +29,7 @@ $cardOrg = $ev['organizations'] ?? null;
   </div>
   <div class="event-body">
     <h3 class="event-name"><?= htmlspecialchars($ev['title']) ?></h3>
-    <div class="event-meta"><?= icon('calendar', 14) ?> <?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?><?= !empty($ev['start_time']) ? ' · ' . htmlspecialchars(format_event_time($ev['start_time'])) : '' ?></div>
+    <div class="event-meta"><?= icon('calendar', 14) ?> <?= htmlspecialchars(event_date_range($ev)) ?><?= !empty($ev['start_time']) ? ' · ' . htmlspecialchars(format_event_time($ev['start_time'])) : '' ?></div>
     <?php if ($cardOnline): ?>
       <div class="event-meta"><?= icon('online', 14) ?> Online (Webinar)</div>
     <?php else: ?>
