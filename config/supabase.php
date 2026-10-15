@@ -82,7 +82,9 @@ function detect_base_url(): string
 //        is_published (false only for drafts), send_notification,
 //        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at,
 //        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'],
-//        year_levels int2[] (student year levels that may register; empty = all))
+//        year_levels int2[] (student year levels that may register; empty = all),
+//        category_other text (the event type typed in when the category is "Other"))
+//        event_type is no longer picked on the form: it follows the category's name.
 //        Categories/organizations can't be deleted while an event uses them (ON DELETE RESTRICT).
 //        trg_events_venue_type keeps venue_type = 'online' exactly when is_online is true.
 //        trg_events_schedule_rules refuses the same title on the same date (DUPLICATE_EVENT) and
@@ -538,6 +540,20 @@ const SEMESTERS = ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' =>
 function label_of(array $labels, ?string $key, string $default = '—'): string
 {
     return $labels[(string) $key] ?? $default;
+}
+
+/** True for the catch-all "Other" category (its events say what they are in events.category_other). */
+function is_other_category(?string $name): bool
+{
+    return strcasecmp(trim((string) $name), 'Other') === 0;
+}
+
+/** An event's category for display — the typed-in event type when the category is "Other". */
+function event_category_label(array $ev, string $default = 'Event'): string
+{
+    $name = $ev['categories']['name'] ?? label_of(EVENT_TYPES, $ev['event_type'] ?? null, $default);
+    $custom = trim((string) ($ev['category_other'] ?? ''));
+    return $custom !== '' && is_other_category($name) ? $custom : $name;
 }
 
 /** Kinds of account (profiles.account_type) and of student (profiles.student_type). */
@@ -1788,6 +1804,47 @@ function get_event_admin(string $eventId): ?array
     return $rows[0] ?? null;
 }
 
+/**
+ * Co-organizers of multi-organization events (event_organizations), as
+ * event id => [organization rows]. The main organizer is events.organization_id
+ * and isn't repeated here. Pass ids for a few events, or null for every event.
+ * Empty until migration 20261015120000_manage_events_update.sql is run.
+ */
+function get_event_partner_orgs(?array $eventIds = null): array
+{
+    $ids = array_values(array_filter($eventIds ?? [], 'is_uuid'));
+    if ($eventIds !== null && !$ids) return [];
+    $rows = supabase_request('event_organizations',
+        'select=event_id,organizations(id,name,logo_url)' . ($ids ? '&event_id=in.(' . implode(',', $ids) . ')' : ''),
+        'GET', null, session_access_token());
+    $map = [];
+    foreach ($rows as $row) {
+        if (!empty($row['organizations'])) $map[$row['event_id']][] = $row['organizations'];
+    }
+    foreach ($map as &$orgs) usort($orgs, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+    return $map;
+}
+
+/** Replace an event's co-organizers. @return bool false if they couldn't be saved */
+function set_event_partner_orgs(string $eventId, array $organizationIds): bool
+{
+    supabase_user_request('event_organizations', 'event_id=eq.' . urlencode($eventId), 'DELETE');
+    if (supabase_last_error() !== '') return false;
+    if (!$organizationIds) return true;
+    $rows = array_map(fn($id) => ['event_id' => $eventId, 'organization_id' => $id], array_values($organizationIds));
+    supabase_user_request('event_organizations', '', 'POST', $rows);
+    return supabase_last_error() === '';
+}
+
+/** "JPSSITE" or "JPSSITE, SIES & ACpES" — an event's main organizer, then its co-organizers. */
+function event_organizers_label(array $ev, array $partners = [], string $default = 'Organizer'): string
+{
+    $names = array_values(array_filter(array_merge([$ev['organizations']['name'] ?? ''], array_column($partners, 'name'))));
+    if (!$names) return $default;
+    $last = array_pop($names);
+    return $names ? implode(', ', $names) . ' & ' . $last : $last;
+}
+
 /** @return array{ok:bool, message:string, event?:array} */
 function create_event_admin(array $fields): array
 {
@@ -1852,9 +1909,12 @@ function set_event_status_admin(string $eventId, string $status): array
 }
 
 /** Categories / organizations for the event form's dropdowns (alphabetical). */
+/** Categories A–Z, with "Other" always last. */
 function get_categories(): array
 {
-    return supabase_request('categories', 'select=id,name&order=name.asc');
+    $categories = supabase_request('categories', 'select=id,name&order=name.asc');
+    usort($categories, fn($a, $b) => is_other_category($a['name']) <=> is_other_category($b['name']));
+    return $categories;
 }
 
 function get_organizations(): array
@@ -2205,6 +2265,65 @@ function send_csv(string $filename, array $header, array $rows): void
     }
     fclose($out);
     exit;
+}
+
+/**
+ * One page of a list, $perPage rows at a time. Pages start at 1; a page
+ * past the end shows the last one.
+ * @return array{rows: array, page: int, pages: int, total: int, from: int, to: int}
+ */
+function paginate(array $rows, int $perPage, int $page): array
+{
+    $total = count($rows);
+    $pages = max(1, (int) ceil($total / $perPage));
+    $page = min(max(1, $page), $pages);
+    $offset = ($page - 1) * $perPage;
+    return [
+        'rows' => array_slice(array_values($rows), $offset, $perPage),
+        'page' => $page, 'pages' => $pages, 'total' => $total,
+        'from' => $total ? $offset + 1 : 0, 'to' => min($offset + $perPage, $total),
+    ];
+}
+
+/**
+ * ‹ Prev · 1 2 3 … 9 · Next › under a list, and "Showing 1–10 of 24 events".
+ * $p from paginate(); $url(n) is the link to page n.
+ */
+function render_pagination(array $p, callable $url, string $one = 'item', string $many = 'items'): string
+{
+    $html = '';
+    if ($p['pages'] > 1) {
+        $link = fn(int $n, string $text, string $attrs = '') => '<a href="' . htmlspecialchars($url($n)) . '"' . $attrs . '>' . $text . '</a>';
+        $html .= '<nav class="pagination admin-pagination" aria-label="Pages">';
+        if ($p['page'] > 1) $html .= $link($p['page'] - 1, '‹ Prev', ' class="btn btn-outline" rel="prev"');
+        $html .= '<span class="admin-pages">';
+        for ($n = 1; $n <= $p['pages']; $n++) {
+            if ($n === $p['page']) {
+                $html .= '<span class="admin-page is-current" aria-current="page">' . $n . '</span>';
+            } elseif ($n === 1 || $n === $p['pages'] || abs($n - $p['page']) <= 1) {
+                $html .= $link($n, (string) $n, ' class="admin-page"');
+            } elseif (abs($n - $p['page']) === 2) {
+                $html .= '<span class="admin-page-gap" aria-hidden="true">…</span>';
+            }
+        }
+        $html .= '</span>';
+        if ($p['page'] < $p['pages']) $html .= $link($p['page'] + 1, 'Next ›', ' class="btn btn-outline" rel="next"');
+        $html .= '</nav>';
+    }
+    if ($p['total']) {
+        $html .= '<p class="admin-hint admin-pagination-info">Showing ' . $p['from'] . '–' . $p['to'] . ' of ' . $p['total'] . ' ' . ($p['total'] === 1 ? $one : $many) . '</p>';
+    }
+    return $html;
+}
+
+/** True if $q (already trimmed) is found in any of the texts, ignoring case. */
+function matches_search(string $q, array $texts): bool
+{
+    if ($q === '') return true;
+    foreach ($texts as $text) {
+        if (stripos((string) $text, $q) !== false) return true;
+    }
+    return false;
 }
 
 /** 'Kalinangan Hall' -> 'kalinangan-hall' (file names). */

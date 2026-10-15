@@ -226,7 +226,7 @@ $breadcrumbs = [['Admin Dashboard', null]];
             <h2>This week's events</h2>
             <p><?= htmlspecialchars(week_label($weekStart)) ?></p>
           </div>
-          <a href="event-organizer.php">Manage events ›</a>
+          <a href="event-organizer.php?view=update">Manage events ›</a>
         </div>
         <?php if (empty($thisWeek)): ?>
           <p class="admin-muted">No events this week.</p>

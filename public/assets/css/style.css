@@ -1323,6 +1323,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 
 /* ============================================================
    NEUMORPHISM — body.neu: home, Event Calendar, Organizations, My Profile
+   The sidebar carries .neu itself (includes/nav.php), so it looks the same
+   on every page — admin and moderator pages included.
    Soft light-grey surface; controls look pressed out of it (raised:
    light shadow top-left + dark shadow bottom-right) or into it (inset),
    with blue for the active / primary state.
@@ -1350,7 +1352,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
    blue glow). Raised = dark shadow bottom-right + faint blue light top-left;
    pressed = the same shadows inset. Current page: orange pill like the
    login page's Login button. Icons show white (shared .sidebar rule). */
-.neu .sidebar {
+.neu .sidebar,
+.sidebar.neu {
   --sb-text: #dbe7ff;
   --sb-muted: rgba(191, 210, 245, 0.72);
   --sb-surface: rgba(255, 255, 255, 0.05);
@@ -1364,10 +1367,10 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   box-shadow: 6px 0 24px rgba(6, 20, 48, 0.35);
   z-index: 2;
 }
-.neu .sidebar .brand { color: #fff; }
-.neu .sidebar .brand-text .campus { color: #ff7a21; }
-.neu .sidebar .brand-text .hub { color: #fff; }
-.neu .sidebar .brand-logo {
+.neu .sidebar .brand, .sidebar.neu .brand { color: #fff; }
+.neu .sidebar .brand-text .campus, .sidebar.neu .brand-text .campus { color: #ff7a21; }
+.neu .sidebar .brand-text .hub, .sidebar.neu .brand-text .hub { color: #fff; }
+.neu .sidebar .brand-logo, .sidebar.neu .brand-logo {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18), 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
@@ -1549,9 +1552,9 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: var(--sb-out); }
 /* Log in: the sidebar's dark shadow instead of the white neumorphic glow,
    which showed as a halo on the dark blue. */
-.neu .sidebar .side-auth .btn-primary { box-shadow: var(--sb-out); }
-.neu .sidebar .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
-.neu .sidebar .side-auth .btn:active { box-shadow: var(--sb-in); }
+.neu .sidebar .side-auth .btn-primary, .sidebar.neu .side-auth .btn-primary { box-shadow: var(--sb-out); }
+.neu .sidebar .side-auth .btn-primary:hover, .sidebar.neu .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
+.neu .sidebar .side-auth .btn:active, .sidebar.neu .side-auth .btn:active { box-shadow: var(--sb-in); }
 
 @media (max-width: 1100px) {
   .neu .right-rail .rail-card { background: var(--neu-bg); box-shadow: var(--neu-out); }

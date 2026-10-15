@@ -5,6 +5,12 @@
  * organization's events. Events are refused if they duplicate another event
  * (same title, same date) or double-book a venue; they're marked Completed
  * automatically once they end.
+ *
+ * Three views (sidebar: Manage Events ▾ Create Event / Update Events):
+ *   event-organizer.php              Create Event — a blank form
+ *   event-organizer.php?view=update  Update Events — the events list, with
+ *                                    search, filters and 5 rows per page
+ *   event-organizer.php?edit=<id>    Edit one event (from the list)
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
@@ -12,7 +18,9 @@ $user = require_staff(); // admins + moderators; everyone else goes to the dashb
 $isAdmin = ($user['role'] ?? '') === 'admin';
 
 $categories = get_categories();
-$organizations = get_event_organizations_for($user);
+$organizations = get_event_organizations_for($user); // who may be the main organizer
+$allOrganizations = $isAdmin ? $organizations : get_organizations(); // who may co-organize
+$departments = get_departments(); // the clickable headings in the Organization picker
 
 $editId = get_param('edit');
 $editEvent = is_uuid($editId) ? get_event_admin($editId) : null;
@@ -22,6 +30,12 @@ if ($editId !== '' && (!$editEvent || !can_manage_event($editEvent, $user))) {
     exit;
 }
 $errors = [];
+$view = $editId !== '' ? 'edit' : (get_param('view') === 'update' ? 'update' : 'create');
+
+// Where the list's buttons return to: the same search, filters and page.
+$listUrl = 'event-organizer.php?view=update';
+$back = post_param('back');
+if (!preg_match('~^event-organizer\.php\?view=update(&[\w%.+\-=&]*)?$~', $back)) $back = $listUrl;
 
 // The event a status / delete button acts on, if this user may manage it.
 $target = function (string $id) use ($user): ?array {
@@ -33,7 +47,7 @@ $target = function (string $id) use ($user): ?array {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete') {
     $result = $target(post_param('id')) ? delete_event_admin(post_param('id')) : ['ok' => false, 'message' => "You can't delete that event."];
     flash($result['ok'] ? 'success' : 'error', $result['message']);
-    header('Location: event-organizer.php');
+    header('Location: ' . $back);
     exit;
 }
 
@@ -41,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete') 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_status') {
     $result = $target(post_param('id')) ? set_event_status_admin(post_param('id'), post_param('status')) : ['ok' => false, 'message' => "You can't change that event."];
     flash($result['ok'] ? 'success' : 'error', $result['message']);
-    header('Location: event-organizer.php');
+    header('Location: ' . $back);
     exit;
 }
 
@@ -59,7 +73,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
     $onlineLink = post_param('online_event_link');
     $registrationLimit = post_param('registration_limit');
-    $eventType = post_param('event_type', 'other');
+    // No separate Event Type on the form: it follows the category's name
+    // (e.g. "Seminar"), anything else is 'other'.
+    $categoryName = (string) (array_column($categories, 'name', 'id')[post_param('category_id')] ?? '');
+    $eventType = strtolower(trim($categoryName));
+    $categoryOther = is_other_category($categoryName) ? post_param('category_other') : '';
     $audience = post_param('audience', 'students');
     $audience = isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students';
     $venueType = post_param('venue_type', 'on_campus');
@@ -68,11 +86,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $yearLevels = $audience === 'faculty' ? [] : parse_year_levels($_POST['year_levels'] ?? []);
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
 
+    // Organizations: one, or two or more for a multi-organization event. The
+    // main organizer (events.organization_id) runs the event — a moderator's
+    // own organization; the rest are saved as co-organizers.
+    $multiOrg = isset($_POST['multi_org']);
+    $picked = array_values(array_unique(array_intersect(
+        array_filter((array) ($_POST['organization_ids'] ?? []), 'is_string'),
+        array_column($allOrganizations, 'id')
+    )));
+    if (!$isAdmin) {
+        $leadOrg = (string) $user['organization_id'];
+        $picked = array_values(array_unique(array_merge([$leadOrg], $picked)));
+    } else {
+        $leadOrg = in_array(post_param('organization_id'), $picked, true) ? post_param('organization_id') : ($picked[0] ?? '');
+    }
+    if (!$multiOrg) $picked = $leadOrg !== '' ? [$leadOrg] : [];
+    $partnerOrgs = array_values(array_diff($picked, [$leadOrg]));
+
     // Collect everything typed FIRST, so a failed save re-shows the form filled in.
     $fields = [
         'title' => post_param('title'),
         'category_id' => post_param('category_id'),
-        'organization_id' => $isAdmin ? post_param('organization_id') : (string) $user['organization_id'],
+        'category_other' => $categoryOther !== '' ? $categoryOther : null,
+        'organization_id' => $leadOrg,
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
         'audience' => $audience,
         'year_levels' => $yearLevels ?: null,
@@ -100,10 +136,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // Only send year levels when used (or being cleared), so saving still works
     // on a database that doesn't have the column yet.
     if (!$fields['year_levels'] && empty($previous['year_levels'])) unset($fields['year_levels']);
+    // Same for the "Other" event type.
+    if (!$fields['category_other'] && empty($previous['category_other'])) unset($fields['category_other']);
 
     if ($fields['title'] === '') $errors[] = 'Event title is required.';
     if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors[] = 'Please choose a category.';
+    if (is_other_category($categoryName) && $categoryOther === '') $errors[] = 'For the "Other" category, type what kind of event it is.';
+    if (mb_strlen($categoryOther) > 60) $errors[] = 'The event type must be 60 characters or fewer.';
     if (!in_array($fields['organization_id'], array_column($organizations, 'id'), true)) $errors[] = 'Please choose an organization.';
+    elseif ($multiOrg && count($picked) < 2) $errors[] = 'A multi-organization event needs two or more organizations — pick the others, or untick "Multi-organization event".';
     if ($fields['description'] === '') $errors[] = 'Description is required.';
     if (mb_strlen($fields['description']) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
     if ($fields['start_date'] === '') $errors[] = 'Start date is required.';
@@ -152,6 +193,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
             $eventId = $previous['id'] ?? $result['event']['id'];
             $message = $previous ? 'Event updated.' : ($intent === 'publish' ? 'Event published.' : 'Draft saved.');
 
+            // Co-organizers (also cleared when an event stops being multi-organization).
+            if (($partnerOrgs || $previous) && !set_event_partner_orgs($eventId, $partnerOrgs) && $partnerOrgs) {
+                $message .= ' (The other organizations couldn\'t be saved — an admin needs to run the latest database update.)';
+            }
+
             // "Send Notification to Users": a newly published event goes to
             // everyone; changes to an already-published one go to registrants.
             if ($fields['status'] === 'published' && $sendNotification) {
@@ -170,9 +216,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
             if ($fields['status'] === 'published') {
                 auto_complete_events(true);
             }
-            // Published / saved: back to a clean form.
+            // New event: back to a clean form. Edited event: back to the list.
             flash('success', $message);
-            header('Location: event-organizer.php');
+            header('Location: ' . ($previous ? $listUrl : 'event-organizer.php'));
             exit;
         }
         $errors[] = $result['message'];
@@ -184,9 +230,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (!empty($_FILES['poster_file']['name'])) {
         $errors[] = 'Choose the poster image again (files can\'t be kept after an error).';
     }
-    remember_form('event', $fields + ['id' => $previous['id'] ?? null], $errors);
+    remember_form('event', $fields + ['id' => $previous['id'] ?? null, 'multi_org' => $multiOrg, 'partner_ids' => $partnerOrgs], $errors);
     header('Location: event-organizer.php' . ($previous ? '?edit=' . urlencode($previous['id']) : '') . '#event-form');
     exit;
+}
+
+// The event's co-organizers, when editing one.
+if ($editEvent) {
+    $editEvent['partner_ids'] = array_column(get_event_partner_orgs([$editEvent['id']])[$editEvent['id']] ?? [], 'id');
+    $editEvent['multi_org'] = (bool) $editEvent['partner_ids'];
 }
 
 // A form with errors from the save just above (shown once).
@@ -196,8 +248,39 @@ if ($state && ($state['values']['id'] ?? '') === ($editEvent['id'] ?? '')) {
     $errors = $state['errors'];
 }
 
-$events = get_all_events_admin();
-$counts = get_registration_counts();
+// ---- Update Events list: search, filters, 5 rows per page ----
+if ($view === 'update') {
+    $allEvents = get_all_events_admin();
+    $counts = get_registration_counts();
+    $partners = get_event_partner_orgs(); // co-organizers of multi-organization events
+
+    $statuses = ['draft' => 'Draft', 'published' => 'Published', 'completed' => 'Completed', 'cancelled' => 'Cancelled'];
+    $timeframes = ['upcoming' => 'Upcoming & ongoing', 'past' => 'Past'];
+    $q = get_param('q');
+    $statusFilter = isset($statuses[get_param('status')]) ? get_param('status') : '';
+    $categoryFilter = in_array(get_param('category'), array_column($categories, 'id'), true) ? get_param('category') : '';
+    $orgFilter = $isAdmin && in_array(get_param('org'), array_column($organizations, 'id'), true) ? get_param('org') : '';
+    $whenFilter = isset($timeframes[get_param('when')]) ? get_param('when') : '';
+    $filters = array_filter(['q' => $q, 'status' => $statusFilter, 'category' => $categoryFilter, 'org' => $orgFilter, 'when' => $whenFilter], 'strlen');
+
+    $today = date('Y-m-d');
+    $events = array_values(array_filter($allEvents, function ($ev) use ($q, $statusFilter, $categoryFilter, $orgFilter, $whenFilter, $today, $partners) {
+        $evPartners = $partners[$ev['id']] ?? [];
+        if ($statusFilter !== '' && ($ev['status'] ?? 'draft') !== $statusFilter) return false;
+        if ($categoryFilter !== '' && ($ev['category_id'] ?? '') !== $categoryFilter) return false;
+        if ($orgFilter !== '' && ($ev['organization_id'] ?? '') !== $orgFilter && !in_array($orgFilter, array_column($evPartners, 'id'), true)) return false;
+        $ends = (string) ($ev['end_date'] ?? $ev['start_date'] ?? '');
+        if ($whenFilter === 'upcoming' && $ends < $today) return false;
+        if ($whenFilter === 'past' && $ends >= $today) return false;
+        return matches_search($q, [$ev['title'] ?? '', event_organizers_label($ev, $evPartners, ''), event_category_label($ev, ''), $ev['venue'] ?? '']);
+    }));
+
+    $pager = paginate($events, 5, (int) get_param('page'));
+    $events = $pager['rows'];
+    $total = $pager['total'];
+    $pageUrl = fn(int $p): string => $listUrl . (($qs = http_build_query($filters + ($p > 1 ? ['page' => $p] : []))) !== '' ? '&' . $qs : '');
+    $back = $pageUrl($pager['page']);
+}
 
 // Values to pre-fill the form with (event being edited, or a failed submission).
 $f = $editEvent ?? [];
@@ -208,16 +291,18 @@ $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 $formLevels = parse_year_levels($f['year_levels'] ?? []);
 
 $myOrgName = $organizations[0]['name'] ?? '';
-$activeNav = 'manage-events';
-$breadcrumbs = [$isAdmin ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], ['Manage Events', $editId ? 'event-organizer.php' : null]];
-if ($editId) $breadcrumbs[] = ['Edit Event', null];
+$activeNav = $view === 'create' ? 'manage-create' : 'manage-update';
+$pageTitle = ['create' => 'Create Event', 'update' => 'Update Events', 'edit' => 'Edit Event'][$view];
+$breadcrumbs = [$isAdmin ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], ['Manage Events', null]];
+if ($view === 'edit') $breadcrumbs[] = ['Update Events', $listUrl];
+$breadcrumbs[] = [$pageTitle, null];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= $editId ? 'Edit Event' : 'Manage Events' ?> — Campus Event Hub</title>
+<title><?= $pageTitle ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
@@ -229,7 +314,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
   <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
   <main class="dash-main">
-    <h1 class="page-title"><?= $editId ? 'Edit Event' : 'Create New Event' ?></h1>
+    <h1 class="page-title"><?= $view === 'create' ? 'Create New Event' : $pageTitle ?></h1>
     <?php if (!$isAdmin): ?>
       <p class="admin-note">You're a <strong>moderator</strong> for <strong><?= htmlspecialchars($myOrgName) ?></strong>: you can create, publish, edit and cancel its events, and manage their schedules, registrations and attendance. Only admins can delete events.</p>
     <?php endif; ?>
@@ -237,6 +322,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
+    <?php if ($view !== 'update'): ?>
     <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset>
       <input type="hidden" name="action" value="save">
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
@@ -247,44 +333,91 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
         <input type="text" id="title" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
 
-        <div class="admin-two-col">
+        <div>
           <div>
             <label class="admin-label" for="category_id">Category <span class="req">*</span></label>
             <select id="category_id" name="category_id" class="admin-input" required>
               <option value="">Select a category</option>
               <?php foreach ($categories as $c): ?>
-                <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+                <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?><?= is_other_category($c['name']) ? ' data-other' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
               <?php endforeach; ?>
             </select>
             <?php if (empty($categories)): ?>
               <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> first.</p>
             <?php endif; ?>
-          </div>
-          <div>
-            <label class="admin-label" for="organization_id">Organization <span class="req">*</span></label>
-            <?php if (!$isAdmin): ?>
-              <input type="hidden" name="organization_id" value="<?= htmlspecialchars((string) $user['organization_id']) ?>">
-              <input type="text" id="organization_id" class="admin-input" value="<?= htmlspecialchars($myOrgName) ?>" readonly>
-              <p class="admin-hint">Moderators create events for their own organization.</p>
-            <?php else: ?>
-            <select id="organization_id" name="organization_id" class="admin-input" required>
-              <option value="">Select an organization</option>
-              <?php foreach ($organizations as $o): ?>
-                <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <?php if (empty($organizations)): ?>
-              <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
-            <?php endif; ?>
-            <?php endif; ?>
+            <div data-category-other hidden>
+              <label class="admin-label" for="category_other">Type of Event <span class="req">*</span></label>
+              <input type="text" id="category_other" name="category_other" class="admin-input" maxlength="60" placeholder="e.g. Hackathon, Outreach, Film Showing" value="<?= $val('category_other') ?>">
+            </div>
           </div>
         </div>
 
-        <span class="admin-label">Event Type</span>
-        <div class="admin-radio-row">
-          <?php foreach (EVENT_TYPES as $typeKey => $label): ?>
-            <label class="admin-radio"><input type="radio" name="event_type" value="<?= $typeKey ?>" <?= ($f['event_type'] ?? 'other') === $typeKey ? 'checked' : '' ?>> <?= $label ?></label>
-          <?php endforeach; ?>
+        <?php /* Organization picker: departments from Categories & Orgs (e.g. CITE) are
+                 clickable and open to show their organizations (JPSSITE, SIES, ACpES…).
+                 One organization, or two or more with "Multi-organization event". */
+        $pickedIds = array_values(array_filter(array_merge([(string) ($f['organization_id'] ?? '')], $f['partner_ids'] ?? [])));
+        $isMulti = !empty($f['multi_org']);
+        $orgGroups = [];
+        foreach ($departments as $d) {
+            $members = array_values(array_filter($allOrganizations, fn($o) => ($o['department_id'] ?? '') === $d['id']));
+            if ($members) $orgGroups[] = [$d['code'] ?: $d['name'], $d['name'], $members];
+        }
+        $ungrouped = array_values(array_filter($allOrganizations, fn($o) => !in_array($o['department_id'] ?? '', array_column($departments, 'id'), true)));
+        if ($ungrouped) $orgGroups[] = ['Other organizations', '', $ungrouped];
+        $ownOrg = $isAdmin ? '' : (string) $user['organization_id'];
+        ?>
+        <div class="org-field" data-org-field>
+          <span class="admin-label" id="org-label">Organization <span class="req">*</span></span>
+          <label class="admin-checkbox org-multi-toggle">
+            <input type="checkbox" name="multi_org" data-multi-org <?= $isMulti ? 'checked' : '' ?>>
+            Multi-organization event <span class="admin-muted">— two or more organizations hold it together</span>
+          </label>
+          <?php if (!$isAdmin): ?>
+            <input type="hidden" name="organization_ids[]" value="<?= htmlspecialchars($ownOrg) ?>">
+          <?php endif; ?>
+
+          <div class="org-picker" role="group" aria-labelledby="org-label">
+            <?php foreach ($orgGroups as [$heading, $fullName, $members]):
+              $groupPicked = count(array_intersect(array_column($members, 'id'), $pickedIds)); ?>
+              <details class="org-dept"<?= $groupPicked ? ' open' : '' ?>>
+                <summary>
+                  <span class="org-dept-name"><?= htmlspecialchars($heading) ?></span>
+                  <?php if ($fullName !== '' && $fullName !== $heading): ?><span class="org-dept-full"><?= htmlspecialchars($fullName) ?></span><?php endif; ?>
+                  <span class="org-dept-count" data-dept-count><?= $groupPicked ? $groupPicked . ' selected' : count($members) . ' org' . (count($members) === 1 ? '' : 's') ?></span>
+                </summary>
+                <div class="org-dept-list">
+                  <?php foreach ($members as $o):
+                    $isOwn = $o['id'] === $ownOrg;
+                    $isPicked = in_array($o['id'], $pickedIds, true) || $isOwn; ?>
+                    <label class="org-option<?= $isOwn ? ' is-locked' : '' ?>">
+                      <input type="checkbox" <?= $isOwn ? 'disabled data-own' : 'name="organization_ids[]"' ?> value="<?= htmlspecialchars($o['id']) ?>" data-org-name="<?= htmlspecialchars($o['name']) ?>" <?= $isPicked ? 'checked' : '' ?>>
+                      <?php if (!empty($o['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                      <span><?= htmlspecialchars($o['name']) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
+                    </label>
+                  <?php endforeach; ?>
+                </div>
+              </details>
+            <?php endforeach; ?>
+            <?php if (empty($allOrganizations)): ?>
+              <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
+            <?php endif; ?>
+          </div>
+
+          <?php if ($isAdmin): ?>
+            <div class="org-lead" data-org-lead<?= $isMulti ? '' : ' hidden' ?>>
+              <label class="admin-label" for="organization_id">Main Organizer <span class="req">*</span></label>
+              <select id="organization_id" name="organization_id" class="admin-input" data-lead-select>
+                <?php foreach ($allOrganizations as $o): ?>
+                  <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          <?php endif; ?>
+          <p class="admin-hint" data-org-hint>
+            <?= $isAdmin
+              ? 'Click a department to see its organizations. For a multi-organization event, the main organizer\'s moderators run the event; the others are shown as co-organizers.'
+              : 'Your organization runs the event. Tick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
+          </p>
         </div>
 
         <span class="admin-label">Audience <span class="req">*</span></span>
@@ -399,15 +532,50 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
       </div>
 
       <div class="admin-actions">
-        <a href="event-organizer.php" class="btn btn-outline">Cancel</a>
+        <a href="<?= $editId ? $listUrl : 'event-organizer.php' ?>" class="btn btn-outline">Cancel</a>
         <button type="submit" name="intent" value="draft" class="btn btn-muted">Save Draft</button>
         <button type="submit" name="intent" value="publish" class="btn btn-primary"><?= $editId ? 'Save &amp; Publish' : 'Publish Event' ?></button>
       </div>
     </form>
+    <?php else: ?>
 
-    <!-- Manage existing events -->
+    <!-- Update existing events: search + filters, 5 per page -->
+    <form method="get" action="event-organizer.php" class="admin-search events-filter" role="search">
+      <input type="hidden" name="view" value="update">
+      <input type="search" name="q" class="admin-input" placeholder="Title, organization, category or venue" value="<?= htmlspecialchars($q) ?>" aria-label="Search events">
+      <select name="status" class="admin-input" aria-label="Status">
+        <option value="">Every status</option>
+        <?php foreach ($statuses as $key => $label): ?>
+          <option value="<?= $key ?>" <?= $statusFilter === $key ? 'selected' : '' ?>><?= $label ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="category" class="admin-input" aria-label="Category">
+        <option value="">Every category</option>
+        <?php foreach ($categories as $c): ?>
+          <option value="<?= htmlspecialchars($c['id']) ?>" <?= $categoryFilter === $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <?php if ($isAdmin): ?>
+        <select name="org" class="admin-input" aria-label="Organization">
+          <option value="">Every organization</option>
+          <?php foreach ($organizations as $o): ?>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $orgFilter === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php endif; ?>
+      <select name="when" class="admin-input" aria-label="Date">
+        <option value="">Any date</option>
+        <?php foreach ($timeframes as $key => $label): ?>
+          <option value="<?= $key ?>" <?= $whenFilter === $key ? 'selected' : '' ?>><?= $label ?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit" class="btn btn-outline">Filter</button>
+      <?php if ($filters): ?><a href="<?= $listUrl ?>" class="btn btn-muted">Clear</a><?php endif; ?>
+    </form>
+
     <div class="section-head section-head-spaced">
-      <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= count($events) ?>)</h2>
+      <h2><?= $isAdmin ? 'All Events' : htmlspecialchars($myOrgName) . ' Events' ?> (<?= $total ?><?= $filters ? ' of ' . count($allEvents) : '' ?>)</h2>
+      <a href="event-organizer.php" class="btn btn-primary">+ Create Event</a>
     </div>
     <p class="admin-hint admin-hint-block">Published events become <strong>Completed</strong> automatically once they end. Use Mark Completed to close one early.</p>
     <div class="admin-table-wrap admin-table-scroll">
@@ -424,7 +592,10 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         </thead>
         <tbody>
           <?php if (empty($events)): ?>
-            <tr><td colspan="6" class="admin-table-empty">No events yet — create your first one above.</td></tr>
+            <tr><td colspan="6" class="admin-table-empty">
+              <?php if ($allEvents): ?>No events match your search. <a href="<?= $listUrl ?>">Clear the filters</a>.
+              <?php else: ?>No events yet — <a href="event-organizer.php">create your first one</a>.<?php endif; ?>
+            </td></tr>
           <?php endif; ?>
           <?php foreach ($events as $ev):
             $status = $ev['status'] ?? 'draft';
@@ -433,7 +604,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
             <tr>
               <td>
                 <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="admin-table-title"><?= htmlspecialchars($ev['title']) ?></a>
-                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([$ev['categories']['name'] ?? '', label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')]))) ?></div>
+                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([event_category_label($ev, ''), label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')]))) ?></div>
               </td>
               <td>
                 <?php if (!empty($ev['organizations']['name'])): ?>
@@ -441,6 +612,9 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                     <?php if (!empty($ev['organizations']['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($ev['organizations']['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
                     <?= htmlspecialchars($ev['organizations']['name']) ?>
                   </span>
+                  <?php if (!empty($partners[$ev['id']])): ?>
+                    <div class="admin-table-sub">with <?= htmlspecialchars(implode(', ', array_column($partners[$ev['id']], 'name'))) ?></div>
+                  <?php endif; ?>
                 <?php else: ?>—<?php endif; ?>
               </td>
               <td class="admin-nowrap"><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
@@ -460,6 +634,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                       <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
                         <input type="hidden" name="action" value="set_status">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                         <input type="hidden" name="status" value="cancelled">
                         <button type="submit" class="btn-sm btn-sm-danger">Mark Cancelled</button>
                       </form>
@@ -469,6 +644,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                       <form method="POST" action="event-organizer.php">
                         <input type="hidden" name="action" value="set_status">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                         <input type="hidden" name="status" value="completed">
                         <button type="submit" class="btn-sm btn-sm-accent">Mark Completed</button>
                       </form>
@@ -478,6 +654,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                       <form method="POST" action="event-organizer.php">
                         <input type="hidden" name="action" value="set_status">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                         <input type="hidden" name="status" value="draft">
                         <button type="submit" class="btn-sm">Reopen as Draft</button>
                       </form>
@@ -487,6 +664,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
                       <form method="POST" action="event-organizer.php" class="row-more-danger" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
+                        <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                         <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
                       </form>
                     <?php endif; ?>
@@ -510,6 +688,9 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
         </tbody>
       </table>
     </div>
+
+    <?= render_pagination($pager, $pageUrl, 'event', 'events') ?>
+    <?php endif; ?>
   </main>
 
 </div>
@@ -517,6 +698,7 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
 <script>
 (function () {
   var form = document.getElementById('event-form');
+  if (!form) return; // Update Events list: no form on the page
 
   // Venue type decides which field is required: the venue (on/off-campus) or the link (online).
   var venue = document.getElementById('venue');
@@ -528,6 +710,66 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
     link.required = online;
     document.querySelector('[data-venue-req]').hidden = online;
     document.querySelector('[data-link-req]').hidden = !online;
+  }
+
+  // Organization picker. Single: one organization (ticking one unticks the
+  // rest). Multi: two or more, and admins choose which one is the main organizer.
+  var multi = form.querySelector('[data-multi-org]');
+  var orgBoxes = Array.prototype.slice.call(form.querySelectorAll('.org-option input[type="checkbox"]:not([data-own])'));
+  var ownBox = form.querySelector('.org-option input[data-own]');
+  var leadBox = form.querySelector('[data-org-lead]');
+  var leadSelect = form.querySelector('[data-lead-select]');
+  function pickedOrgs() { return orgBoxes.filter(function (b) { return b.checked; }); }
+  function syncOrgs(changed) {
+    var isMulti = multi.checked;
+    if (!isMulti) {
+      if (ownBox) {
+        orgBoxes.forEach(function (b) { b.checked = false; }); // moderators: just their own organization
+      } else {
+        var keep = changed && changed.checked ? changed : pickedOrgs()[0];
+        orgBoxes.forEach(function (b) { if (b !== keep) b.checked = false; });
+      }
+    }
+    orgBoxes.forEach(function (b) { b.disabled = !isMulti && !!ownBox; });
+    if (leadSelect) {
+      var picked = pickedOrgs().map(function (b) { return b.value; });
+      leadBox.hidden = !isMulti;
+      Array.prototype.forEach.call(leadSelect.options, function (o) { o.hidden = o.disabled = picked.indexOf(o.value) === -1; });
+      if (picked.indexOf(leadSelect.value) === -1 && picked.length) leadSelect.value = picked[0];
+    }
+    form.querySelectorAll('.org-dept').forEach(function (dept) {
+      var all = dept.querySelectorAll('.org-option input');
+      var n = dept.querySelectorAll('.org-option input:checked').length;
+      dept.querySelector('[data-dept-count]').textContent = n ? n + ' selected' : all.length + (all.length === 1 ? ' org' : ' orgs');
+      dept.classList.toggle('has-picked', n > 0);
+    });
+  }
+  multi.addEventListener('change', function () { syncOrgs(null); });
+  orgBoxes.forEach(function (b) { b.addEventListener('change', function () { syncOrgs(b); }); });
+  form.addEventListener('submit', function (e) {
+    var n = pickedOrgs().length + (ownBox ? 1 : 0);
+    var need = multi.checked ? 2 : 1;
+    if (n < need) {
+      e.preventDefault();
+      var hint = form.querySelector('[data-org-hint]');
+      hint.textContent = multi.checked ? 'Pick two or more organizations for a multi-organization event (click a department to see its organizations).' : 'Pick the organization holding this event (click a department to see its organizations).';
+      hint.classList.add('admin-hint-error');
+      var firstDept = form.querySelector('.org-dept');
+      if (firstDept) firstDept.open = true;
+      form.querySelector('[data-org-field]').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, true);
+  syncOrgs(null);
+
+  // "Other" category: say what kind of event it is.
+  var category = document.getElementById('category_id');
+  var otherBox = document.querySelector('[data-category-other]');
+  var otherInput = document.getElementById('category_other');
+  function syncCategory() {
+    var opt = category.options[category.selectedIndex];
+    var isOther = !!(opt && opt.hasAttribute('data-other'));
+    otherBox.hidden = !isOther;
+    otherInput.required = isOther;
   }
 
   // Year levels only apply to events students can join.
@@ -569,8 +811,9 @@ if ($editId) $breadcrumbs[] = ['Edit Event', null];
     }, 350);
   }
 
-  form.addEventListener('change', function () { syncVenue(); syncAudience(); checkSchedule(); });
+  form.addEventListener('change', function () { syncCategory(); syncVenue(); syncAudience(); checkSchedule(); });
   ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
+  syncCategory();
   syncVenue();
   syncAudience();
   checkSchedule();

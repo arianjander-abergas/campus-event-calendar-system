@@ -359,7 +359,9 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
   .admin-table tfoot { display: table-row-group; } /* totals once, not on every page */
   .admin-table-sub { font-size: 8.5px; }
   .admin-org-logo { width: 16px; height: 16px; }
-  .cell-bar { min-width: 60px; }
+  /* Reports print the numbers only: no graphs, no bars inside table cells. */
+  .cell-bar { min-width: 0; display: block; }
+  .cell-bar-track { display: none !important; }
   .rating-bar { min-width: 110px; }
   a { color: inherit !important; text-decoration: none !important; }
   .admin-grid-2 { grid-template-columns: 1fr; }
@@ -528,3 +530,78 @@ td.admin-row-actions > form { gap: 6px; }
    and pushing Save out of view). */
 .role-form { display: inline-flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
 .role-form .role-select { width: 130px; min-width: 0; text-overflow: ellipsis; }
+
+/* Search + filters and the pager: Update Events (5 per page), Categories & Orgs (10 per page). */
+.taxonomy-list { min-width: 0; }
+.taxonomy-filter .admin-input[type="search"] { flex: 1 1 220px; }
+.events-filter, .taxonomy-filter { flex-wrap: wrap; margin-bottom: 8px; }
+.events-filter select.admin-input, .taxonomy-filter select.admin-input { width: auto; }
+.events-filter .btn, .taxonomy-filter .btn { display: inline-flex; align-items: center; }
+.admin-pagination { flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.admin-pages { display: inline-flex; align-items: center; gap: 6px; }
+.admin-page {
+  min-width: 36px; height: 36px; padding: 0 10px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--card-bg); box-shadow: var(--shadow);
+  color: var(--navy); font-weight: 600; text-decoration: none;
+}
+.admin-page:hover { box-shadow: var(--shadow-hover); }
+.admin-page.is-current { background: var(--orange-strong); color: #fff; }
+.admin-page-gap { color: var(--text-muted); padding: 0 2px; }
+.admin-pagination-info { text-align: center; margin-top: 6px; }
+@media (max-width: 760px) {
+  .events-filter select.admin-input, .taxonomy-filter select.admin-input { flex: 1 1 45%; }
+}
+
+/* Create Event › Organization picker: click a department (e.g. CITE) to show
+   its organizations; tick one, or two or more for a multi-organization event. */
+.org-field { margin-top: 4px; }
+.org-multi-toggle { margin: 4px 0 10px; }
+.org-picker { display: flex; flex-direction: column; gap: 8px; }
+.org-dept { border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); overflow: hidden; }
+.org-dept > summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; cursor: pointer; list-style: none; user-select: none;
+}
+.org-dept > summary::-webkit-details-marker { display: none; }
+.org-dept > summary::before {
+  content: "›"; display: inline-block; width: 12px; font-weight: 800; color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.org-dept[open] > summary::before { transform: rotate(90deg); }
+.org-dept > summary:hover { background: var(--bg); }
+.org-dept > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.org-dept-name { font-weight: 800; color: var(--navy); }
+.org-dept-full { color: var(--text-muted); font-size: 0.85rem; }
+.org-dept-count { margin-left: auto; font-size: 0.78rem; color: var(--text-muted); }
+.org-dept.has-picked .org-dept-count { color: var(--orange-text); font-weight: 700; }
+.org-dept-list { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px 10px 34px; }
+.org-option { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+.org-option:hover { background: var(--bg); }
+.org-option input { width: 16px; height: 16px; accent-color: var(--orange-strong); flex-shrink: 0; }
+.org-option input:disabled + * , .org-option input:disabled ~ span { opacity: 0.55; }
+.org-option.is-locked { cursor: default; }
+.org-option.is-locked input:disabled ~ span { opacity: 1; font-weight: 600; }
+.org-option em { color: var(--text-muted); font-style: normal; font-size: 0.82rem; font-weight: 400; }
+.org-lead { margin-top: 10px; max-width: 360px; }
+.admin-hint-error { color: #b42318; font-weight: 600; }
+
+/* Categories & Orgs › Edit Department / Edit Organization pop-up
+   (base look: .acct-modal in style.css). Padding sits on the form so a click
+   on the dialog element itself is always the backdrop. */
+.admin-modal { padding: 0; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; }
+.admin-modal > form { padding: 22px 24px 20px; }
+.admin-modal[open] { animation: admin-modal-in 0.16s ease-out; }
+@keyframes admin-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.admin-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.admin-modal-head h2 { margin: 0; }
+.admin-modal-close {
+  display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+  border: none; border-radius: 50%; background: transparent; color: var(--text-muted); cursor: pointer;
+}
+.admin-modal-close:hover { background: var(--bg); color: var(--text-main); }
+.admin-modal-logo { display: flex; align-items: flex-end; gap: 14px; }
+.admin-modal-logo > div { flex: 1; min-width: 0; }
+.admin-modal-logo .admin-logo-preview { width: 64px; height: 64px; margin: 0; object-fit: cover; border-radius: 50%; flex-shrink: 0; }
+.admin-modal .acct-modal-actions { margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) { .admin-modal[open] { animation: none; } }

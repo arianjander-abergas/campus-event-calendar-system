@@ -35,8 +35,9 @@ if ($eventId !== '') {
 $img = 'assets/images/event-details/';
 $posterUrl = asset_url($event['poster_url'] ?? null, $img . 'event-poster.svg');
 $orgLogo = asset_url($event['organizations']['logo_url'] ?? null, $img . 'org-logo.svg');
-$categoryName = $event['categories']['name'] ?? EVENT_TYPES[$event['event_type'] ?? 'other'] ?? 'Event';
+$categoryName = event_category_label($event);
 $orgName = $event['organizations']['name'] ?? 'Organizer';
+$coOrganizers = get_event_partner_orgs([$eventId])[$eventId] ?? []; // multi-organization events
 
 $going = $event ? get_registration_count($eventId) : 0;
 $myRegistration = $event ? get_my_registration($eventId) : null;
@@ -189,6 +190,10 @@ if ($event) {
             <?php else: ?>
               <span><?= htmlspecialchars($orgName) ?></span>
             <?php endif; ?>
+            <?php foreach ($coOrganizers as $i => $co): ?>
+              <?= $i === count($coOrganizers) - 1 ? '&amp;' : ',' ?>
+              <a href="organizations.php#org-<?= htmlspecialchars($co['id']) ?>"><?= htmlspecialchars($co['name']) ?></a>
+            <?php endforeach; ?>
           </div>
         </div>
 

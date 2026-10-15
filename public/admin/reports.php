@@ -3,15 +3,17 @@
  * Admin: event reports. Filter by school year, semester, department,
  * organization, audience and venue type (or a date range), then see:
  * totals, events per semester / month / week, per department and
- * organization, and the full event list. Print-ready ("Print report") and
- * downloadable as CSV. Numbers come from the event_report view.
+ * organization, and the full event list. Print-ready ("Print report" prints
+ * the totals and tables only, no graphs) and downloadable as an Excel
+ * workbook. Numbers come from the event_report view.
  *
  *   ?school_year=2026-2027|all &semester=1st|2nd|summer &department=<id>
  *   &organization=<id> &audience=students|faculty|all
- *   &venue_type=on_campus|off_campus|online &from=Y-m-d &to=Y-m-d &export=csv
+ *   &venue_type=on_campus|off_campus|online &from=Y-m-d &to=Y-m-d &export=xlsx
  */
 require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../includes/charts.php';
+require_once __DIR__ . '/../../includes/spreadsheet.php';
 
 $user = require_admin();
 
@@ -42,7 +44,7 @@ $rows = get_event_report($filters);
 $totals = report_totals($rows);
 $held = array_values(array_filter($rows, fn($r) => $r['status'] !== 'cancelled'));
 
-// ---- Describe the filters (page subtitle, printout, CSV name) ----
+// ---- Describe the filters (page subtitle, printout, Excel file name) ----
 $deptName = array_column($departments, null, 'id')[$filters['department']] ?? null;
 $orgName = array_column($organizations, 'name', 'id')[$filters['organization']] ?? '';
 $scope = array_filter([
@@ -59,9 +61,9 @@ $isFiltered = $filters['semester'] !== '' || $filters['department'] !== '' || $f
     || $filters['audience'] !== '' || $filters['venue_type'] !== '' || $filters['from'] !== '' || $filters['to'] !== ''
     || $filters['school_year'] !== $current['school_year'];
 
-// ---- CSV: the event list with every column ----
-if (get_param('export') === 'csv') {
-    send_csv('events-report-' . slugify($scopeText) . '.csv',
+// ---- Excel: the event list with every column ----
+if (get_param('export') === 'xlsx') {
+    send_xlsx('events-report-' . slugify($scopeText) . '.xlsx', 'Events report',
         ['Start date', 'End date', 'Event', 'Status', 'Organization', 'Department', 'Category', 'Audience', 'Venue type', 'Venue',
          'School year', 'Semester', 'Registered', 'Attended', 'No-show', 'Evaluations', 'Average rating', 'Interpretation'],
         array_map(fn($r) => [
@@ -158,7 +160,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
         <p class="page-sub"><?= htmlspecialchars($scopeText) ?></p>
       </div>
       <div class="page-head-actions">
-        <a href="<?= htmlspecialchars($query(['export' => 'csv'])) ?>" class="btn btn-outline">Download CSV</a>
+        <a href="<?= htmlspecialchars($query(['export' => 'xlsx'])) ?>" class="btn btn-outline">Download Excel</a>
         <button type="button" class="btn btn-primary" data-print>Print report</button>
       </div>
     </div>
@@ -241,7 +243,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
     <?php else: ?>
 
     <!-- Per month -->
-    <section class="admin-panel chart-panel">
+    <section class="admin-panel chart-panel no-print">
       <div class="admin-panel-head">
         <div>
           <h2>Events per month</h2>
