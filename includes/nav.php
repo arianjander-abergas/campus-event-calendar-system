@@ -4,7 +4,7 @@
  * and moderator pages). Set $activeNav before including to highlight the
  * current page:
  *   'home' | 'dashboard' | 'events' | 'my-events' | 'event' | 'organizations' | 'profile'
- *   'manage-events' | 'import' | 'my-officers'           (moderators and admins)
+ *   'manage-create' | 'manage-update' | 'import' | 'my-officers'  (moderators and admins)
  *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-taxonomy'
  *   'admin-calendar' | 'admin-users'                      (admins)
  * Logged-out visitors see the public links (Log in / Sign up are in the top
@@ -23,8 +23,20 @@ $navActive = fn(string $key): string => $activeNav === $key ? ' class="active" a
 $navLink = fn(string $href, string $key, string $icon, string $label, int $size = 18): string =>
     '<a href="' . BASE_URL . $href . '"' . $navActive($key) . ' title="' . $label . '"><span class="icon">' . icon($icon, $size) . '</span><span class="nav-label">' . $label . '</span></a>';
 $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
+$manageOpen = in_array($activeNav, ['manage-create', 'manage-update'], true);
+/** "Manage Events" dropdown (moderators and admins): Create Event, Update Events. */
+$manageMenu = fn(): string =>
+    '<div class="side-nav-item has-submenu">'
+    . '<button type="button" class="submenu-toggle' . ($manageOpen ? ' is-current' : '') . '" aria-expanded="' . ($manageOpen ? 'true' : 'false') . '" aria-controls="manageSubmenu" title="Manage Events">'
+    . '<span class="icon">' . icon('tools') . '</span><span class="nav-label">Manage Events</span>'
+    . '<span class="chevron" aria-hidden="true">' . icon('chevron-down', 14) . '</span></button>'
+    . '<div class="event-submenu" id="manageSubmenu"' . ($manageOpen ? '' : ' hidden') . '>'
+    . $navLink('/admin/event-organizer.php', 'manage-create', 'register', 'Create Event', 16)
+    . $navLink('/admin/event-organizer.php?view=update', 'manage-update', 'list', 'Update Events', 16)
+    . '</div></div>';
 ?>
-<aside class="sidebar" id="sidebar" aria-label="Site menu">
+<?php /* .neu: the home page's dark-blue neumorphic sidebar on every page (style.css). */ ?>
+<aside class="sidebar neu" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
       <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
@@ -74,7 +86,7 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
   <?php if ($navRole === 'moderator'): ?>
     <nav class="side-nav side-admin" aria-label="Moderator">
       <div class="side-group-label">Moderator</div>
-      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+      <?= $manageMenu() ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?php if (!empty($navUser['organization_id'])): ?>
         <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>
@@ -84,7 +96,7 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
     <nav class="side-nav side-admin" aria-label="Admin">
       <div class="side-group-label">Admin</div>
       <?= $navLink('/admin/dashboard.php', 'admin-dashboard', 'chart', 'Admin Dashboard') ?>
-      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+      <?= $manageMenu() ?>
       <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>

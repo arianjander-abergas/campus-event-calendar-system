@@ -52,8 +52,8 @@ if ($errors) {
 }
 $val = fn(string $key) => htmlspecialchars((string) ($editing[$key] ?? ''));
 
-$activeNav = 'manage-events';
-$breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Schedule', null]];
+$activeNav = 'manage-update';
+$breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Schedule', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en">

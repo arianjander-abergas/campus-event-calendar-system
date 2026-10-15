@@ -305,7 +305,7 @@ function calendar_time_line(array $ev): string
               <?php endif; ?>
               <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
               <span class="cal-event-tags">
-                <span class="cal-tag"><?= htmlspecialchars($ev['categories']['name'] ?? label_of(EVENT_TYPES, $ev['event_type'] ?? 'other', 'Event')) ?></span>
+                <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>
                 <?php elseif ($ended): ?><span class="cal-tag cal-tag-muted">Ended</span>
                 <?php elseif ($ev['start_date'] <= $today): ?><span class="cal-tag cal-tag-today">Happening now</span><?php endif; ?>

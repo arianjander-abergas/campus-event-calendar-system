@@ -16,7 +16,7 @@ $cardOrg = $ev['organizations'] ?? null;
 ?>
 <a class="event-card" href="<?= BASE_URL ?>/event-details.php?id=<?= urlencode((string) $ev['id']) ?>">
   <div class="event-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');">
-    <span class="event-tag"><?= htmlspecialchars($ev['categories']['name'] ?? EVENT_TYPES[$ev['event_type'] ?? 'other'] ?? 'Event') ?></span>
+    <span class="event-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
     <?php if (!empty($ev['my_label'])): ?>
       <span class="status-pill status-<?= htmlspecialchars(strtolower($ev['my_label'])) ?>"><?= htmlspecialchars($ev['my_label']) ?></span>
     <?php elseif (($ev['status'] ?? '') === 'completed'): ?>

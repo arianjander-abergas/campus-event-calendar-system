@@ -45,8 +45,8 @@ if (get_param('export') === 'csv') {
 
 $totals = array_count_values(array_column($registrations, 'status'));
 $evaluationCount = count($evaluators);
-$activeNav = 'manage-events';
-$breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
+$activeNav = 'manage-update';
+$breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en">
