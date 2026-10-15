@@ -56,8 +56,19 @@
   background: #fff;
   color: var(--text-main);
 }
-.admin-input:focus { border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(216, 30, 69, 0.15); }
-.admin-input[type="file"] { padding: 9px 10px; font-size: 0.82rem; }
+.admin-input:focus { border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(var(--p-accent-rgb), 0.15); }
+.admin-input[type="file"] { padding: 9px 10px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
+/* "Choose File": a main-colour (lavender) button instead of the browser's grey one (it
+   didn't fit the cream or the dark cards), dark text on it in every theme. */
+.admin-input[type="file"]::file-selector-button {
+  margin-right: 12px; padding: 7px 14px;
+  border: none; border-radius: 8px;
+  background: var(--p-main); color: var(--p-on-main);
+  font: inherit; font-weight: 700; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.admin-input[type="file"]:hover::file-selector-button { background: var(--p-main-hover); }
+.admin-input[type="file"]:focus-visible::file-selector-button { outline: 2px solid var(--focus); outline-offset: 2px; }
 .admin-input-follow { margin-top: 8px; }
 textarea.admin-input { resize: vertical; }
 
@@ -131,7 +142,7 @@ textarea.admin-input { resize: vertical; }
 .admin-table-avatar { border-radius: 50%; }
 .admin-table-logo-initials {
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(145deg, var(--blue-accent), var(--navy)); color: #fff; font-weight: 800; font-size: 0.72rem;
+  background: var(--orange-strong); color: #fff; font-weight: 800; font-size: 0.72rem;
 }
 .admin-row-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .admin-row-actions form { display: inline-flex; gap: 6px; margin: 0; }
@@ -149,8 +160,8 @@ textarea.admin-input { resize: vertical; }
 .btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-sm-danger { border-color: #f3b4b0; color: #c0392b; }
 .btn-sm-danger:hover:not(:disabled) { border-color: var(--red); color: var(--red); background: #fef2f2; }
-.btn-sm-accent { border-color: #bfd8dc; color: var(--blue-accent); }
-.btn-sm-accent:hover:not(:disabled) { border-color: var(--blue-accent); color: var(--blue-accent); background: #eef5f6; }
+.btn-sm-accent { border-color: var(--p-soft-6); color: var(--blue-accent); }
+.btn-sm-accent:hover:not(:disabled) { border-color: var(--blue-accent); color: var(--blue-accent); background: var(--p-soft-9); }
 
 /* Status pills (events, registrations, users) */
 .admin-status {
@@ -164,7 +175,7 @@ textarea.admin-input { resize: vertical; }
 .admin-status-published, .admin-status-attended { background: #dcfce7; color: #166534; }
 .admin-status-draft, .admin-status-registered { background: #f3f4f6; color: #4b5563; }
 .admin-status-cancelled, .admin-status-no_show { background: #fee2e2; color: #991b1b; }
-.admin-status-completed, .admin-status-waitlisted { background: #e3eef0; color: #a3112f; }
+.admin-status-completed, .admin-status-waitlisted { background: var(--p-soft-8); color: var(--p-accent-deep); }
 
 /* Registrations summary */
 .admin-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 18px; }
@@ -224,7 +235,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .admin-grid-2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 .admin-grid-halves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 .admin-muted { color: var(--text-muted); font-size: 0.82rem; margin: 0; }
-.admin-note { background: #ebf3f5; color: #a3112f; border: 1px solid #cbe0e4; border-radius: 10px; padding: 11px 16px; font-size: 0.84rem; margin: 0 0 18px; line-height: 1.5; }
+.admin-note { background: var(--p-soft-2); color: var(--p-accent-deep); border: 1px solid var(--p-soft-7); border-radius: 10px; padding: 11px 16px; font-size: 0.84rem; margin: 0 0 18px; line-height: 1.5; }
 .admin-note a { font-weight: 700; text-decoration: underline; }
 
 /* Number columns line up. */
@@ -249,7 +260,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .chart-mark:hover, .chart-mark:focus { opacity: 0.78; }
 .chart-tip {
   position: absolute; z-index: 100; max-width: 280px;
-  background: #12232a; color: #fff; font-size: 0.76rem; font-weight: 600;
+  background: var(--p-text); color: #fff; font-size: 0.76rem; font-weight: 600;
   padding: 6px 10px; border-radius: 6px; pointer-events: none;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
 }
@@ -261,7 +272,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 /* A small bar inside a table cell (reports: events per month / week). */
 .cell-bar { display: flex; align-items: center; gap: 8px; min-width: 120px; }
 .cell-bar-track { flex: 1; }
-.cell-bar-fill { height: 8px; border-radius: 0 4px 4px 0; background: #d81e45; min-width: 2px; }
+.cell-bar-fill { height: 8px; border-radius: 0 4px 4px 0; background: var(--p-accent); min-width: 2px; }
 .cell-bar span { font-variant-numeric: tabular-nums; min-width: 1.5em; text-align: right; font-weight: 700; }
 
 /* Rating distribution (evaluation results): diverging around "Satisfactory". */
@@ -292,7 +303,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 /* Lists of events on the dashboard. */
 .event-line { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--border); }
 .event-line:last-child { border-bottom: none; }
-.event-line-date { width: 46px; flex-shrink: 0; text-align: center; border-radius: 8px; background: #f0f6f7; padding: 5px 0; line-height: 1.1; }
+.event-line-date { width: 46px; flex-shrink: 0; text-align: center; border-radius: 8px; background: var(--p-soft-3); padding: 5px 0; line-height: 1.1; }
 .event-line-date strong { display: block; font-size: 1.05rem; color: var(--navy); }
 .event-line-date span { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
 .event-line-info { flex: 1; min-width: 0; }
@@ -307,7 +318,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 
 /* Paper-only header and signature lines (reports, evaluation results). */
 .print-only { display: none !important; }
-.print-head { display: flex; align-items: center; gap: 16px; padding-bottom: 10px; margin-bottom: 16px; border-bottom: 2px solid #12232a; }
+.print-head { display: flex; align-items: center; gap: 16px; padding-bottom: 10px; margin-bottom: 16px; border-bottom: 2px solid var(--p-text); }
 .print-head img { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
 .print-head-text { flex: 1; text-align: center; line-height: 1.35; }
 .print-head-text strong { display: block; font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.02em; }
@@ -315,7 +326,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .print-head-text h1 { margin: 6px 0 0; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .print-meta { font-size: 0.8rem; margin: 0 0 12px; }
 .print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; margin-top: 48px; font-size: 0.82rem; }
-.print-signatures div { border-top: 1px solid #12232a; padding-top: 4px; text-align: center; }
+.print-signatures div { border-top: 1px solid var(--p-text); padding-top: 4px; text-align: center; }
 .print-signatures small { display: block; color: #555; }
 
 @media (max-width: 1100px) {
@@ -400,13 +411,13 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .eval-option:has(input:checked) { background: var(--navy); border-color: var(--navy); }
 .eval-option:has(input:checked) .eval-option-num,
 .eval-option:has(input:checked) .eval-option-label { color: #fff; }
-.eval-option:has(input:focus-visible) { outline: 3px solid rgba(216, 30, 69, 0.45); outline-offset: 2px; }
+.eval-option:has(input:focus-visible) { outline: 3px solid rgba(var(--p-accent-rgb), 0.45); outline-offset: 2px; }
 .eval-option:has(input:disabled) { cursor: default; }
 .eval-option:has(input:disabled):hover { border-color: var(--border); }
 .eval-option input:disabled { cursor: default; }
 .eval-scale-legend { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 16px; }
 .eval-event { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
-.eval-event-poster { width: 74px; height: 74px; border-radius: 10px; background-color: #8e0f29; background-size: cover; background-position: center; flex-shrink: 0; }
+.eval-event-poster { width: 74px; height: 74px; border-radius: 10px; background-color: var(--p-accent-deeper); background-size: cover; background-position: center; flex-shrink: 0; }
 .eval-event h2 { margin: 0 0 4px; font-size: 1.1rem; }
 .eval-event p { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
 .eval-submit { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -456,9 +467,9 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .roles-table td:not(:first-child), .roles-table th:not(:first-child) { text-align: center; white-space: nowrap; }
 .perm-yes { color: #166534; font-weight: 800; }
 .perm-no { color: #9ca3af; }
-.perm-some { font-size: 0.75rem; font-weight: 700; color: #a3112f; background: #ebf3f5; padding: 2px 8px; border-radius: 999px; }
-.role-admin { background: #e3eef0; color: #a3112f; }
-.role-moderator { background: #fde8ec; color: #a3112f; }
+.perm-some { font-size: 0.75rem; font-weight: 700; color: var(--p-accent-deep); background: var(--p-soft-2); padding: 2px 8px; border-radius: 999px; }
+.role-admin { background: var(--p-soft-8); color: var(--p-accent-deep); }
+.role-moderator { background: var(--p-tint-2); color: var(--p-accent-deep); }
 .role-user { background: #f3f4f6; color: #4b5563; }
 .role-form { flex-wrap: nowrap; }
 .role-select { width: auto; padding: 6px 8px; font-size: 0.78rem; }

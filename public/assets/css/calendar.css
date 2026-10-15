@@ -97,7 +97,7 @@
   overflow: hidden;
   position: relative;
 }
-.cal-day:hover { border-color: #bfd8dc; background: #fff; }
+.cal-day:hover { border-color: var(--p-soft-6); background: #fff; }
 .cal-day:focus-visible { outline: 3px solid var(--blue-accent); outline-offset: 1px; }
 .cal-num {
   font-size: 0.8rem;
@@ -109,9 +109,9 @@
 }
 .cal-cell.is-outside .cal-day { opacity: 0.45; }
 .cal-cell.is-past .cal-num { color: var(--text-muted); }
-.cal-cell.has-events .cal-day { background: #f0f6f7; }
+.cal-cell.has-events .cal-day { background: var(--p-soft-3); }
 .cal-cell.is-today .cal-num { background: var(--navy); color: #fff; }
-.cal-cell.is-selected .cal-day { border-color: var(--orange); background: #fdecef; }
+.cal-cell.is-selected .cal-day { border-color: var(--orange); background: var(--p-tint-1); }
 
 .cal-chip {
   display: block;
@@ -163,14 +163,14 @@
   border-left: 4px solid var(--navy);
   color: inherit;
 }
-.cal-event:hover { box-shadow: var(--shadow-hover); border-color: #bfd8dc; border-left-color: var(--blue-accent); }
+.cal-event:hover { box-shadow: var(--shadow-hover); border-color: var(--p-soft-6); border-left-color: var(--blue-accent); }
 .cal-event-time { font-size: 0.75rem; font-weight: 800; color: var(--blue-accent); text-transform: uppercase; letter-spacing: 0.3px; }
 .cal-event-title { font-size: 0.92rem; line-height: 1.3; overflow-wrap: anywhere; }
 .cal-event-meta { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--text-muted); }
 .cal-event-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .cal-tag { padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: var(--navy); font-size: 0.75rem; font-weight: 700; }
 .cal-tag-today { background: var(--orange-strong); color: #fff; }
-.cal-tag-done { background: #e3eef0; color: #a3112f; }
+.cal-tag-done { background: var(--p-soft-8); color: var(--p-accent-deep); }
 .cal-tag-muted { background: #e5e7eb; color: #4b5563; }
 .cal-tag-plain { background: transparent; color: var(--text-muted); padding-left: 0; }
 

@@ -673,7 +673,10 @@ function recall_form(string $key): ?array
 
 function session_start_once(): void
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) {
+    // While the assistant waits for Claude's answer it lets go of the session
+    // (assistant_handle() in includes/assistant.php), so the user's other pages
+    // aren't held up; it stays closed until the assistant reopens it to save.
+    if (session_status() !== PHP_SESSION_ACTIVE && empty($GLOBALS['session_detached'])) {
         // HttpOnly: scripts can't read the login cookie. SameSite=Lax: the
         // browser won't send it with form posts from other websites, so
         // another site can't trigger admin actions (CSRF).
@@ -1345,10 +1348,12 @@ function get_upcoming_events(int $limit = 3, ?string $excludeId = null): array
  * category whose name matches), category, organization,
  * audience ('students'|'faculty'), venue_type.
  * "For students" also lists events for students & faculty (same for faculty).
+ * $statuses: the calendar's published + completed events; the assistant
+ * also asks for cancelled ones.
  */
-function find_events(array $filters, string $from = '', string $to = '', int $limit = 500): array
+function find_events(array $filters, string $from = '', string $to = '', int $limit = 500, array $statuses = ['published', 'completed']): array
 {
-    $parts = [EVENT_CARD_SELECT, 'status=in.(published,completed)', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=' . $limit];
+    $parts = [EVENT_CARD_SELECT, 'status=in.(' . implode(',', $statuses) . ')', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=' . $limit];
     if ($to !== '') $parts[] = 'start_date=lte.' . $to;
     if ($from !== '') $parts[] = 'end_date=gte.' . $from;
 
