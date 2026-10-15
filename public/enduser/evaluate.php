@@ -53,7 +53,7 @@ $activeNav = 'events';
 $breadcrumbs = [['Dashboard', 'dashboard.php'], [$event['title'], '../event-details.php?id=' . urlencode($eventId)], ['Evaluation', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
