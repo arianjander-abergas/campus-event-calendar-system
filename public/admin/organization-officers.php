@@ -97,7 +97,7 @@ $activeNav = $isAdmin ? 'admin-taxonomy' : 'my-officers';
 $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'] : ['Dashboard', '../enduser/dashboard.php'], [$org['name'], null], ['Officers', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">

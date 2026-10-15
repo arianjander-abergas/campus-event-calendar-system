@@ -71,7 +71,7 @@ if ($event) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -100,6 +100,7 @@ if ($event) {
     </nav>
 
     <div class="ed-topbar-right">
+      <?php include __DIR__ . '/../includes/theme-switch.php'; ?>
       <div class="ed-notif" data-notifications>
         <button class="ed-bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
           <?= icon('bell', 20) ?>

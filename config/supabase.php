@@ -924,6 +924,22 @@ function reload_session_profile(): void
     $_SESSION['user_checked_at'] = time();
 }
 
+/** Appearance chosen with the top bar's switcher (includes/theme-switch.php), kept in the "theme" cookie. */
+const THEMES = ['light' => 'Light', 'dim' => 'Dim', 'dark' => 'Dark'];
+
+function current_theme(): string
+{
+    $theme = is_string($_COOKIE['theme'] ?? null) ? $_COOKIE['theme'] : 'light';
+    return isset(THEMES[$theme]) ? $theme : 'light';
+}
+
+/** ' data-theme="dark"' for <html>, so the page is drawn in the chosen look straight away ('' for light). */
+function theme_attr(): string
+{
+    $theme = current_theme();
+    return $theme === 'light' ? '' : ' data-theme="' . $theme . '"';
+}
+
 /**
  * The logged-in user (id, email, full_name, role, account_type,
  * department_id, organization_id, year_level, course, student_type,

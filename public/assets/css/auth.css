@@ -20,9 +20,9 @@
 .login-page {
   --login-bg: #d9d9d9;
   --login-field: #ebebeb;
-  --login-btn: #6a7fa2;
-  --login-btn-hover: #5a6e90;
-  --login-link: #1a73e8;
+  --login-btn: #5f8289;
+  --login-btn-hover: #4f7077;
+  --login-link: #d81e45;
   --login-label: #4a4a4a;
 
   min-height: 100vh;
@@ -51,13 +51,13 @@
   font-size: 2.9rem;
   font-weight: 800;
   letter-spacing: -1.5px;
-  color: #ff7a21;
+  color: #d81e45; /* violet on the light page; brand red on the dark glass pages (below) */
 }
 .login-logo-text .hub {
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: #0e2a5e;
+  color: #002a32;
 }
 
 /* ---- Card ---- */
@@ -95,7 +95,7 @@
   font-size: 0.85rem;
 }
 .login-alert { background: #fdecec; color: #b42318; }
-.login-notice { background: #eaf2fd; color: #1a4f9c; }
+.login-notice { background: #ebf3f5; color: #a3112f; }
 
 /* ---- Form ---- */
 .login-form { padding-left: 12px; }
@@ -144,7 +144,7 @@ button.login-field-icon { cursor: pointer; }
   outline: none;
 }
 .login-field input::placeholder { color: #8a8a8a; }
-.login-field:focus-within { box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.45); }
+.login-field:focus-within { box-shadow: 0 0 0 2px rgba(110, 140, 148, 0.45); }
 
 .login-forgot {
   display: block;
@@ -230,7 +230,7 @@ button.login-field-icon { cursor: pointer; }
   outline: none;
 }
 .login-input::placeholder { color: #8a8a8a; }
-.login-input:focus { box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.45); }
+.login-input:focus { box-shadow: 0 0 0 2px rgba(110, 140, 148, 0.45); }
 .login-optional { font-size: 0.8rem; color: #888; }
 
 /* ---- Sign-up ---- */
@@ -255,7 +255,7 @@ button.login-field-icon { cursor: pointer; }
 .register-form .acct-type legend { font-size: 1.05rem; color: var(--login-label); margin-bottom: 10px; }
 .register-form .acct-option span { background: var(--login-field); border-color: transparent; }
 .register-form .acct-option strong { font-weight: 700; color: #222; }
-.register-form .acct-option input:checked + span { background: #fff; border-color: var(--login-btn); box-shadow: 0 0 0 2px rgba(106, 127, 162, 0.25); }
+.register-form .acct-option input:checked + span { background: #fff; border-color: var(--login-btn); box-shadow: 0 0 0 2px rgba(110, 140, 148, 0.25); }
 .register-form .acct-student { border-top-color: #bdbdbd; }
 .register-form .req { color: #c0392b; }
 .login-alert ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
@@ -268,14 +268,14 @@ button.login-field-icon { cursor: pointer; }
    Tweak: --panel-rest (strip position) and the 38fr/62fr split.
    ============================================================ */
 .login-glass {
-  --glass-text: #f0f6ff;
-  --glass-muted: rgba(219, 234, 254, 0.72);
+  --glass-text: #eef5f6;
+  --glass-muted: rgba(230, 240, 242, 0.72);
   --glass-field: rgba(255, 255, 255, 0.06);
-  --glass-field-border: rgba(147, 197, 253, 0.18);
-  --glass-placeholder: rgba(147, 197, 253, 0.62);
-  --glass-link: #93c5fd;
-  --glass-gold: #fb923c;
-  --glass-gold-ring: rgba(251, 146, 60, 0.28);
+  --glass-field-border: rgba(150, 190, 198, 0.18);
+  --glass-placeholder: rgba(150, 190, 198, 0.62);
+  --glass-link: #9fc3ca;
+  --glass-gold: #ff5a76; /* red focus rings on the dark glass */
+  --glass-gold-ring: rgba(237, 37, 78, 0.28);
 
   position: relative;
   justify-content: center;
@@ -283,9 +283,9 @@ button.login-field-icon { cursor: pointer; }
   overflow-x: hidden;
   color: var(--glass-text);
   background:
-    radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.30), transparent 40%),
-    radial-gradient(circle at 85% 80%, rgba(59, 91, 219, 0.32), transparent 45%),
-    linear-gradient(160deg, #061430 0%, #0e2a6b 55%, #061430 100%);
+    radial-gradient(circle at 15% 20%, rgba(216, 30, 69, 0.30), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(237, 37, 78, 0.32), transparent 45%),
+    linear-gradient(160deg, #001a20 0%, #003a45 55%, #001a20 100%);
   background-attachment: fixed;
 }
 
@@ -307,8 +307,8 @@ button.login-field-icon { cursor: pointer; }
 .gb-hero {
   display: block;
   border-radius: 14px;
-  background: rgba(147, 197, 253, 0.07);
-  border: 1px solid rgba(147, 197, 253, 0.06);
+  background: rgba(150, 190, 198, 0.07);
+  border: 1px solid rgba(150, 190, 198, 0.06);
 }
 .gb-sidebar {
   display: flex;
@@ -316,13 +316,13 @@ button.login-field-icon { cursor: pointer; }
   gap: 14px;
   padding: 22px 16px;
   border-radius: 20px;
-  background: rgba(147, 197, 253, 0.05);
+  background: rgba(150, 190, 198, 0.05);
 }
 .gb-sidebar i { height: 38px; }
-.gb-sidebar i:first-child { height: 56px; margin-bottom: 18px; background: rgba(37, 99, 235, 0.25); }
+.gb-sidebar i:first-child { height: 56px; margin-bottom: 18px; background: rgba(216, 30, 69, 0.25); }
 .gb-main { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .gb-topbar { height: 54px; }
-.gb-hero { height: 34vh; background: linear-gradient(120deg, rgba(37, 99, 235, 0.2), rgba(59, 91, 219, 0.18)); }
+.gb-hero { height: 34vh; background: linear-gradient(120deg, rgba(216, 30, 69, 0.2), rgba(237, 37, 78, 0.18)); }
 .gb-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
 .gb-cards i { height: 150px; }
 .gb-rows { display: flex; flex-direction: column; gap: 12px; }
@@ -338,17 +338,17 @@ button.login-field-icon { cursor: pointer; }
   padding: 0;
   overflow: hidden;
   border-radius: 26px;
-  background: rgba(12, 32, 80, 0.62);
-  border: 1px solid rgba(147, 197, 253, 0.16);
+  background: rgba(0, 42, 50, 0.62);
+  border: 1px solid rgba(150, 190, 198, 0.16);
   box-shadow:
-    0 40px 100px rgba(2, 8, 24, 0.65),
-    0 0 80px rgba(59, 130, 246, 0.12),
+    0 40px 100px rgba(0, 0, 0, 0.65),
+    0 0 80px rgba(237, 37, 78, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   -webkit-backdrop-filter: blur(22px) saturate(140%);
   backdrop-filter: blur(22px) saturate(140%);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .login-glass .login-card { background: rgba(12, 32, 80, 0.95); }
+  .login-glass .login-card { background: rgba(0, 42, 50, 0.95); }
 }
 
 /* The empty panel: full card width, slid left so only a strip stays visible. */
@@ -357,12 +357,12 @@ button.login-field-icon { cursor: pointer; }
   inset: 0;
   z-index: 2;
   background:
-    radial-gradient(circle at 28% 18%, rgba(37, 99, 235, 0.35), transparent 55%),
-    radial-gradient(circle at 20% 90%, rgba(59, 91, 219, 0.25), transparent 50%),
-    linear-gradient(155deg, #1a3f8f 0%, #133074 55%, #0c2160 100%);
+    radial-gradient(circle at 28% 18%, rgba(216, 30, 69, 0.35), transparent 55%),
+    radial-gradient(circle at 20% 90%, rgba(237, 37, 78, 0.25), transparent 50%),
+    linear-gradient(155deg, #8e0f29 0%, #003a45 55%, #00323c 100%);
   box-shadow:
-    inset -1px 0 0 rgba(147, 197, 253, 0.35),
-    18px 0 60px rgba(59, 130, 246, 0.32);
+    inset -1px 0 0 rgba(150, 190, 198, 0.35),
+    18px 0 60px rgba(237, 37, 78, 0.32);
   transform: translateX(var(--panel-rest));
   /* Only the visible strip is drawn (the glow on its edge is kept), so when it
      moves between sides it travels as one solid block. */
@@ -412,7 +412,7 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-logo-text { flex-direction: row; align-items: baseline; gap: 6px; line-height: 1; }
 .login-glass .login-logo-text .campus,
 .login-glass .login-logo-text .hub { font-size: 1.15rem; letter-spacing: 1px; color: #fff; }
-.login-glass .login-logo-text .campus { color: #ff7a21; } /* "CAMPUS" in the brand orange */
+.login-glass .login-logo-text .campus { color: #ed254e; } /* "CAMPUS" in red on the dark glass */
 
 .login-glass .login-card h1 { margin: 0 0 6px; text-align: center; font-size: 1.45rem; color: #fff; }
 .login-subtitle { margin: 0 0 24px; text-align: center; font-size: 0.86rem; color: var(--glass-muted); }
@@ -422,7 +422,7 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-notice,
 .login-glass .login-card .flash { margin: 0 0 18px; border-radius: 12px; }
 .login-glass .login-alert { background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.35); color: #fecaca; }
-.login-glass .login-notice { background: rgba(59, 130, 246, 0.18); border: 1px solid rgba(96, 165, 250, 0.4); color: #bfdbfe; }
+.login-glass .login-notice { background: rgba(237, 37, 78, 0.18); border: 1px solid rgba(237, 37, 78, 0.4); color: #c9dfe3; }
 
 /* ---- Form ---- */
 .login-glass .login-form { padding-left: 0; }
@@ -456,7 +456,7 @@ button.login-field-icon { cursor: pointer; }
 /* Keep Chrome autofill from painting the field yellow/blue. */
 .login-glass .login-field input:-webkit-autofill {
   -webkit-text-fill-color: var(--glass-text);
-  -webkit-box-shadow: 0 0 0 1000px rgba(14, 36, 88, 0.98) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(0, 34, 42, 0.98) inset;
   caret-color: var(--glass-text);
   transition: background-color 9999s;
 }
@@ -485,37 +485,37 @@ button.login-field-icon { cursor: pointer; }
   font-size: 0.95rem;
   transition: transform 0.15s, box-shadow 0.25s, background 0.25s, border-color 0.25s;
 }
-/* The one splash of orange-red on the page. */
+/* The one splash of red on the page. */
 .login-glass .login-submit {
   width: 100%;
-  background: linear-gradient(135deg, #f76b15 0%, #d9480f 100%);
-  box-shadow: 0 10px 30px rgba(247, 107, 21, 0.4);
+  background: linear-gradient(135deg, #d81e45 0%, #b8173a 100%);
+  box-shadow: 0 10px 30px rgba(216, 30, 69, 0.4);
   letter-spacing: 0.3px;
 }
 .login-glass .login-submit:hover {
-  background: linear-gradient(135deg, #fb7d2a 0%, #e8550f 100%);
+  background: linear-gradient(135deg, #ed254e 0%, #d81e45 100%);
   transform: translateY(-1px);
-  box-shadow: 0 14px 36px rgba(247, 107, 21, 0.5);
+  box-shadow: 0 14px 36px rgba(216, 30, 69, 0.5);
 }
 .login-glass .login-btn:focus-visible { outline: 3px solid var(--glass-gold); outline-offset: 3px; }
 
 .login-glass .login-divider { margin: 26px 0 16px; color: var(--glass-muted); }
 .login-glass .login-divider::before,
-.login-glass .login-divider::after { background: rgba(147, 197, 253, 0.18); }
+.login-glass .login-divider::after { background: rgba(150, 190, 198, 0.18); }
 
 .login-glass .login-socials { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .login-glass .login-socials .login-btn {
   width: auto;
   gap: 10px;
-  background: rgba(249, 115, 22, 0.12);
-  border: 1px solid rgba(251, 146, 60, 0.55);
+  background: rgba(216, 30, 69, 0.12);
+  border: 1px solid rgba(237, 37, 78, 0.55);
 }
-.login-glass .login-socials .login-btn:hover { background: rgba(249, 115, 22, 0.24); transform: translateY(-1px); }
+.login-glass .login-socials .login-btn:hover { background: rgba(216, 30, 69, 0.24); transform: translateY(-1px); }
 /* IMAGE SLOTS 6, 7 — Google + Admin icons */
 .login-glass .login-socials .login-btn img { width: 22px; height: 22px; }
 /* Admin Login stays lit while admin mode is on (fades in/out with the slide). */
 .login-glass .login-socials .login-btn[aria-pressed="true"] {
-  background: rgba(251, 146, 60, 0.12);
+  background: rgba(237, 37, 78, 0.12);
   border-color: var(--glass-gold);
   box-shadow: 0 0 0 3px var(--glass-gold-ring);
 }
@@ -545,13 +545,13 @@ button.login-field-icon { cursor: pointer; }
   bottom: 0;
   right: 0;
   width: 38%;
-  box-shadow: inset -1px 0 0 rgba(147, 197, 253, 0.35);
+  box-shadow: inset -1px 0 0 rgba(150, 190, 198, 0.35);
   transition: opacity 0.6s ease-in-out; /* in step with the panel slide */
 }
 .signin-card .login-slide-panel::before {
   background:
-    linear-gradient(270deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
-    linear-gradient(180deg, rgba(14, 42, 107, 0.5) 0%, rgba(19, 48, 116, 0.2) 45%, rgba(8, 24, 70, 0.85) 100%),
+    linear-gradient(270deg, rgba(0, 42, 50, 0.75) 0%, rgba(0, 42, 50, 0) 38%),
+    linear-gradient(180deg, rgba(0, 58, 69, 0.5) 0%, rgba(0, 58, 69, 0.2) 45%, rgba(0, 42, 50, 0.85) 100%),
     url("../images/login/lcup.jpg") 16% center / cover no-repeat; /* framed on the cross */
 }
 /* IMAGE SLOT 11 — admin view photo | file: assets/images/login/sister-president.jpg.
@@ -559,8 +559,8 @@ button.login-field-icon { cursor: pointer; }
    for Google). Here the strip is on the right, so the fade faces left. */
 .signin-card .login-slide-panel::after {
   background:
-    linear-gradient(90deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
-    linear-gradient(180deg, rgba(14, 42, 107, 0.45) 0%, rgba(19, 48, 116, 0.15) 45%, rgba(8, 24, 70, 0.85) 100%),
+    linear-gradient(90deg, rgba(0, 42, 50, 0.75) 0%, rgba(0, 42, 50, 0) 38%),
+    linear-gradient(180deg, rgba(0, 58, 69, 0.45) 0%, rgba(0, 58, 69, 0.15) 45%, rgba(0, 42, 50, 0.85) 100%),
     url("../images/login/sister-president.jpg") 53% center / cover no-repeat; /* framed on her */
   opacity: 0;
 }
@@ -615,8 +615,8 @@ button.login-field-icon { cursor: pointer; }
 .register-card .login-slide-panel {
   clip-path: none;
   box-shadow:
-    inset 1px 0 0 rgba(147, 197, 253, 0.35),
-    -18px 0 60px rgba(59, 130, 246, 0.32);
+    inset 1px 0 0 rgba(150, 190, 198, 0.35),
+    -18px 0 60px rgba(237, 37, 78, 0.32);
 }
 /* IMAGE SLOT 9 — campus festival photo in the panel strip | file:
    assets/images/login/festival.jpg. Covers only the visible 38% of the panel
@@ -630,15 +630,15 @@ button.login-field-icon { cursor: pointer; }
   left: 0;
   width: 38%;
   background:
-    linear-gradient(90deg, rgba(12, 32, 80, 0.75) 0%, rgba(12, 32, 80, 0) 38%),
-    linear-gradient(180deg, rgba(14, 42, 107, 0.55) 0%, rgba(19, 48, 116, 0.25) 45%, rgba(8, 24, 70, 0.85) 100%),
+    linear-gradient(90deg, rgba(0, 42, 50, 0.75) 0%, rgba(0, 42, 50, 0) 38%),
+    linear-gradient(180deg, rgba(0, 58, 69, 0.55) 0%, rgba(0, 58, 69, 0.25) 45%, rgba(0, 42, 50, 0.85) 100%),
     url("../images/login/festival.jpg") 55% center / cover no-repeat;
-  box-shadow: inset 1px 0 0 rgba(147, 197, 253, 0.35);
+  box-shadow: inset 1px 0 0 rgba(150, 190, 198, 0.35);
 }
 /* Close (✕) sits on the photo here: darker backing so it stays visible. */
 .login-glass .register-card .login-close,
 .login-glass .signin-card.is-admin .login-close {
-  background: rgba(8, 24, 70, 0.6);
+  background: rgba(0, 42, 50, 0.6);
   border-color: rgba(255, 255, 255, 0.35);
 }
 .login-glass .register-card .login-close img,
@@ -664,10 +664,10 @@ button.login-field-icon { cursor: pointer; }
   box-shadow: 0 0 0 4px var(--glass-gold-ring);
 }
 .login-glass select.login-input option,
-.login-glass select.login-input optgroup { background: #0e2458; color: var(--glass-text); }
+.login-glass select.login-input optgroup { background: #00323c; color: var(--glass-text); }
 .login-glass .login-input:-webkit-autofill {
   -webkit-text-fill-color: var(--glass-text);
-  -webkit-box-shadow: 0 0 0 1000px rgba(14, 36, 88, 0.98) inset;
+  -webkit-box-shadow: 0 0 0 1000px rgba(0, 34, 42, 0.98) inset;
   caret-color: var(--glass-text);
   transition: background-color 9999s;
 }
@@ -679,17 +679,17 @@ button.login-field-icon { cursor: pointer; }
   border-radius: 14px;
   transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
 }
-.login-glass .register-form .acct-option:hover span { border-color: rgba(251, 146, 60, 0.5); transform: translateY(-1px); }
+.login-glass .register-form .acct-option:hover span { border-color: rgba(237, 37, 78, 0.5); transform: translateY(-1px); }
 .login-glass .register-form .acct-option strong { color: var(--glass-text); }
 .login-glass .register-form .acct-option small { color: var(--glass-muted); font-weight: 400; }
 .login-glass .register-form .acct-option input:checked + span {
-  background: rgba(251, 146, 60, 0.1);
+  background: rgba(237, 37, 78, 0.1);
   border-color: var(--glass-gold);
   box-shadow: 0 0 0 3px var(--glass-gold-ring);
 }
 .login-glass .register-form .acct-option input:focus-visible + span { outline: 3px solid var(--glass-gold); }
 .login-glass .register-form .req { color: #fca5a5; }
-.login-glass .register-form .acct-student { border-top-color: rgba(147, 197, 253, 0.2); }
+.login-glass .register-form .acct-student { border-top-color: rgba(150, 190, 198, 0.2); }
 .login-glass .register-form .acct-label {
   margin-bottom: 8px;
   font-size: 0.85rem;
@@ -700,9 +700,9 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .acct-status label { font-weight: 400; color: var(--glass-text); }
 .login-glass .acct-status input { accent-color: var(--glass-gold); }
 .login-glass .acct-irregular-summary {
-  background: rgba(251, 146, 60, 0.1);
-  border-color: rgba(251, 146, 60, 0.35);
-  color: #fed7aa;
+  background: rgba(237, 37, 78, 0.1);
+  border-color: rgba(237, 37, 78, 0.35);
+  color: #fad0d8;
 }
 .login-glass .acct-link { color: var(--glass-link); }
 /* The irregular-student pop-up keeps its light look (dark text on white). */
@@ -763,12 +763,12 @@ button.login-field-icon { cursor: pointer; }
   right: 0;                 /* the visible strip is the panel's right 38% */
   width: 38%;
   background:
-    linear-gradient(270deg, rgba(12, 32, 80, 0.85) 0%, rgba(12, 32, 80, 0) 22%),
-    linear-gradient(180deg, rgba(12, 32, 80, 0.35) 0%, rgba(12, 32, 80, 0) 22%, rgba(12, 32, 80, 0) 72%, rgba(8, 24, 70, 0.8) 100%),
+    linear-gradient(270deg, rgba(0, 42, 50, 0.85) 0%, rgba(0, 42, 50, 0) 22%),
+    linear-gradient(180deg, rgba(0, 42, 50, 0.35) 0%, rgba(0, 42, 50, 0) 22%, rgba(0, 42, 50, 0) 72%, rgba(0, 42, 50, 0.8) 100%),
     url("../images/login/forgot-password.jpg") 52% center / cover no-repeat,
-    linear-gradient(160deg, #e6f0ff 0%, #c7dbfb 100%);
+    linear-gradient(160deg, #e6f0f2 0%, #c9dfe3 100%);
   background-blend-mode: normal, normal, multiply, normal;
-  box-shadow: inset -1px 0 0 rgba(147, 197, 253, 0.35);
+  box-shadow: inset -1px 0 0 rgba(150, 190, 198, 0.35);
 }
 
 .forgot-card .login-field-icon img { transition: transform 0.25s ease; }
@@ -814,7 +814,7 @@ button.login-field-icon { cursor: pointer; }
     grid-column: 1;
     grid-row: 1;
     height: clamp(130px, 38vw, 200px);
-    background-color: #0e2a6b;
+    background-color: #003a45;
     background-repeat: no-repeat;
     background-size: cover;
   }
@@ -824,35 +824,35 @@ button.login-field-icon { cursor: pointer; }
 
   .login-glass .signin-card::before {
     background-image:
-      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      linear-gradient(180deg, rgba(0, 58, 69, 0.15) 0%, rgba(0, 42, 50, 0.35) 55%, rgba(0, 42, 50, 0.95) 100%),
       url("../images/login/lcup.jpg");
     background-position: center, center 40%;
   }
   /* Admin Login: the photo of the school president, as on computers. */
   .login-glass .signin-card.is-admin::before {
     background-image:
-      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      linear-gradient(180deg, rgba(0, 58, 69, 0.15) 0%, rgba(0, 42, 50, 0.35) 55%, rgba(0, 42, 50, 0.95) 100%),
       url("../images/login/sister-president.jpg");
     background-position: center, center 25%;
   }
   .login-glass .register-card::before {
     background-image:
-      linear-gradient(180deg, rgba(14, 42, 107, 0.15) 0%, rgba(12, 32, 80, 0.35) 55%, rgba(12, 32, 80, 0.95) 100%),
+      linear-gradient(180deg, rgba(0, 58, 69, 0.15) 0%, rgba(0, 42, 50, 0.35) 55%, rgba(0, 42, 50, 0.95) 100%),
       url("../images/login/festival.jpg");
     background-position: center, center 45%;
   }
   /* The forgot-password drawing is on white: blended onto light blue as on computers. */
   .login-glass .forgot-card::before {
     background-image:
-      linear-gradient(180deg, rgba(12, 32, 80, 0) 45%, rgba(12, 32, 80, 0.95) 100%),
+      linear-gradient(180deg, rgba(0, 42, 50, 0) 45%, rgba(0, 42, 50, 0.95) 100%),
       url("../images/login/forgot-password.jpg"),
-      linear-gradient(160deg, #e6f0ff 0%, #c7dbfb 100%);
+      linear-gradient(160deg, #e6f0f2 0%, #c9dfe3 100%);
     background-blend-mode: normal, multiply, normal;
     background-size: cover, contain, cover;
     background-position: center, center, center;
   }
   /* The ✕ sits on the photo: darker backing so it stays visible. */
-  .login-glass .login-card .login-close { background: rgba(8, 24, 70, 0.6); border-color: rgba(255, 255, 255, 0.35); }
+  .login-glass .login-card .login-close { background: rgba(0, 42, 50, 0.6); border-color: rgba(255, 255, 255, 0.35); }
   .login-glass .login-card .login-close img { filter: brightness(1.9); }
 }
 

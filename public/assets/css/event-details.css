@@ -21,11 +21,11 @@
 
 .event-details-page {
   --ed-bg: #ebebeb;
-  --ed-navy: #1f3f8f;
-  --ed-navy-dark: #17326f;
+  --ed-navy: #8e0f29;
+  --ed-navy-dark: #003a45;
   --ed-text: #111;
   --ed-muted: #555;
-  --ed-line: #2c4a8f;
+  --ed-line: #a3112f;
 
   font-family: "Lexend", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--ed-bg);
@@ -37,7 +37,7 @@
 
 /* Sidebar: highlight "Event" as the current section on this page. */
 .event-details-page .submenu-toggle.is-current {
-  background: #2c4f9e;
+  background: #a3112f;
   color: #fff;
 }
 
@@ -100,7 +100,7 @@
 .ed-notif-list { max-height: 320px; overflow-y: auto; }
 .ed-notif-empty { padding: 16px; font-size: 0.85rem; color: var(--ed-muted); }
 .ed-notif-list .notif-item { padding: 10px 16px; border-bottom: 1px solid #f1f1f1; }
-.ed-notif-list .notif-item.unread { background: #f3f6fd; }
+.ed-notif-list .notif-item.unread { background: #f0f6f7; }
 .ed-notif-list .notif-title { margin: 0 0 2px; font-weight: 600; font-size: 0.85rem; }
 .ed-notif-list .notif-message { margin: 0; font-size: 0.8rem; color: var(--ed-muted); }
 
@@ -212,7 +212,7 @@
   cursor: pointer;
 }
 .ed-btn:hover:not(:disabled) { background: var(--ed-navy-dark); }
-.ed-btn:disabled { background: #5d7ab8; cursor: default; }
+.ed-btn:disabled { background: #3f7480; cursor: default; }
 
 /* Programs */
 .ed-section-title { margin: 12px 0 6px 6px; font-size: 1.2rem; font-weight: 600; }
@@ -305,7 +305,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #0e2a5e;
+  background: #002a32;
   transform: translate(-50%, -50%);
 }
 /* Line keeps going a little past the last item, like the design. */
@@ -322,7 +322,7 @@
 .ed-org-text a { color: var(--ed-navy); font-weight: 500; }
 .ed-org-text a:hover { text-decoration: underline; }
 .ed-meta-row a { color: var(--ed-navy); font-weight: 600; text-decoration: underline; }
-.ed-flash-info { background: #eaf2fd; color: #1a4f9c; }
+.ed-flash-info { background: #ebf3f5; color: #a3112f; }
 .ed-empty a { color: var(--ed-navy); font-weight: 600; }
 .ed-notif-list .notif-item { display: block; color: inherit; }
 a.notif-item:hover { background: #f8fafc; }
@@ -368,7 +368,7 @@ a.ed-program-card:hover .ed-program-title { color: var(--ed-navy); }
 
 /* ---- Evaluation (attendees evaluate the event once) ---- */
 a.ed-btn { display: inline-block; text-decoration: none; }
-.ed-btn-evaluate { background: #f4622c; font-weight: 600; }
-.ed-btn-evaluate:hover { background: #d94f1e !important; }
+.ed-btn-evaluate { background: #d81e45; font-weight: 600; }
+.ed-btn-evaluate:hover { background: #b8173a !important; }
 .ed-eval-note { margin: 8px 0 0; font-size: 0.75rem; color: #444; text-align: right; }
 .ed-admin-links { flex-wrap: wrap; }
