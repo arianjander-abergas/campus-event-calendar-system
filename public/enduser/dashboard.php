@@ -168,10 +168,10 @@ $topbarSearch = true;
 
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
 <script>window.CALENDAR_EVENTS = <?= json_encode($calendarEvents) ?>;</script>
-<script src="../assets/js/main.js"></script>
+<script src="../assets/js/main.js?v=<?= filemtime(__DIR__ . '/../assets/js/main.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

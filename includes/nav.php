@@ -10,6 +10,9 @@
  * Logged-out visitors see the public links (Log in / Sign up are in the top
  * bar; on phones they're also at the bottom of this menu).
  *
+ * It also brings the Event Hub Assistant chat box (includes/assistant-widget.php),
+ * so the assistant is on every page that has this sidebar.
+ *
  * Screen sizes (style.css, assets/js/sidebar.js):
  *   computer  full sidebar with labels
  *   tablet    slim icon-only sidebar; the top bar's menu button opens the full one
@@ -107,3 +110,5 @@ $manageMenu = fn(): string =>
   <?php endif; ?>
 </aside>
 <div class="nav-backdrop" data-nav-close hidden></div>
+<?php /* The Event Hub Assistant chat box in the bottom-right corner — every page with this sidebar. */ ?>
+<?php include __DIR__ . '/assistant-widget.php'; ?>

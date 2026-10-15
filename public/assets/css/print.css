@@ -8,7 +8,7 @@
   --ink: #111827;
   --muted: #4b5563;
   --rule: #9ca3af;
-  --navy: #002a32;
+  --navy: #2f4a37;
 }
 
 * { box-sizing: border-box; }
@@ -27,19 +27,19 @@ a { color: inherit; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
   padding: 12px 20px; background: var(--navy); color: #fff; font-size: 13px;
 }
-.tb-back { color: #cde0e3; text-decoration: none; font-weight: 600; }
+.tb-back { color: #ebe0c6; text-decoration: none; font-weight: 600; }
 .tb-back:hover { color: #fff; }
 .tb-modes { display: flex; gap: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 3px; }
-.tb-modes a { padding: 6px 12px; border-radius: 6px; color: #cde0e3; text-decoration: none; font-weight: 600; }
+.tb-modes a { padding: 6px 12px; border-radius: 6px; color: #ebe0c6; text-decoration: none; font-weight: 600; }
 .tb-modes a.active { background: #fff; color: var(--navy); }
 .tb-blank { display: flex; align-items: center; gap: 8px; margin: 0; }
 .tb-blank input { width: 56px; padding: 4px 6px; border-radius: 6px; border: none; font: inherit; }
 .tb-blank button { padding: 5px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; font: inherit; cursor: pointer; }
 .tb-print {
   margin-left: auto; padding: 8px 22px; border: none; border-radius: 999px;
-  background: #d81e45; color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+  background: #6a7140; color: #fff; font: inherit; font-weight: 700; cursor: pointer;
 }
-.tb-print:hover { background: #b8173a; }
+.tb-print:hover { background: #5a6135; }
 
 /* ---- The sheet ---- */
 .sheet {

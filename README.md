@@ -20,9 +20,11 @@ The site works from any folder name; links are built from `BASE_URL`, which is d
 ```
 config/supabase.php     All Supabase access + helpers (auth, events, registrations, admin, uploads,
                         departments, school calendar, reports, evaluations)
+config/assistant.local.example.php  Settings of the AI chat box — copy to assistant.local.php + API key
 includes/               Shared page parts: nav (the sidebar on EVERY page) + topbar, footer, event-card,
                         account-fields.php (student/faculty fields + irregular pop-up of sign-up and My Profile),
-                        spreadsheet.php (reads .xlsx / .csv for Import & Verify), charts.php, evaluation-fields.php
+                        spreadsheet.php (reads .xlsx / .csv for Import & Verify), charts.php, evaluation-fields.php,
+                        assistant.php + assistant-widget.php (the Event Hub Assistant chat box)
 public/                 Everything the browser can reach
   index.php             Home (live stats, upcoming events, About)
   events.php            Event Calendar: month view, one filter bar, click a date for all its events;
@@ -46,10 +48,12 @@ public/                 Everything the browser can reach
     organization-officers.php, school-calendar.php
   auth/                 login, register, forgot-password, callback (Google + reset links), logout
   api/                  Small JSON endpoints: presence (Active Users), notifications (mark read), stats,
-                        schedule-check (other events on the chosen dates / clashes, for the event form)
-  assets/css            style.css (shared) + admin.css, auth.css, calendar.css, event-details.css, print.css
+                        schedule-check (other events on the chosen dates / clashes, for the event form),
+                        assistant (the AI chat box)
+  assets/css            style.css (shared) + admin.css, auth.css, calendar.css, event-details.css, print.css,
+                        assistant.css
   assets/js             main.js, sidebar.js, calendar.js, account.js, forms.js, notifications.js,
-                        presence.js, auth.js, charts.js
+                        presence.js, auth.js, charts.js, assistant.js
   assets/images         school-logo.png, login/ and event-details/ hold numbered placeholder images (see
                         the IMAGE SLOT comments in the PHP/CSS) — replace a file, keep its name
 supabase/migrations/    SQL of database changes made from this repo, oldest first. Run any that aren't applied
@@ -131,3 +135,51 @@ After that, admins promote others (to moderator or admin) from **Admin → Users
 - **Admin Dashboard and Reports:** counts of events this week (Mon–Sun), this month, this semester and this school year, split by venue type and audience. Reports filter by school year, semester, department, organization, audience and venue type and break the numbers down per month, week, semester, department and organization, with the full event list. Cancelled events are counted separately and left out of every other number. *Registered* = everyone who signed up and didn't cancel; *attendance rate* = attended ÷ registered, for events that have ended. Reports print on A4 (with the school header and signature lines) and download as CSV.
 - **Attendance:** on an event's Registrations page, mark people Attended / No-show one by one or pick several rows. **Print attendance** gives an A4 sheet: an *attendance sheet* to sign at the event (registered people + blank rows for walk-ins) or an *attendance report* afterwards (attendees with their time in, plus totals).
 - **Event evaluation:** one standard form is used for every event (Admin → Evaluation Form; replace the default questions with the school's official form). When someone is marked Attended they get a notification, and the event page and their dashboard show **Evaluate this event**. Ratings use 5 Excellent · 4 Very Satisfactory · 3 Satisfactory · 2 Fair · 1 Poor; results show each statement's mean and verbal interpretation (4.21–5.00 Excellent, 3.41–4.20 Very Satisfactory, 2.61–3.40 Satisfactory, 1.81–2.60 Fair, 1.00–1.80 Poor) and the written answers, without names. Results print and download as CSV; **Remind attendees** notifies anyone who hasn't answered yet.
+
+## Event Hub Assistant (AI chat box)
+
+A round chat button in the bottom-right corner of every page with the sidebar, for everyone: visitors, students, faculty, moderators and admins. It answers questions about what is on the site, and it can open pages for the user ("take me to the Event Calendar"). The conversation follows the user from page to page until **New chat** or logging out. It answers in English, Filipino or Taglish.
+
+It can answer about:
+- Upcoming, today's, ended and cancelled events.
+- One event's details and schedule.
+- Organizations and their officers.
+- Categories and the school calendar.
+- How to register, evaluate, or use a page.
+- The user's own registrations, pending evaluations and notifications.
+
+**Switch it on:**
+1. Copy `config/assistant.local.example.php` to `config/assistant.local.php`.
+2. Paste in an Anthropic API key from console.anthropic.com → API keys. Usage is billed to that account.
+3. Optionally, change the model (default `claude-opus-5-5`) and the site's daily question limit in the same file.
+
+`config/assistant.local.php` is listed in `.gitignore`. Until a key is set, only admins see the chat box, with a note saying what's missing.
+
+**What keeps it safe:**
+- **Read-only tools.** It can search events, read one event, list organizations, read the school calendar, categories and site numbers, read the user's own registrations, and open a page. None of these changes anything, so no message can make it register, edit or delete.
+- **No more than the user could see.** Reads run with the user's own login under the database's RLS rules. Visitors only see public events, and drafts are never shown.
+- **Fixed pages, site-only links.** Pages it opens come from a fixed list for the user's role, so a student can't be sent to admin pages. Links in its replies must be pages of this site.
+- **Replies shown as text.** Only bold, lists and site links are formatted, so nothing in a reply can run on the page.
+- **Limited to the site's content.** It declines:
+  - questions about the code, database, keys or servers;
+  - requests to hack, overload or get around the site's rules;
+  - requests for other people's private details.
+
+  It treats event descriptions as data, not instructions.
+- **Request checks.** Requests are accepted only from the site's own pages (same origin, JSON). A question can be at most 500 characters.
+- **Rate limits.** Each person gets 12 questions per 2 minutes and 150 a day; visitors get 40 a day per IP address. The whole site gets `daily_limit` a day.
+- **Unsaved forms.** It won't leave a page with an unsaved form; it shows an **Open** button instead.
+
+**Privacy:** to answer, the assistant sends Anthropic these things:
+- the question;
+- the user's first name and role;
+- the page they're on;
+- the site data it looked up, such as events and, for logged-in users, their own registrations.
+
+It never sends accounts' emails, School IDs or passwords. An event's own contact details, as shown on its page, can be included. The conversation itself stays in the PHP session.
+
+**Files:**
+- `includes/assistant.php`: instructions, tools, limits and the Claude API call.
+- `includes/assistant-widget.php`: the chat box, included by `includes/nav.php`.
+- `public/api/assistant.php`: the endpoint.
+- `public/assets/js/assistant.js` and `public/assets/css/assistant.css`: behaviour and styles.

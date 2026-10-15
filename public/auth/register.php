@@ -165,8 +165,8 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
   </div>
 </main>
 
-<script src="../assets/js/account.js"></script>
-<script src="../assets/js/forms.js"></script>
+<script src="../assets/js/account.js?v=<?= filemtime(__DIR__ . '/../assets/js/account.js') ?>"></script>
+<script src="../assets/js/forms.js?v=<?= filemtime(__DIR__ . '/../assets/js/forms.js') ?>"></script>
 <script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
 <!-- Chrome/Edge get the login page ready while the pointer rests on "Log in", so it opens instantly. -->
 <script type="speculationrules">{"prerender": [{"source": "list", "urls": ["login.php"], "eagerness": "moderate"}]}</script>

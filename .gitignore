@@ -1,0 +1,2 @@
+# The Event Hub Assistant's Anthropic API key (see config/assistant.local.example.php)
+config/assistant.local.php
