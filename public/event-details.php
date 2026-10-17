@@ -65,7 +65,8 @@ $openTo = $event ? year_levels_label($event['year_levels'] ?? []) : '';
 $banner = null;
 if ($event) {
     if ($event['status'] === 'cancelled') $banner = ['error', 'This event was cancelled.'];
-    elseif ($event['status'] === 'draft') $banner = ['info', "Draft — only admins and its organization's moderators can see this event until it is published."];
+    elseif ($event['status'] === 'draft' && ($event['approval_status'] ?? null) === 'pending') $banner = ['info', "Waiting for a Super Admin's approval — it's published once approved. Until then only admins and its organization's moderators can see it."];
+    elseif ($event['status'] === 'draft') $banner = ['info', "Draft — only Super Admins and its organization's Admins can see this event until it is published."];
     elseif ($event['status'] === 'completed') $banner = ['info', 'Completed — this event has ended.'];
     elseif (($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
 }

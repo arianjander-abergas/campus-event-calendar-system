@@ -10,7 +10,7 @@ $isAdmin = ($user['role'] ?? '') === 'admin';
 
 $orgId = get_param('org');
 if (!$isAdmin && $orgId !== ($user['organization_id'] ?? '')) {
-    flash('error', "Moderators can only manage their own organization's officers.");
+    flash('error', "Admins can only manage their own organization's officers.");
     header('Location: organization-officers.php?org=' . urlencode((string) $user['organization_id']));
     exit;
 }

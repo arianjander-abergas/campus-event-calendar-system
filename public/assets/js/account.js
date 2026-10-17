@@ -2,6 +2,7 @@
  * Campus Event Hub — the account fields of the sign-up form and My Profile
  * (includes/account-fields.php):
  *  - Student / Faculty: the student-only fields show (and are required) for students.
+ *  - School ID: typed as 23-3170-870 — only digits are kept and the dashes are added.
  *  - Department: the Organization list shows only that department's organizations.
  *  - Irregular: opens the pop-up to pick the year levels of the student's
  *    subjects (the highest year level is always picked; higher ones can't be).
@@ -26,6 +27,63 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   typeInputs.forEach((i) => i.addEventListener("change", syncType));
   syncType();
+
+  /* ---- School ID: 23-3170-870 (2 digits, 4 digits, 3 digits) ----
+     The dashes are added while typing. An incomplete ID gets a message under
+     the field (on leaving it, and on sending the form) instead of the
+     browser's "Please match the requested format" bubble; otherwise nothing
+     shows there (the placeholder gives the format). */
+  const schoolId = root.querySelector("[data-school-id]");
+  const schoolHint = root.querySelector("[data-school-id-hint]");
+  if (schoolId) {
+    const example = schoolId.dataset.example || "23-3170-870";
+    const format = (digits) => [digits.slice(0, 2), digits.slice(2, 6), digits.slice(6, 9)].filter(Boolean).join("-");
+    // Complete, or the account's own ID saved before the format was required, unchanged.
+    const isComplete = () => /^\d{2}-\d{4}-\d{3}$/.test(schoolId.value)
+      || (schoolId.dataset.saved !== undefined && schoolId.value === schoolId.dataset.saved);
+    let showing = false;
+    const showError = (on) => {
+      showing = on;
+      schoolId.classList.toggle("is-invalid", on);
+      if (on) schoolId.setAttribute("aria-invalid", "true");
+      else schoolId.removeAttribute("aria-invalid");
+      if (!schoolHint) return;
+      schoolHint.classList.toggle("is-error", on);
+      schoolHint.hidden = !on;
+      const typed = schoolId.value.replace(/\D/g, "").length;
+      schoolHint.textContent = on
+        ? "Enter all 9 digits, like " + example + (typed ? " (you've typed " + typed + ")." : ".")
+        : "";
+    };
+
+    schoolId.addEventListener("input", () => {
+      const value = schoolId.value;
+      const digitsBeforeCaret = value.slice(0, schoolId.selectionStart).replace(/\D/g, "").length;
+      const formatted = format(value.replace(/\D/g, "").slice(0, 9));
+      if (formatted !== value) {
+        schoolId.value = formatted;
+        schoolId.maxLength = 11; // an old-style saved ID being replaced
+        // Keep the caret after the same digit.
+        let pos = 0;
+        for (let seen = 0; pos < formatted.length && seen < digitsBeforeCaret; pos++) {
+          if (/\d/.test(formatted[pos])) seen++;
+        }
+        schoolId.setSelectionRange(pos, pos);
+      }
+      if (showing) showError(!isComplete()); // update the count, or clear it once complete
+    });
+    schoolId.addEventListener("blur", () => {
+      if (schoolId.value !== "" && !isComplete()) showError(true);
+    });
+    form.addEventListener("submit", (e) => {
+      // Students only; an empty field is left to the browser's "required" check.
+      if (accountType() !== "student" || schoolId.readOnly || schoolId.value === "" || isComplete()) return;
+      e.preventDefault();
+      showError(true);
+      schoolId.focus();
+      schoolId.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }
 
   /* ---- Department -> its organizations ---- */
   const dept = root.querySelector("#department_id");

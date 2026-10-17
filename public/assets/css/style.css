@@ -756,6 +756,14 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 .side-nav a:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .side-nav a.active { background: var(--orange); color: #fff; }
 .side-nav .icon { width: 18px; text-align: center; flex-shrink: 0; }
+/* A count on a link (Approvals: what's waiting for the super admin). */
+.side-nav a { position: relative; }
+.nav-count {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #dc2626; color: #fff; font-size: 0.72rem; font-weight: 800; line-height: 1;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.35);
+}
 .side-group-label {
   padding: 0 14px 6px;
   font-size: 0.7rem;
@@ -1150,6 +1158,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   .sidebar:not(:hover):not(:focus-within) .side-nav .event-submenu a { width: auto; justify-content: center; padding: 8px; }
   .sidebar:not(:hover):not(:focus-within) .side-nav .event-submenu { padding-left: 0; align-items: center; }
   .sidebar:not(:hover):not(:focus-within) .side-admin { padding-top: 12px; }
+  /* Slim sidebar: the count sits on the icon's corner. */
+  .sidebar:not(:hover):not(:focus-within) .nav-count { position: absolute; top: 0; right: 0; min-width: 18px; height: 18px; padding: 0 5px; font-size: 0.65rem; }
   .sidebar .nav-label { white-space: nowrap; }
   /* Dashboard: as many card columns as fit the narrower content area. */
   .dash-events-row { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
@@ -1315,6 +1325,11 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .acct-status label { display: inline-flex !important; align-items: center; gap: 6px; margin: 0 !important; font-size: 0.9rem; cursor: pointer; }
 .acct-label { display: block; }
 .acct-verified { margin: -10px 0 12px; font-size: 0.75rem; color: #166534; font-weight: 600; }
+.acct-hint { margin: -10px 0 12px; font-size: 0.75rem; color: var(--text-muted); }
+/* An incomplete School ID (account.js): the message shows under the field, the field gets a red edge. */
+.acct-hint.is-error { color: var(--red); font-weight: 600; }
+.acct-grid .is-invalid, .acct-grid .is-invalid:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .acct-hint.is-error { color: #fca5a5; }
 .acct-irregular-summary {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin: 0 0 12px; padding: 9px 12px;

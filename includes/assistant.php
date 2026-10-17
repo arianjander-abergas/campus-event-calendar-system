@@ -405,9 +405,9 @@ function assistant_guide(?array $user): array
     }
     if ($role === 'moderator') {
         $org = assistant_org_name($user['organization_id'] ?? null) ?: 'their organization';
-        $guide[] = "As a moderator, the user runs $org's events: Manage Events → Create Event, and Update Events (edit, publish, cancel; only admins delete). From Update Events, each event has its Schedule, Registrations (mark Attended / No-show, print the attendance sheet) and Evaluation results. Import & Verify marks attendance from an Excel sheet. Our Officers lists $org's officers.";
+        $guide[] = "As an Admin, the user runs $org's events: Manage Events → Create Event, and Update Events (edit, cancel; new events are published once a Super Admin approves them — the button says Send for Approval; only Super Admins delete). From Update Events, each event has its Schedule, Registrations (mark Attended / No-show, print the attendance sheet) and Evaluation results. Import & Verify marks attendance from an Excel sheet. Our Officers lists $org's officers.";
     } elseif ($role === 'admin') {
-        $guide[] = "Admins manage everything: every organization's events (including deleting them), the Admin Dashboard and Reports, Import & Verify (attendance sheets, and the registrar's student list to verify School IDs), the Evaluation Form, Categories & Orgs (categories, departments, organizations), the School Calendar, and Users & Roles (roles: student / faculty, moderator, admin).";
+        $guide[] = "Super Admins manage everything: every organization's events (including deleting them), the Admin Dashboard and Reports, Import & Verify (attendance sheets, and the registrar's student list to verify School IDs), the Evaluation Form, Categories & Orgs (categories, departments, organizations), the School Calendar, Users & Roles (roles: Student / Faculty, Admin, Super Admin; edit and delete accounts), and Approvals (Admins' new events and profile edits, which Super Admins approve or reject).";
     }
     return $guide;
 }
@@ -436,7 +436,8 @@ function assistant_pages(?array $user): array
         'my_events' => ['My Events', '/events.php?mine=1', 'every event they registered for, marked Registered, Evaluate, Completed or Cancelled'],
         'event_details' => ['Event page', '/event-details.php', 'one event: details, schedule, going count, Register / Cancel registration and Evaluate this event (give event_id; without it: the next event)'],
         'evaluate_event' => ['Evaluation form', '/enduser/evaluate.php', 'the evaluation form of an event they attended (give event_id)'],
-        'my_profile' => ['My Profile', '/enduser/profile.php', 'their account details and password'],
+        'my_profile' => ['My Profile', '/enduser/profile.php', 'their account details, Change password, and the status of profile changes waiting for approval'],
+        'edit_profile' => ['Edit my profile', '/enduser/edit-profile.php', 'the form to change their details; changes are saved once a Super Admin approves them (a Super Admin\'s own are saved straight away)'],
     ];
     if ($role === 'admin') {
         $pages['admin_dashboard'] = ['Admin Dashboard', '/admin/dashboard.php', 'event counts this week, month, semester and school year'];
@@ -461,7 +462,8 @@ function assistant_pages(?array $user): array
             'categories_orgs' => ['Categories & Orgs', '/admin/admin-taxonomy.php', 'the categories, departments and organizations (give tab)'],
             'organization_officers' => ['Organization officers', '/admin/organization-officers.php', "one organization's officers (give organization)"],
             'school_calendar' => ['School Calendar', '/admin/school-calendar.php', 'the school years and semester dates'],
-            'users_roles' => ['Users & Roles', '/admin/users.php', 'accounts, roles (student / faculty, moderator, admin) and School IDs'],
+            'users_roles' => ['Users & Roles', '/admin/users.php', 'accounts, roles (Student / Faculty, Admin, Super Admin) and School IDs; each account can be edited or deleted'],
+            'approvals' => ['Approvals', '/admin/users.php?tab=approvals', 'Admins\' new events and profile edits waiting for a Super Admin to approve or reject'],
         ];
     }
     return $pages;
