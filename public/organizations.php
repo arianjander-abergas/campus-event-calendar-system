@@ -44,17 +44,6 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
     <p class="events-empty">No organizations yet.</p>
   <?php endif; ?>
 
-  <?php if (count($organizations) > 1): ?>
-    <nav class="org-jump" aria-label="Jump to organization">
-      <?php foreach ($byDepartment as $deptName => $orgs): ?>
-        <span class="org-jump-dept"><?= htmlspecialchars($deptName) ?>:</span>
-        <?php foreach ($orgs as $org): ?>
-          <a href="#org-<?= htmlspecialchars($org['id']) ?>"><?= htmlspecialchars($org['name']) ?></a>
-        <?php endforeach; ?>
-      <?php endforeach; ?>
-    </nav>
-  <?php endif; ?>
-
   <?php foreach ($byDepartment as $deptName => $orgs): ?>
   <h2 class="org-dept-heading"><?= htmlspecialchars($deptName) ?> <span><?= count($orgs) ?> organization<?= count($orgs) === 1 ? '' : 's' ?></span></h2>
   <?php foreach ($orgs as $org): ?>

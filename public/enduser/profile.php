@@ -120,7 +120,7 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
           </div>
           <div class="admin-actions admin-actions-start">
             <a href="edit-profile.php" class="btn btn-outline">Change the request</a>
-            <form method="POST" action="profile.php" onsubmit="return confirm('Withdraw these changes? Your profile stays as it is.');">
+            <form method="POST" action="profile.php" data-confirm="Withdraw these changes? Your profile stays as it is." data-confirm-title="Withdraw changes" data-confirm-ok="Withdraw" data-confirm-cancel="Keep waiting">
               <input type="hidden" name="action" value="withdraw_request">
               <input type="hidden" name="id" value="<?= htmlspecialchars($request['id']) ?>">
               <button type="submit" class="btn btn-muted">Withdraw</button>

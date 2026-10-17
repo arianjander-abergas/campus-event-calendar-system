@@ -170,7 +170,8 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
               ['See evaluation results', 'no', 'Own organization', 'All events'],
               ['Manage organization officers', 'no', 'Own organization', 'All organizations'],
               ['Import the student list and verify School IDs', 'no', 'no', 'yes'],
-              ['Admin Dashboard, Reports, Evaluation Form', 'no', 'no', 'yes'],
+              ['Admin Dashboard, Reports', 'no', 'no', 'yes'],
+              ['Edit the evaluation form and see its results', 'no', 'Own organization\x27s results', 'yes'],
               ['Categories, departments, organizations, school calendar', 'no', 'no', 'yes'],
               ['Change roles and School IDs, edit and delete accounts', 'no', 'no', 'yes'],
               ['Approve Admins\' new events and profile edits (Approvals)', 'no', 'no', 'yes'],
@@ -239,7 +240,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
               <td class="admin-row-actions user-actions">
                 <?php if (!$isMe && !isset($protected[$p['id']])): ?>
                   <form method="POST" action="<?= htmlspecialchars($back) ?>" class="role-form"
-                        onsubmit="var s=this.role; return confirm('Change <?= htmlspecialchars(addslashes($p['full_name'])) ?> to ' + s.options[s.selectedIndex].text + '?');">
+                        data-confirm="Change <?= htmlspecialchars($p['full_name']) ?> to {select:role}?" data-confirm-title="Change role" data-confirm-ok="Change role">
                     <input type="hidden" name="action" value="set_role">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                     <select name="role" class="admin-input role-select" aria-label="Role of <?= htmlspecialchars($p['full_name']) ?>">
@@ -253,7 +254,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
                 <a href="user-edit.php?id=<?= urlencode($p['id']) ?>&amp;back=<?= urlencode($back) ?>" class="btn-sm">Edit</a>
                 <?php if (!$isMe && !isset($protected[$p['id']])): ?>
                   <form method="POST" action="<?= htmlspecialchars($back) ?>"
-                        onsubmit="return confirm('Delete <?= htmlspecialchars(addslashes($p['full_name'])) ?>\'s account? They won\'t be able to log in, and their registrations go with it. This can\'t be undone.');">
+                        data-confirm="Delete <?= htmlspecialchars($p['full_name']) ?>’s account? They won’t be able to log in, and their registrations go with it. This can’t be undone." data-confirm-title="Delete account" data-confirm-ok="Delete account" data-confirm-tone="danger">
                     <input type="hidden" name="action" value="delete_account">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                     <button type="submit" class="btn-sm btn-sm-danger">Delete</button>

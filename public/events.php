@@ -4,7 +4,7 @@
  * single filter bar; clicking a day shows every event on that date.
  *   ?month=2026-09        the month shown (default: this month)
  *   ?date=2026-09-30      the selected day (default: today, or the 1st event of the month)
- *   ?q=keyword &category=<id> &organization=<id> &audience=students|faculty
+ *   ?q=keyword &category=<id> &organization=<id> &audience=students|faculty|outsiders
  *   &venue_type=on_campus|off_campus|online
  *   ?mine=1               the logged-in user's registered events (a list)
  * The header / dashboard search boxes, "View All" links and the
@@ -40,7 +40,7 @@ $filters = [
     'q' => get_param('q'),
     'category' => is_uuid(get_param('category')) ? get_param('category') : '',
     'organization' => is_uuid(get_param('organization')) ? get_param('organization') : '',
-    'audience' => in_array(get_param('audience'), ['students', 'faculty'], true) ? get_param('audience') : '',
+    'audience' => in_array(get_param('audience'), ['students', 'faculty', 'outsiders'], true) ? get_param('audience') : '',
     'venue_type' => isset(VENUE_TYPES[get_param('venue_type')]) ? get_param('venue_type') : '',
 ];
 $isFiltered = implode('', $filters) !== '';
@@ -181,6 +181,7 @@ function calendar_time_line(array $ev): string
       <option value="">Any audience</option>
       <option value="students" <?= $filters['audience'] === 'students' ? 'selected' : '' ?>>For students</option>
       <option value="faculty" <?= $filters['audience'] === 'faculty' ? 'selected' : '' ?>>For faculty</option>
+      <?php if (audiences_ready()): ?><option value="outsiders" <?= $filters['audience'] === 'outsiders' ? 'selected' : '' ?>>Open to outsiders</option><?php endif; ?>
     </select>
     <select name="venue_type" aria-label="Venue type">
       <option value="">Any venue</option>
@@ -303,7 +304,7 @@ function calendar_time_line(array $ev): string
               <?php if (!empty($ev['organizations']['name'])): ?>
                 <span class="cal-event-meta"><?= icon('organizations', 13) ?> <?= htmlspecialchars($ev['organizations']['name']) ?></span>
               <?php endif; ?>
-              <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
+              <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
               <span class="cal-event-tags">
                 <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>

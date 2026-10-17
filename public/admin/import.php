@@ -280,7 +280,7 @@ function render_matches(array $items, string $mode): void
             <div class="kpi"><span class="kpi-label">Duplicates in file</span><span class="kpi-value"><?= count($result['duplicate']) ?></span></div>
           </div>
           <?php if ($toVerify > 0): ?>
-            <form method="POST" action="<?= htmlspecialchars($self) ?>" class="import-action" onsubmit="return confirm('Mark <?= $toVerify ?> matched account(s) as verified?');">
+            <form method="POST" action="<?= htmlspecialchars($self) ?>" class="import-action" data-confirm="Mark <?= $toVerify ?> matched account(s) as verified?" data-confirm-title="Verify School IDs" data-confirm-ok="Mark verified">
               <input type="hidden" name="action" value="verify">
               <button type="submit" class="btn btn-primary">Mark <?= $toVerify ?> matched account<?= $toVerify === 1 ? '' : 's' ?> as verified</button>
               <span class="admin-hint">Only accounts whose School ID, name, course and year level all match.</span>
@@ -302,13 +302,13 @@ function render_matches(array $items, string $mode): void
           </div>
           <div class="import-action">
             <?php if ($result['to_mark']): ?>
-              <form method="POST" action="<?= htmlspecialchars($self) ?>" onsubmit="return confirm('Mark <?= count($result['to_mark']) ?> people as Attended?');">
+              <form method="POST" action="<?= htmlspecialchars($self) ?>" data-confirm="Mark <?= count($result['to_mark']) ?> people as Attended?" data-confirm-title="Mark attendance" data-confirm-ok="Mark Attended">
                 <input type="hidden" name="action" value="mark_attended">
                 <button type="submit" class="btn btn-primary">Mark <?= count($result['to_mark']) ?> as Attended</button>
               </form>
             <?php endif; ?>
             <?php if ($result['absent'] && $event['start_date'] <= date('Y-m-d')): ?>
-              <form method="POST" action="<?= htmlspecialchars($self) ?>" onsubmit="return confirm('Mark <?= count($result['absent']) ?> registered people who are not on the sheet as No-show?');">
+              <form method="POST" action="<?= htmlspecialchars($self) ?>" data-confirm="Mark <?= count($result['absent']) ?> registered people who are not on the sheet as No-show?" data-confirm-title="Mark No-show" data-confirm-ok="Mark No-show" data-confirm-tone="danger">
                 <input type="hidden" name="action" value="mark_no_show">
                 <button type="submit" class="btn btn-outline">Mark <?= count($result['absent']) ?> not on the sheet as No-show</button>
               </form>

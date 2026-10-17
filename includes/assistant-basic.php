@@ -2,7 +2,7 @@
 /**
  * Event Hub Assistant — BASIC MODE: answers without AI, so the chat box works
  * with no Anthropic API key (and whenever the AI can't answer). It looks for
- * common words and phrases in the question (English and some Filipino), runs
+ * common words and phrases in the question (English only), runs
  * the same read-only lookups as the AI's tools (includes/assistant.php), and
  * writes the answer from templates. It understands:
  *   - events: upcoming, today, tomorrow, this / next / last week or month, a
@@ -21,20 +21,26 @@
  * misuse it.
  */
 
-const ASSISTANT_BASIC_YES = ['yes', 'yeah', 'yep', 'yup', 'ya', 'sure', 'ok', 'okay', 'oki', 'okie', 'go', 'go ahead', 'please', 'yes please', 'open it', 'do it', 'oo', 'opo', 'sige', 'sige po', 'tara', 'game'];
-const ASSISTANT_BASIC_NO = ['no', 'nope', 'nah', 'no thanks', 'not now', 'hindi', 'huwag', 'wag', 'ayoko', 'di na'];
-const ASSISTANT_BASIC_HELLO = ['hi', 'hello', 'hey', 'heya', 'hiya', 'yo', 'good morning', 'good afternoon', 'good evening', 'kumusta', 'kamusta', 'musta', 'magandang umaga', 'magandang hapon', 'magandang gabi'];
-const ASSISTANT_BASIC_THANKS = ['thanks', 'thank you', 'thank u', 'thx', 'ty', 'tysm', 'salamat', 'great', 'nice', 'cool', 'awesome', 'got it', 'noted'];
-const ASSISTANT_BASIC_HOW = ['how', 'paano', 'pano', 'papaano', 'steps', 'procedure', 'where do i', 'where can i', 'what do i do', 'can i', 'could i', 'pwede', 'puwede', 'is it possible'];
-const ASSISTANT_BASIC_PAST = ['ended', 'past', 'finished', 'done', 'previous', 'previously', 'already happened', 'happened', 'was held', 'were held', 'recent', 'recently', 'latest', 'last event', 'tapos', 'natapos', 'nakaraan', 'nangyari', 'noong'];
-const ASSISTANT_BASIC_UPCOMING = ['upcoming', 'coming', 'coming up', 'next', 'soon', 'future', 'later', 'scheduled', 'will there', 'will be', 'susunod', 'paparating', 'darating', 'magkakaroon'];
-const ASSISTANT_BASIC_CANCELLED = ['cancelled', 'canceled', 'kinansela', 'nacancel', 'na cancel', 'postponed'];
+const ASSISTANT_BASIC_YES = ['yes', 'yeah', 'yep', 'yup', 'ya', 'sure', 'ok', 'okay', 'oki', 'okie', 'go', 'go ahead', 'please', 'yes please', 'open it', 'do it', 'game'];
+const ASSISTANT_BASIC_NO = ['no', 'nope', 'nah', 'no thanks', 'not now'];
+const ASSISTANT_BASIC_HELLO = ['hi', 'hello', 'hey', 'heya', 'hiya', 'yo', 'good morning', 'good afternoon', 'good evening'];
+const ASSISTANT_BASIC_THANKS = ['thanks', 'thank you', 'thank u', 'thx', 'ty', 'tysm', 'great', 'nice', 'cool', 'awesome', 'got it', 'noted'];
+const ASSISTANT_BASIC_HOW = ['how', 'steps', 'procedure', 'where do i', 'where can i', 'what do i do', 'can i', 'could i', 'is it possible'];
+const ASSISTANT_BASIC_PAST = ['ended', 'past', 'finished', 'done', 'previous', 'previously', 'already happened', 'happened', 'was held', 'were held', 'recent', 'recently', 'latest', 'last event'];
+const ASSISTANT_BASIC_UPCOMING = ['upcoming', 'coming', 'coming up', 'next', 'soon', 'future', 'later', 'scheduled', 'will there', 'will be'];
+const ASSISTANT_BASIC_CANCELLED = ['cancelled', 'canceled', 'postponed'];
+
+/** The assistant only understands English: common Filipino words that give a question away. */
+const ASSISTANT_NOT_ENGLISH_WORDS = ['ang', 'ng', 'mga', 'po', 'opo', 'ba', 'ko', 'ako', 'mo', 'kayo', 'sa', 'yung', 'iyong',
+    'ito', 'iyan', 'yan', 'dito', 'doon', 'paano', 'pano', 'kailan', 'saan', 'nasaan', 'sino', 'ano', 'anong', 'meron',
+    'mayroon', 'wala', 'pwede', 'puwede', 'ngayon', 'ngayong', 'bukas', 'kahapon', 'susunod', 'salamat', 'kumusta',
+    'kamusta', 'naman', 'lang', 'talaga', 'gusto', 'kasi', 'nang', 'nga', 'pala', 'sige', 'hindi', 'huwag', 'kailangan',
+    'dapat', 'magandang', 'buksan', 'dalhin', 'ipakita'];
+const ASSISTANT_ENGLISH_ONLY_REPLY = 'Sorry, I can only understand English. Please ask your question in English — for example, "What events are coming up this week?"';
 
 const ASSISTANT_BASIC_MONTHS = [
-    'january' => 1, 'enero' => 1, 'february' => 2, 'pebrero' => 2, 'march' => 3, 'marso' => 3, 'april' => 4, 'abril' => 4,
-    'may' => 5, 'mayo' => 5, 'june' => 6, 'hunyo' => 6, 'july' => 7, 'hulyo' => 7, 'august' => 8, 'agosto' => 8,
-    'september' => 9, 'setyembre' => 9, 'october' => 10, 'oktubre' => 10, 'november' => 11, 'nobyembre' => 11,
-    'december' => 12, 'disyembre' => 12,
+    'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4, 'may' => 5, 'june' => 6, 'july' => 7,
+    'august' => 8, 'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12,
     'jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4, 'jun' => 6, 'jul' => 7, 'aug' => 8, 'sep' => 9, 'sept' => 9,
     'oct' => 10, 'nov' => 11, 'dec' => 12,
 ];
@@ -42,8 +48,7 @@ const ASSISTANT_BASIC_MONTHS = [
 const ASSISTANT_BASIC_LOOSE_MONTHS = ['may', 'mar', 'jan', 'feb', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'];
 const ASSISTANT_BASIC_WEEKDAYS = [
     'monday' => 'monday', 'tuesday' => 'tuesday', 'wednesday' => 'wednesday', 'thursday' => 'thursday', 'friday' => 'friday',
-    'saturday' => 'saturday', 'sunday' => 'sunday', 'lunes' => 'monday', 'martes' => 'tuesday', 'miyerkules' => 'wednesday',
-    'huwebes' => 'thursday', 'biyernes' => 'friday', 'sabado' => 'saturday',
+    'saturday' => 'saturday', 'sunday' => 'sunday',
 ];
 
 /** Pages "take me to …" can open, most specific first: page key => phrases. */
@@ -70,7 +75,7 @@ const ASSISTANT_BASIC_PAGES = [
     'home' => ['home', 'homepage', 'home page', 'main page', 'start page'],
 ];
 
-/** Words that are never part of an event's name (questions, filters, dates, Filipino particles). */
+/** Words that are never part of an event's name (questions, filters, dates). */
 const ASSISTANT_BASIC_STOP = [
     'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'am', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'should',
     'i', 'me', 'my', 'you', 'your', 'we', 'our', 'us', 'it', 'its', 'this', 'that', 'these', 'those', 'there', 'here', 'what', 'whats',
@@ -91,10 +96,6 @@ const ASSISTANT_BASIC_STOP = [
     'scheduled', 'happenings', 'activity', 'activities', 'program', 'programs', 'schedule', 'schedules', 'calendar', 'school',
     'university', 'lcup', 'campus', 'teachers', 'teacher', 'professors', 'instructors', 'webinars', 'virtual', 'zoom',
     'outside', 'inside', 'semester', 'sem', 'sy', 'term', 'were', 'whats', 'whos', 'wheres', 'hows',
-    'ngayong', 'linggo', 'buwan', 'taon', 'araw', 'nang', 'nga', 'pala', 'kasi', 'si', 'ni', 'kay', 'ganap', 'kaganapan',
-    'po', 'ba', 'ang', 'ng', 'mga', 'sa', 'na', 'ko', 'ako', 'mo', 'ka', 'kayo', 'may', 'meron', 'mayroon', 'wala', 'kailan', 'saan',
-    'ano', 'anong', 'sino', 'paano', 'yung', 'iyong', 'ito', 'iyan', 'dito', 'doon', 'ngayon', 'bukas', 'kahapon', 'susunod',
-    'paparating', 'darating', 'nakaraan', 'natapos', 'tapos', 'lang', 'naman', 'din', 'rin', 'ba', 'kaya',
 ];
 
 /** An answer: the reply, a page to open now (or null), a page to offer next (or null). */
@@ -132,6 +133,11 @@ function assistant_basic_answer(string $message, ?array $user, array $page, ?arr
     $refusal = assistant_basic_refusal($m);
     if ($refusal !== '') return assistant_basic_say($refusal);
 
+    // English only.
+    if (assistant_basic_not_english($m, $wordCount)) {
+        return assistant_basic_say(ASSISTANT_ENGLISH_ONLY_REPLY);
+    }
+
     // "Yes" / "no" to its offer to open a page.
     if ($offer && $wordCount <= 5) {
         if (assistant_basic_has($m, ASSISTANT_BASIC_YES)) return assistant_basic_open($offer, $user);
@@ -155,14 +161,14 @@ function assistant_basic_answer(string $message, ?array $user, array $page, ?arr
     }
 
     // Open a page.
-    if (preg_match('/^ (open|go|goto|navigate|bring me|take me|dalhin|punta|pumunta|buksan|ipakita) | (take me|bring me|go to|goto|navigate to|redirect me|open the|open my|open up|show me the [\p{L} ]{1,40}page|dalhin mo ako|punta sa|pumunta sa|buksan ang|buksan mo) /u', $m)) {
+    if (preg_match('/^ (open|go|goto|navigate|bring me|take me) | (take me|bring me|go to|goto|navigate to|redirect me|open the|open my|open up|show me the [\p{L} ]{1,40}page) /u', $m)) {
         $answer = assistant_basic_navigate($m, $user, $orgs, $dates);
         if ($answer) return $answer;
     }
 
     // "Where is the evaluation form / my registrations / the calendar?": that page.
     // ("Where are JPSSITE's events?" is left to the event answers below.)
-    if (!$orgs && !$dates && assistant_basic_has($m, ['where', 'saan', 'nasaan'])) {
+    if (!$orgs && !$dates && assistant_basic_has($m, ['where'])) {
         $answer = assistant_basic_page_mention($m, $user);
         if ($answer) return $answer;
     }
@@ -187,7 +193,7 @@ function assistant_basic_answer(string $message, ?array $user, array $page, ?arr
     if ($keywords !== '') {
         $answer = assistant_basic_named_event($keywords, $user);
         if ($answer) return $answer;
-        if (assistant_basic_has($m, ['is there', 'are there', 'any', 'meron', 'mayroon', 'may', 'when is', 'where is', 'kailan', 'saan'])) {
+        if (assistant_basic_has($m, ['is there', 'are there', 'any', 'when is', 'where is'])) {
             return assistant_basic_not_found($keywords);
         }
     }
@@ -232,6 +238,16 @@ function assistant_basic_norm(string $text): string
     $text = preg_replace('/(?<=\p{L})[-\/](?=\p{L})/u', ' ', $text) ?? $text; // on-campus -> on campus
     $text = preg_replace('/[^\p{L}\p{N}\/-]+/u', ' ', $text) ?? $text;
     return ' ' . trim(preg_replace('/\s+/u', ' ', $text) ?? $text) . ' ';
+}
+
+/**
+ * True if the question looks like it isn't English: two or more common
+ * Filipino words, or one in a question of three words or fewer.
+ */
+function assistant_basic_not_english(string $m, int $wordCount): bool
+{
+    $hits = count(array_intersect(array_unique(explode(' ', trim($m))), ASSISTANT_NOT_ENGLISH_WORDS));
+    return $hits >= 2 || ($hits === 1 && $wordCount <= 3);
 }
 
 /** True if any of the phrases is in the question as whole words. */
@@ -342,14 +358,14 @@ function assistant_basic_dates(string $m): ?array
         if (checkdate($month, (int) $x[2], $year)) return $onDay($today->setDate($year, $month, (int) $x[2]));
     }
 
-    if (assistant_basic_has($m, ['today', 'tonight', 'ngayon', 'ngayong araw', 'right now', 'happening now', 'ongoing', 'on going', 'currently'])) {
+    if (assistant_basic_has($m, ['today', 'tonight', 'right now', 'happening now', 'ongoing', 'on going', 'currently'])) {
         return $range($today, $today, 'today');
     }
-    if (assistant_basic_has($m, ['tomorrow', 'tmrw', 'tmr', 'bukas'])) {
+    if (assistant_basic_has($m, ['tomorrow', 'tmrw', 'tmr'])) {
         $d = $today->modify('+1 day');
         return $range($d, $d, 'tomorrow');
     }
-    if (assistant_basic_has($m, ['yesterday', 'kahapon'])) {
+    if (assistant_basic_has($m, ['yesterday'])) {
         $d = $today->modify('-1 day');
         return $range($d, $d, 'yesterday');
     }
@@ -357,9 +373,9 @@ function assistant_basic_dates(string $m): ?array
     // Weeks run Monday to Sunday.
     if (assistant_basic_has($m, ['next weekend'])) return $range($today->modify('saturday next week'), $today->modify('sunday next week'), 'next weekend');
     if (assistant_basic_has($m, ['this weekend', 'weekend'])) return $range($today->modify('saturday this week'), $today->modify('sunday this week'), 'this weekend');
-    if (assistant_basic_has($m, ['next week', 'susunod na linggo'])) return $range($today->modify('monday next week'), $today->modify('sunday next week'), 'next week');
-    if (assistant_basic_has($m, ['last week', 'nakaraang linggo'])) return $range($today->modify('monday last week'), $today->modify('sunday last week'), 'last week');
-    if (assistant_basic_has($m, ['this week', 'ngayong linggo', 'within the week'])) return $range($today->modify('monday this week'), $today->modify('sunday this week'), 'this week');
+    if (assistant_basic_has($m, ['next week'])) return $range($today->modify('monday next week'), $today->modify('sunday next week'), 'next week');
+    if (assistant_basic_has($m, ['last week'])) return $range($today->modify('monday last week'), $today->modify('sunday last week'), 'last week');
+    if (assistant_basic_has($m, ['this week', 'within the week'])) return $range($today->modify('monday this week'), $today->modify('sunday this week'), 'this week');
 
     $first = $today->modify('first day of this month');
     if (assistant_basic_has($m, ['next month', 'susunod na buwan'])) {
@@ -370,9 +386,9 @@ function assistant_basic_dates(string $m): ?array
         $f = $first->modify('-1 month');
         return $range($f, $f->modify('last day of this month'), 'last month');
     }
-    if (assistant_basic_has($m, ['this month', 'ngayong buwan', 'within the month'])) return $range($first, $first->modify('last day of this month'), 'this month');
+    if (assistant_basic_has($m, ['this month', 'within the month'])) return $range($first, $first->modify('last day of this month'), 'this month');
 
-    if (assistant_basic_has($m, ['this semester', 'this sem', 'ngayong semester', 'ngayong sem'])) {
+    if (assistant_basic_has($m, ['this semester', 'this sem'])) {
         $p = school_period_of();
         [$from, $to] = term_range($p['school_year'], $p['semester']);
         return $range(new DateTimeImmutable($from), new DateTimeImmutable($to), 'this semester');
@@ -381,7 +397,7 @@ function assistant_basic_dates(string $m): ?array
         [$from, $to] = term_range(school_period_of()['school_year']);
         return $range(new DateTimeImmutable($from), new DateTimeImmutable($to), 'this school year');
     }
-    if (assistant_basic_has($m, ['this year', 'ngayong taon'])) {
+    if (assistant_basic_has($m, ['this year'])) {
         return $range($today->setDate($thisYear, 1, 1), $today->setDate($thisYear, 12, 31), 'this year');
     }
 
@@ -389,12 +405,12 @@ function assistant_basic_dates(string $m): ?array
     foreach (ASSISTANT_BASIC_MONTHS as $word => $month) {
         if (!preg_match('~ ' . $word . '(?: (\d{4}))? ~', $m, $x)) continue;
         if (in_array($word, ASSISTANT_BASIC_LOOSE_MONTHS, true) && empty($x[1])
-            && !preg_match('~ (in|of|this|next|last|during|until|for|ngayong|noong) ' . $word . ' ~', $m)) {
+            && !preg_match('~ (in|of|this|next|last|during|until|for) ' . $word . ' ~', $m)) {
             continue;
         }
         $year = !empty($x[1]) ? (int) $x[1] : $thisYear;
         // A month that's already over this year means next year's, unless they ask about the past.
-        if (empty($x[1]) && $month < (int) $today->format('n') && !assistant_basic_has($m, array_merge(ASSISTANT_BASIC_PAST, ['last', 'noong']))) {
+        if (empty($x[1]) && $month < (int) $today->format('n') && !assistant_basic_has($m, array_merge(ASSISTANT_BASIC_PAST, ['last']))) {
             $year++;
         }
         $f = $today->setDate($year, $month, 1);
@@ -404,7 +420,7 @@ function assistant_basic_dates(string $m): ?array
     // A weekday: "Friday", "this Friday", "next Friday", "last Friday".
     foreach (ASSISTANT_BASIC_WEEKDAYS as $word => $day) {
         if (!assistant_basic_has($m, [$word])) continue;
-        if (assistant_basic_has($m, ['last ' . $word, 'noong ' . $word])) return $onDay($today->modify('last ' . $day));
+        if (assistant_basic_has($m, ['last ' . $word])) return $onDay($today->modify('last ' . $day));
         if (assistant_basic_has($m, ['next ' . $word])) return $onDay($today->modify('next ' . $day));
         return $onDay($today->modify($day)); // today if it's that day, else the next one
     }
@@ -436,7 +452,7 @@ function assistant_basic_keywords(string $m): string
 function assistant_basic_event_name(string $m): string
 {
     $patterns = [
-        '/ (?:when|where|what time|kailan|saan) (?:(?:is|was|will|does|did) )?(?:(?:ang|yung|ba|po) )*(?:the )?(.+?) (?:(?:be|happen|happening|start|starting|end|ending|held|take place|taking place|begin|located|gaganapin|mangyayari|magsisimula) )?(?:event )?$/',
+        '/ (?:when|where|what time) (?:(?:is|was|will|does|did) )?(?:the )?(.+?) (?:(?:be|happen|happening|start|starting|end|ending|held|take place|taking place|begin|located) )?(?:event )?$/',
         '/ (?:tell me about|tell me more about|details (?:of|on|about|for)|info (?:on|about|for)|information (?:on|about|for)|more about|know about|describe) (?:the )?(.+?) (?:event )?$/',
     ];
     foreach ($patterns as $re) {
@@ -618,7 +634,7 @@ function assistant_basic_mine(string $m, ?array $user): ?array
         'did i register', 'i registered', 'have i registered', 'i joined', 'naka register', 'nakaregister', 'nag register', 'nagregister',
         'my schedule', 'events i registered', 'events i joined']);
     $evaluations = preg_match('/ (evaluat\w*|feedback) /', $m)
-        && assistant_basic_has($m, ['my', 'do i', 'i have', 'have i', 'i need', 'pending', 'need to', 'should i', 'dapat', 'kailangan', 'left', 'to']);
+        && assistant_basic_has($m, ['my', 'do i', 'i have', 'have i', 'i need', 'pending', 'need to', 'should i', 'left', 'to']);
     $notifications = assistant_basic_has($m, ['notifications', 'notification', 'announcements', 'announcement', 'any updates', 'my updates', 'inbox']);
     if (!$registrations && !$evaluations && !$notifications) return null;
 
@@ -693,7 +709,7 @@ function assistant_basic_organizations(string $m, array $orgs): ?array
 {
     $orgWords = assistant_basic_has($m, ['organization', 'organizations', 'org', 'orgs', 'club', 'clubs', 'officers', 'officer', 'president',
         'vice president', 'secretary', 'treasurer', 'adviser', 'advisers', 'members', 'samahan']);
-    $aboutWords = assistant_basic_has($m, ['about', 'what is', 'whats', 'who is', 'who are', 'tell me', 'info', 'information', 'sino', 'ano ang']);
+    $aboutWords = assistant_basic_has($m, ['about', 'what is', 'whats', 'who is', 'who are', 'tell me', 'info', 'information']);
     $eventWords = (bool) preg_match('/ (event|events|seminar\w*|workshop\w*|activit\w+|happening|ganap) /', $m);
 
     if ($orgs && ($orgWords || ($aboutWords && !$eventWords))) {
@@ -932,5 +948,5 @@ function assistant_basic_help(?array $user, bool $missed = false): string
         'Take me to the Event Calendar',
     ];
     if ($user) array_splice($examples, 5, 0, ['What am I registered for? · Do I have events to evaluate?']);
-    return ($missed ? "Sorry, I didn't get that. " : '') . "I'm in basic mode, so I understand questions like these:\n- " . implode("\n- ", $examples);
+    return ($missed ? "Sorry, I didn't get that. " : '') . "I understand questions like these (in English):\n- " . implode("\n- ", $examples);
 }

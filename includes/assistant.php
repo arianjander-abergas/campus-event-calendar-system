@@ -36,7 +36,7 @@ const ASSISTANT_KEEP_TURNS = 6;    // earlier questions sent along as context
 const ASSISTANT_KEEP_LOG = 40;     // messages shown in the chat box
 
 /** Words left out when a search phrase is tried word by word. */
-const ASSISTANT_STOP_WORDS = ['the', 'and', 'for', 'with', 'event', 'events', 'about', 'ang', 'mga', 'para', 'nang', 'yung'];
+const ASSISTANT_STOP_WORDS = ['the', 'and', 'for', 'with', 'event', 'events', 'about'];
 
 /** API key, model and daily limit: config/assistant.local.php, or environment variables. */
 function assistant_config(): array
@@ -135,7 +135,7 @@ function assistant_handle(?array $user, string $message, array $page): array
         $why = $result ? (string) ($result['error'] ?? '') : (assistant_has_key() ? "today's AI limit (daily_limit) is used up" : '');
         $result = assistant_basic($message, $user, $page, $state['offer']);
         if ($isAdmin && $why !== '') {
-            $result['reply'] .= "\n\n(Answered in basic mode: " . rtrim($why, '.') . '.)';
+            $result['reply'] .= "\n\n(Answered without AI: " . rtrim($why, '.') . '.)';
         }
     }
 
@@ -331,7 +331,7 @@ WHAT YOU DO
 HOW YOU ANSWER
 - Get facts from the tools every time. Never make up events, dates, times, places, people or numbers. If a tool finds nothing, say so and suggest the Event Calendar or a different search.
 - Be short and friendly: one to three sentences, or a short list of at most 6 items (say how many more there are). Link every event you mention as [Event title](url), using the url from the tool result exactly as given. Don't wrap links in ** and don't show bare URLs or ids.
-- Reply in the language the user writes in (English, Filipino or Taglish).
+- You only understand and reply in English. If the user writes in any other language (Filipino, Taglish or anything else), don't answer the question: say in English, in one sentence, that you can only understand English and ask them to write their question in English. Always reply in English, even if asked to use another language.
 - All dates and times are Philippine time. Rely on the status the tools give (upcoming, happening today, ended…) instead of working it out yourself; say "today", "tomorrow" or the weekday when it helps.
 - When something has to be done on a page (registering, cancelling, evaluating, changing account details, managing events), give the steps in a sentence or two and offer to open the page.
 
@@ -454,6 +454,8 @@ function assistant_pages(?array $user): array
     }
     if ($role === 'moderator' && !empty($user['organization_id'])) {
         $pages['our_officers'] = ['Our Officers', '/admin/organization-officers.php?org=' . rawurlencode($user['organization_id']), "their organization's officers"];
+        $pages['evaluation_form'] = ['Evaluation Form', '/admin/evaluation-form.php', "the one evaluation form used for every event (they can edit it), and their organization's evaluation results"];
+        $pages['approvals'] = ['Approvals', '/admin/users.php?tab=approvals', "their organization's events and their profile edits waiting for a Super Admin, with the Super Admins' notes"];
     }
     if ($role === 'admin') {
         $pages += [
@@ -873,7 +875,6 @@ function assistant_event_row(array $ev, array $partners, int $going, ?array $min
 {
     $reg = registration_state($ev, $mine, $going, $user);
     $levels = year_levels_label($ev['year_levels'] ?? []);
-    $audience = $ev['audience'] ?? 'students';
     $note = rtrim($reg['note'], '.');
     return array_filter([
         'id' => $ev['id'],
@@ -884,7 +885,7 @@ function assistant_event_row(array $ev, array $partners, int $going, ?array $min
         'venue' => event_place($ev) . (!empty($ev['venue_type']) ? ' (' . label_of(VENUE_TYPES, $ev['venue_type'], '') . ')' : ''),
         'category' => event_category_label($ev),
         'organizers' => event_organizers_label($ev, $partners),
-        'for' => label_of(EVENT_AUDIENCES, $audience, 'Students') . ($levels !== '' && $audience !== 'faculty' ? ' — ' . $levels . ' students only' : ''),
+        'for' => event_audience_label($ev) . ($levels !== '' && in_array('students', event_audiences($ev), true) ? ' — ' . $levels . ' students only' : ''),
         'registration' => $reg['state'] === 'open' ? 'open' . ($note !== '' ? ': ' . $note : '') : $note,
         'going' => $going,
         'url' => BASE_URL . '/event-details.php?id=' . rawurlencode($ev['id']),
