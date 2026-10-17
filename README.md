@@ -22,7 +22,8 @@ config/supabase.php     All Supabase access + helpers (auth, events, registratio
                         departments, school calendar, reports, evaluations)
 config/assistant.local.example.php  Settings of the AI chat box — copy to assistant.local.php + API key
 includes/               Shared page parts: nav (the sidebar on EVERY page) + topbar, footer, event-card,
-                        account-fields.php (student/faculty fields + irregular pop-up of sign-up and My Profile),
+                        account-fields.php (student/faculty fields + irregular pop-up of sign-up and Edit my profile),
+                        approvals.php (the Approvals page: Admins' events and profile edits for a Super Admin),
                         spreadsheet.php (reads .xlsx / .csv for Import & Verify), charts.php, evaluation-fields.php,
                         assistant.php + assistant-widget.php (the Event Hub Assistant chat box)
 public/                 Everything the browser can reach
@@ -31,7 +32,7 @@ public/                 Everything the browser can reach
                         My Events (?mine=1)
   organizations.php     Organizations with department, officers and upcoming events
   event-details.php     One event: register/cancel, schedule, "Evaluate this event", other events
-  enduser/              Student pages: dashboard.php, profile.php, evaluate.php
+  enduser/              Student pages: dashboard.php, profile.php (My Profile), edit-profile.php, evaluate.php
   admin/                Admin pages:
     dashboard.php         Admin Dashboard: events this week / month / semester / school year
     reports.php           Reports: filters, per month / week / semester / department / organization, print, CSV
@@ -44,7 +45,9 @@ public/                 Everything the browser can reach
     event-evaluations.php Evaluation results of one event (print, CSV, remind attendees)
     evaluation-form.php   The one evaluation form used for every event
     admin-taxonomy.php    Categories, departments, organizations
-    users.php             Users & Roles: roles (student/faculty, moderator, admin), School IDs, verification
+    users.php             Users & Roles: roles (Student / Faculty, Admin, Super Admin), School IDs, verification,
+                          Edit / Delete accounts; ?tab=approvals is the Approvals page
+    user-edit.php         Edit one account (Super Admins)
     organization-officers.php, school-calendar.php
   auth/                 login, register, forgot-password, callback (Google + reset links), logout
   api/                  Small JSON endpoints: presence (Active Users), notifications (mark read), stats,
@@ -84,6 +87,9 @@ Everything is in the **Thesis** project. The anon key in `config/supabase.php` i
 | Published events become `completed` once they end | `complete_ended_events()` (the site calls it every few minutes) |
 | Categories / organizations can't be deleted while an event uses them; departments while an organization uses them | foreign keys `ON DELETE RESTRICT` |
 | Only admins manage categories, departments, organizations, the school calendar and the evaluation form, and delete events | RLS policies using `is_admin()` |
+| Admins' (moderator role) new events are published only once a Super Admin approves them: publishing keeps the event a draft with `approval_status = 'pending'`; only Super Admins can approve or reject | `enforce_event_approval()` trigger on `events` |
+| Changing your own saved profile details or School ID needs a Super Admin's approval (filling in empty ones doesn't; a Super Admin's own are saved); approved changes are applied by `review_profile_change()`; the protected account can't be demoted or deleted from the site |
+| Only Super Admins delete accounts (the login and profile; events they made stay) — not their own, not the protected one | `delete_account()` | `guard_profile_changes()` / `guard_school_id_changes()` triggers, `profile_change_requests` RLS |
 | Moderators create / edit / publish / cancel only their own organization's events, and manage those events' schedules, registrations, notifications and their organization's officers | RLS policies using `is_moderator()`, `can_manage_event()` |
 | An event's `venue_type` is `online` exactly when `is_online` is true | `sync_event_venue_type()` trigger on `events` |
 | Marking someone Attended records the time (`attended_at`) | `set_attended_at()` trigger on `event_registrations` |
@@ -91,7 +97,7 @@ Everything is in the **Thesis** project. The anon key in `config/supabase.php` i
 | Evaluation answers can't be edited; a question that has answers can't be deleted (only hidden) | no update policies; foreign key `ON DELETE RESTRICT` |
 | School-calendar terms can't overlap; one row per semester per school year | exclusion + unique constraints on `academic_terms` |
 
-**Functions:** `site_stats()` (home-page counters), `event_registration_counts()` (the "N going" numbers, without revealing who), `touch_presence()` / `clear_presence()` (Active Users), `notify_event()` (admins and the event's moderators send notifications to everyone or to an event's registrants), `school_period(date)` (school year + semester of a date), `submit_event_evaluation()` (saves an attendee's evaluation), `is_moderator()` / `can_manage_event()` (role checks used by the rules), `school_id_taken()` (sign-up check), `complete_ended_events()`.
+**Functions:** `site_stats()` (home-page counters), `event_registration_counts()` (the "N going" numbers, without revealing who), `touch_presence()` / `clear_presence()` (Active Users), `notify_event()` (admins and the event's moderators send notifications to everyone or to an event's registrants), `school_period(date)` (school year + semester of a date), `submit_event_evaluation()` (saves an attendee's evaluation), `is_moderator()` / `can_manage_event()` (role checks used by the rules), `school_id_taken()` (sign-up check), `complete_ended_events()`, `is_super_admin()`, `review_profile_change()` (the super admin approves / rejects a profile edit).
 
 **Storage buckets** (public read, admin upload): `event-posters`, `org-logos`, `officer-photos`.
 
@@ -104,6 +110,16 @@ update public.profiles set role = 'admin' where full_name = 'Your Name';
 ```
 
 After that, admins promote others (to moderator or admin) from **Admin → Users & Roles**.
+
+### Role names and the protected Super Admin
+
+The database keeps the role values `user`, `moderator` and `admin`; the site shows them as **Student / Faculty**, **Admin** and **Super Admin** (`ROLES`, `role_display()`). Super Admins approve Admins' new events and profile edits on the **Approvals** page (sidebar). Migrations `20261017120000_super_admin_approvals.sql` and `20261018090000_three_role_levels.sql` set this up; the first also marks Arian Abergas's account as protected (`is_super_admin`), which can only be changed in the SQL Editor:
+
+```sql
+update public.profiles set role = 'admin', is_super_admin = true where id = '<account id>';
+```
+
+Until that migration is run, events publish and profiles save directly, as before.
 
 ### Supabase dashboard settings
 
@@ -124,8 +140,10 @@ After that, admins promote others (to moderator or admin) from **Admin → Users
 - **Event categories:** every event has an **audience** (Students, Faculty, or Students & Faculty) and a **venue type** (On-campus, Off-campus, or Online/Webinar), and can be limited to some **year levels** (none picked = every year level). Online events need the webinar link; on- and off-campus events need a venue. They show on event cards and pages and can be filtered on the Event Calendar (filtering "For students" also shows events for students & faculty).
 - **Event Calendar (one view):** `events.php` is a month calendar with a single filter bar (keyword, category, organization, audience, venue). Clicking a date lists every event on it beside the calendar (no reload); ‹ › change month. Searching jumps to the month of the next match. The dashboard's small calendar lists a clicked day's events too and links to the full calendar. The old dashboard Filters box and the Events page's extra filters (type, when, sort) were removed.
 - **Same sidebar everywhere:** home, calendar, organizations, student, moderator and admin pages all use the same sidebar and top bar (`includes/nav.php`, `includes/topbar.php`); visitors who aren't logged in see Log in / Sign up there. Only the login / sign-up screens and printouts are full-screen.
-- **Accounts:** sign-up asks *student or faculty*, **department** and **organization** (required; the organization list shows the chosen department's organizations). Students also give their **School ID** (unique; letters, digits, dashes, e.g. 2023-00123), **course**, **highest year level**, and **regular or irregular**. Choosing *Irregular* opens a pop-up to pick every year level they have subjects in, with the registration rules for irregular students. Accounts missing any of this (older accounts, Google sign-ins) are sent to My Profile to complete it before anything else. Admins are exempt.
-- **Roles:** *Student / Faculty* (browse, register, evaluate), *Moderator* (their organization's events: create, edit, publish, cancel, schedules, registrations, attendance, printouts, evaluation results, attendance imports, officers), *Admin* (everything, including deleting events, reports, the evaluation form, categories / departments / organizations, the school calendar, users and School IDs). Admins change roles on **Users & Roles**, which also shows a table of what each role can do. A moderator needs an organization.
+- **Accounts:** sign-up asks *student or faculty*, **department** and **organization** (required; the organization list shows the chosen department's organizations). Students also give their **School ID** (unique; the format 23-3170-870 — 2 digits, 4 digits, 3 digits — with the dashes added as it's typed; IDs saved before this format stay valid until changed), **course**, **highest year level**, and **regular or irregular**. Choosing *Irregular* opens a pop-up to pick every year level they have subjects in, with the registration rules for irregular students. Accounts missing any of this (older accounts, Google sign-ins) are sent to the profile form to complete it before anything else; filling in empty details is saved right away. Admins are exempt.
+- **My Profile and approvals:** My Profile shows the account's details with **Edit my profile** (a separate page) and **Change password** (a pop-up). Changes to saved details are sent to the Super Admins; My Profile shows them as *waiting for approval* (they can be changed or withdrawn) and then whether they were approved or not, with the Super Admin's note. A Super Admin's own changes are saved directly.
+- **Event approvals:** a new event created by an Admin says **Send for Approval** instead of Publish. It stays a draft, marked *Awaiting approval* in Update Events, until a Super Admin approves it on the **Approvals** page — then it's published (and announced, if *Send Notification* was ticked). A rejected event shows the reason and can be changed and sent again; saving it as a draft takes a request back. Super Admins' events don't need approval.
+- **Roles:** *Student / Faculty* (browse, register, evaluate), *Admin* (their organization's events: create, edit, cancel — published once a Super Admin approves — schedules, registrations, attendance, printouts, evaluation results, attendance imports, officers), *Super Admin* (everything, including deleting events, reports, the evaluation form, categories / departments / organizations, the school calendar, users and School IDs, and approvals). Super Admins change roles, and edit or delete accounts, on **Users & Roles**, which also shows a table of what each role can do. An Admin needs an organization. Arian Abergas's Super Admin account is protected: it can't be demoted or deleted.
 - **No duplicates:** saving an event with the same title on the same date as another, or at a venue already booked at that time, is refused with the other event's name. While filling in the form, the other events on the chosen dates are listed under the date fields. School-calendar terms can't overlap either.
 - **Forms start clean:** a published / saved event goes back to a blank form. After an error, the form shows what was typed once; refreshing, or leaving and coming back, clears it (`remember_form()` / `recall_form()`, `assets/js/forms.js`).
 - **Completed automatically:** events are marked **Completed** once they end (a student's participation shows **Completed** once they attended and evaluated). *Mark Completed* can still close an event early.

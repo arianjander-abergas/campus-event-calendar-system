@@ -65,7 +65,10 @@ function detect_base_url(): string
 //          Created automatically by the handle_new_user() trigger on sign-up; only admins
 //          can change `role` (protect_profile_role() trigger), moderators can't change their
 //          organization, and the student/faculty choice is fixed once made.
-// school_ids(user_id -> profiles, school_id unique e.g. '2023-00123', verified_at, verified_by)
+//          is_super_admin: the protected Super Admin (Arian Abergas), set only in the SQL Editor. Changing
+//          your own saved details needs a Super Admin's approval (profile_change_requests); filling in
+//          empty ones doesn't (guard_profile_changes() trigger, and the same on school_ids).
+// school_ids(user_id -> profiles, school_id unique e.g. '23-3170-870', verified_at, verified_by)
 //          Kept apart from profiles (which everyone can read): visible to the student, admins,
 //          and moderators whose events the student joined.
 // organizations(id, name unique, description, logo_url, department_id -> departments,
@@ -83,7 +86,11 @@ function detect_base_url(): string
 //        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at,
 //        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'],
 //        year_levels int2[] (student year levels that may register; empty = all),
-//        category_other text (the event type typed in when the category is "Other"))
+//        category_other text (the event type typed in when the category is "Other"),
+//        approval_status[null|'needed'|'pending'|'approved'|'rejected'], approval_note,
+//        approval_requested_at, approval_reviewed_by, approval_reviewed_at)
+//        Admins' (moderator role) new events need a Super Admin's approval: publishing
+//        one keeps it a draft with approval_status 'pending' (trg_events_approval).
 //        event_type is no longer picked on the form: it follows the category's name.
 //        Categories/organizations can't be deleted while an event uses them (ON DELETE RESTRICT).
 //        trg_events_venue_type keeps venue_type = 'online' exactly when is_online is true.
@@ -107,6 +114,9 @@ function detect_base_url(): string
 //        department, school_year, semester and registration / attendance / evaluation totals.
 // notifications(id, event_id, user_id, title, message, status['pending'|'sent'|'failed'|'read'],
 //        created_at, sent_at)
+// profile_change_requests(id, user_id, changes jsonb {column: new value, school_id}, status['pending'|
+//        'approved'|'rejected'|'withdrawn'], review_note, reviewed_by, reviewed_at) -- one pending per
+//        account; decided only by review_profile_change(), which applies approved changes.
 // user_presence(user_id, last_seen_at) -- Active Users heartbeat (only via functions)
 // Storage buckets (public read, admin upload): event-posters, org-logos, officer-photos.
 // Functions: site_stats(), event_registration_counts(), touch_presence(), clear_presence(),
@@ -114,11 +124,12 @@ function detect_base_url(): string
 //        is_moderator(), can_manage_event(org id), can_manage_event_id(event id),
 //        school_period(date) -> (school_year, semester),
 //        submit_event_evaluation(event_id, answers jsonb), school_id_taken(text),
-//        complete_ended_events().
+//        complete_ended_events(), is_super_admin(), review_profile_change(request, approve, note).
 // Roles: admin = everything. moderator = the events of their own organization (create, edit,
 //        publish, cancel — not delete), their schedules, registrations, attendance, printouts,
 //        evaluation results and attendance imports, plus their organization's officers.
-//        user = student or faculty.
+//        user = student or faculty. The super admin is an admin who also approves the other
+//        admins' new events and everyone's profile edits.
 
 // =============================================================================
 // HTTP LAYER
@@ -391,6 +402,13 @@ function format_event_date(?string $date): string
     return $ts ? date('M j, Y', $ts) : $date;
 }
 
+/** A moment (timestamptz) in school time: 'Oct 17, 2026 · 10:30 AM'; empty -> '—'. */
+function format_timestamp(?string $timestamp): string
+{
+    $ts = $timestamp ? strtotime($timestamp) : false;
+    return $ts ? date('M j, Y · g:i A', $ts) : '—';
+}
+
 /** '13:30:00' -> '1:30 PM'; empty -> ''. */
 function format_event_time(?string $time): string
 {
@@ -470,13 +488,53 @@ function take_flashes(): array
 }
 
 /** HTML for all pending flash messages (types: success | error | info). */
+/**
+ * This version's database updates (supabase/migrations), oldest first: file =>
+ * [what it switches on, a quick check — table + query, or 'rpc' + function name + its arguments].
+ */
+const DB_UPDATES = [
+    '20260930120000_solis_suggestions.sql' => ['Admins, School IDs, year levels and the duplicate checks', 'profiles', 'select=account_type&limit=1'],
+    '20261015120000_manage_events_update.sql' => ['The "Other" type of event and multi-organization events', 'events', 'select=category_other&limit=1'],
+    '20261017120000_super_admin_approvals.sql' => ['Approvals of new events and profile edits', 'profiles', 'select=is_super_admin&limit=1'],
+    '20261018090000_three_role_levels.sql' => ['Admin / Super Admin roles and deleting accounts', 'rpc', 'delete_account', ['p_user' => '00000000-0000-0000-0000-000000000000']],
+    '20261018120000_approval_notes.sql' => ['Super Admins\' notes on waiting profile edits', 'rpc', 'note_profile_change', ['p_request' => '00000000-0000-0000-0000-000000000000', 'p_note' => '']],
+];
+
+/**
+ * The database updates that haven't been run yet (file => what it switches on).
+ * Checked at most every 5 minutes per session ($fresh: now).
+ */
+function pending_db_updates(bool $fresh = false): array
+{
+    session_start_once();
+    $cache = $_SESSION['db_updates_pending'] ?? null;
+    if (!$fresh && is_array($cache) && $cache['at'] > time() - 300) return $cache['pending'];
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $pending = [];
+    foreach (DB_UPDATES as $file => $update) {
+        [$label, $table, $check, $args] = $update + [3 => []];
+        if ($table === 'rpc') {
+            // Called without a login: "permission denied" = the function is there.
+            supabase_rpc($check, $args);
+            $missing = str_contains(supabase_last_error(), 'Could not find the function');
+        } else {
+            supabase_request($table, $check);
+            $missing = supabase_last_error() !== '';
+        }
+        if ($missing) $pending[$file] = $label;
+    }
+    $GLOBALS['supabase_last_error'] = $lastError;
+    $_SESSION['db_updates_pending'] = ['pending' => $pending, 'at' => time()];
+    return $pending;
+}
+
 function render_flashes(): string
 {
     $html = '';
-    // Tell admins when the database is missing this version's columns.
-    if (schema_outdated() && is_admin_user()) {
+    // Tell Super Admins when the database is missing an update this version needs.
+    if (is_admin_user() && ($pending = pending_db_updates())) {
         $html .= '<div class="flash flash-info db-banner" role="status"><span><strong>Database update needed.</strong> '
-            . 'Moderators, School IDs, year levels and the duplicate checks turn on once it\'s run.</span> '
+            . htmlspecialchars(count($pending) === 1 ? reset($pending) . ' turn on once it\'s run.' : count($pending) . ' updates haven\'t been run yet: ' . implode('; ', $pending) . '.') . '</span> '
             . '<a href="' . htmlspecialchars(BASE_URL . '/admin/database-update.php') . '" class="btn btn-primary">Run the update</a></div>';
     }
     foreach (take_flashes() as $f) {
@@ -563,8 +621,12 @@ const STUDENT_TYPES = ['regular' => 'Regular', 'irregular' => 'Irregular'];
 /** Student year levels (profiles.year_level = the HIGHEST one; events.year_levels). */
 const YEAR_LEVELS = [1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'];
 
-/** Roles (profiles.role). 'user' shows as Student or Faculty (see role_display()). */
-const ROLES = ['user' => 'Student / Faculty', 'moderator' => 'Moderator', 'admin' => 'Admin'];
+/**
+ * Roles (profiles.role) and how they're shown: 'user' as Student or Faculty
+ * (see role_display()), 'moderator' as Admin (their organization's events),
+ * 'admin' as Super Admin (everything, and approvals).
+ */
+const ROLES = ['user' => 'Student / Faculty', 'moderator' => 'Admin', 'admin' => 'Super Admin'];
 
 /** 3 -> '3rd' */
 function ordinal(int $n): string
@@ -624,20 +686,21 @@ function student_year_line(array $profile): string
 }
 
 // ---- School ID ---------------------------------------------------------------
-// Stored uppercase without spaces. Letters, digits and dashes, 4-20 characters,
-// with at least 4 digits (e.g. 2023-00123). Change SCHOOL_ID_EXAMPLE (and the
-// check in valid_school_id()) to the registrar's exact format when known.
-const SCHOOL_ID_EXAMPLE = '2023-00123';
+// The registrar's format: 2 digits, 4 digits, 3 digits — 23-3170-870. Spaces
+// are dropped, and the dashes are added when only the 9 digits are typed
+// (233170870 -> 23-3170-870). IDs saved before this format was required stay
+// valid until they're changed (validate_account_fields()).
+const SCHOOL_ID_EXAMPLE = '23-3170-870'; // also checked in the browser by assets/js/account.js
 
 function normalize_school_id(?string $value): string
 {
-    return strtoupper(preg_replace('/\s+/', '', (string) $value));
+    $id = strtoupper(preg_replace('/\s+/', '', (string) $value));
+    return preg_match('/^\d{9}$/', $id) ? substr($id, 0, 2) . '-' . substr($id, 2, 4) . '-' . substr($id, 6) : $id;
 }
 
 function valid_school_id(string $normalized): bool
 {
-    return (bool) preg_match('/^[A-Z0-9][A-Z0-9-]{3,19}$/', $normalized)
-        && preg_match_all('/\d/', $normalized) >= 4;
+    return (bool) preg_match('/^\d{2}-\d{4}-\d{3}$/', $normalized);
 }
 
 /** Whether another account already uses this school ID (the database answers without saying whose). */
@@ -922,6 +985,11 @@ function reload_session_profile(): void
         $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
         unset($row['school_ids']);
         $row['schema_ready'] = $schemaReady;
+        // Read on its own: before migration 20261017120000_super_admin_approvals.sql the column
+        // doesn't exist, and that mustn't stop the rest of the profile from loading.
+        $flag = supabase_request('profiles', 'select=is_super_admin' . $id, 'GET', null, $_SESSION['access_token'] ?? null);
+        $row['is_super_admin'] = !empty($flag[0]['is_super_admin']);
+        $GLOBALS['supabase_last_error'] = '';
         $_SESSION['user'] = array_merge($_SESSION['user'], $row);
     }
     $_SESSION['user_checked_at'] = time();
@@ -965,6 +1033,17 @@ function is_admin_user(): bool
     return (current_user()['role'] ?? '') === 'admin';
 }
 
+/**
+ * A Super Admin (the 'admin' role): everything, including approving Admins'
+ * new events and everyone's profile edits. (profiles.is_super_admin marks
+ * the protected one — Arian Abergas — who can't be demoted or deleted.)
+ */
+function is_super_admin_user(?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    return ($user['role'] ?? '') === 'admin';
+}
+
 function is_moderator_user(): bool
 {
     return (current_user()['role'] ?? '') === 'moderator';
@@ -977,14 +1056,14 @@ function is_staff_user(): bool
 }
 
 /**
- * 'admin' -> 'Admin', 'moderator' -> 'Moderator', 'user' -> 'Student' or
+ * 'admin' -> 'Super Admin', 'moderator' -> 'Admin', 'user' -> 'Student' or
  * 'Faculty' (the database keeps the enum value).
  */
 function role_display(string $role, ?string $accountType = null): string
 {
     return match ($role) {
-        'admin' => 'Admin',
-        'moderator' => 'Moderator',
+        'admin' => 'Super Admin',
+        'moderator' => 'Admin',
         default => $accountType === 'faculty' ? 'Faculty' : 'Student',
     };
 }
@@ -1029,9 +1108,9 @@ function require_login(): array
         header('Location: ' . BASE_URL . '/auth/login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? BASE_URL . '/enduser/dashboard.php'));
         exit;
     }
-    if (profile_missing_fields($user) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'profile.php') {
-        // My Profile lists what's missing.
-        header('Location: ' . BASE_URL . '/enduser/profile.php?complete=1');
+    if (profile_missing_fields($user) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'edit-profile.php') {
+        // The profile form lists what's missing.
+        header('Location: ' . BASE_URL . '/enduser/edit-profile.php?complete=1');
         exit;
     }
     return $user;
@@ -1042,7 +1121,7 @@ function require_admin(): array
 {
     $user = require_login();
     if (($user['role'] ?? 'user') !== 'admin') {
-        flash('error', 'That page is for admins only.');
+        flash('error', 'That page is for Super Admins only.');
         header('Location: ' . BASE_URL . '/enduser/dashboard.php');
         exit;
     }
@@ -1055,7 +1134,7 @@ function require_staff(): array
     $user = require_login();
     $role = $user['role'] ?? 'user';
     if ($role !== 'admin' && ($role !== 'moderator' || empty($user['organization_id']))) {
-        flash('error', $role === 'moderator' ? 'Your moderator account has no organization yet. Ask an admin to set it.' : 'That page is for admins and moderators only.');
+        flash('error', $role === 'moderator' ? 'Your Admin account has no organization yet. Ask a Super Admin to set it.' : 'That page is for Admins and Super Admins only.');
         header('Location: ' . BASE_URL . '/enduser/dashboard.php');
         exit;
     }
@@ -1088,7 +1167,7 @@ function require_event_manager(string $eventId): array
     $user = require_staff();
     $event = is_uuid($eventId) ? get_event_admin($eventId) : null;
     if (!$event || !can_manage_event($event, $user)) {
-        flash('error', $event ? 'Moderators can only manage their own organization\'s events.' : "That event doesn't exist anymore.");
+        flash('error', $event ? 'Admins can only manage their own organization\'s events.' : "That event doesn't exist anymore.");
         header('Location: ' . BASE_URL . '/admin/event-organizer.php');
         exit;
     }
@@ -1145,11 +1224,13 @@ function validate_account_fields(array $in, array $departments, array $organizat
         $studentType = (string) ($in['student_type'] ?? '');
         $course = trim((string) ($in['course'] ?? ''));
 
+        // The account's own saved ID, unchanged (it may be from before the format was required).
+        $unchanged = (string) $ownSchoolId !== '' && $schoolId === normalize_school_id($ownSchoolId);
         if ($schoolId === '') {
             $errors[] = 'Your School ID is required.';
-        } elseif (!valid_school_id($schoolId)) {
-            $errors[] = 'Please enter a valid School ID (letters, numbers and dashes, like ' . SCHOOL_ID_EXAMPLE . ').';
-        } elseif ($schoolId !== normalize_school_id($ownSchoolId) && school_id_taken($schoolId)) {
+        } elseif (!$unchanged && !valid_school_id($schoolId)) {
+            $errors[] = 'Please enter your School ID in the format ' . SCHOOL_ID_EXAMPLE . ' (2 digits, 4 digits, then 3 digits).';
+        } elseif (!$unchanged && school_id_taken($schoolId)) {
             $errors[] = 'That School ID is already registered to another account. If it\'s yours, contact an admin.';
         }
         if ($course === '') $errors[] = 'Your course is required.';
@@ -1207,12 +1288,256 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
     if (($user['role'] ?? '') === 'moderator') {
         unset($allowed['organization_id']);
     }
-    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
-    if (empty($rows)) {
-        return ['ok' => false, 'message' => friendly_error('Could not save your profile. Please try again.')];
+    if ($allowed) {
+        $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
+        if (empty($rows)) {
+            return ['ok' => false, 'message' => friendly_error('Could not save your profile. Please try again.')];
+        }
     }
     reload_session_profile();
     return ['ok' => true, 'message' => 'Profile saved.'];
+}
+
+// ---- Profile edits need the super admin's approval ----------------------------
+// (migration 20261017120000_super_admin_approvals.sql: profile_change_requests,
+// review_profile_change(); the database refuses direct changes too.)
+
+/** The details on the profile form, as shown to the reviewer. */
+const PROFILE_DETAIL_LABELS = [
+    'full_name' => 'Full name',
+    'account_type' => 'Student or faculty',
+    'department_id' => 'Department',
+    'organization_id' => 'Organization',
+    'school_id' => 'School ID',
+    'course' => 'Course',
+    'year_level' => 'Highest year level',
+    'student_type' => 'Student status',
+    'irregular_year_levels' => 'Year levels of subjects',
+];
+
+/** One detail in a comparable form (empty = null). */
+function profile_value_norm(string $key, $value)
+{
+    if ($key === 'irregular_year_levels') return parse_year_levels($value ?? []) ?: null;
+    if ($key === 'year_level') return $value === null || $value === '' ? null : (int) $value;
+    if ($key === 'school_id') return ($id = normalize_school_id(is_string($value) ? $value : null)) === '' ? null : $id;
+    $value = is_string($value) ? trim($value) : $value;
+    return $value === '' ? null : $value;
+}
+
+/**
+ * Compare the profile form with the saved profile.
+ * @param array $current the saved profile (current_user(), with school_id)
+ * @param array $new     full_name + validate_account_fields() fields + school_id
+ * @return array{fills: array, changes: array} fills = details that were empty,
+ *         changes = saved details that would change
+ */
+function profile_detail_diff(array $current, array $new): array
+{
+    $out = ['fills' => [], 'changes' => []];
+    foreach (array_keys(PROFILE_DETAIL_LABELS) as $key) {
+        if (!array_key_exists($key, $new)) continue;
+        $old = profile_value_norm($key, $current[$key] ?? null);
+        $value = profile_value_norm($key, $new[$key]);
+        if ($old === $value || ($key === 'school_id' && $value === null)) continue;
+        $out[$old === null ? 'fills' : 'changes'][$key] = $value;
+    }
+    return $out;
+}
+
+/** A detail as people read it: department / organization names, "3rd Year", … ('—' when empty). */
+function profile_value_label(string $key, $value, array $departments, array $organizations): string
+{
+    $value = profile_value_norm($key, $value);
+    if ($value === null) return '—';
+    return match ($key) {
+        'account_type' => label_of(ACCOUNT_TYPES, $value),
+        'department_id' => department_label(array_column($departments, null, 'id')[$value] ?? null) ?: 'Unknown department',
+        'organization_id' => array_column($organizations, 'name', 'id')[$value] ?? 'Unknown organization',
+        'year_level' => year_label($value),
+        'student_type' => label_of(STUDENT_TYPES, $value),
+        'irregular_year_levels' => year_levels_label($value) ?: 'Every year level',
+        default => (string) $value,
+    };
+}
+
+/**
+ * Save the profile form. Details that were still empty are saved straight
+ * away (completing a profile). Changes to saved details go to the super
+ * admin as a change request — except the super admin's own, which are saved.
+ * $completing (the "complete your profile" form): only the empty details are
+ * saved; changes to the others have to be sent from Edit my profile.
+ * @return array{ok: bool, message: string, requested?: bool, unchanged?: bool}
+ */
+function save_profile_details(array $new, bool $completing = false): array
+{
+    $user = current_user();
+    if (!$user) return ['ok' => false, 'message' => 'Please log in again.'];
+    $diff = profile_detail_diff($user, $new);
+    $pending = $completing ? null : get_my_profile_request('pending');
+
+    if (!$diff['fills'] && !$diff['changes']) {
+        if ($pending && withdraw_profile_request($pending['id'])['ok']) {
+            return ['ok' => true, 'unchanged' => true, 'message' => 'That\'s the same as your current profile, so your waiting request was withdrawn.'];
+        }
+        return ['ok' => true, 'unchanged' => true, 'message' => 'Nothing changed.'];
+    }
+
+    $save = function (array $fields): array {
+        $schoolId = $fields['school_id'] ?? null;
+        unset($fields['school_id']);
+        return update_my_profile($fields, $schoolId);
+    };
+    $later = 'Changes to details you had already filled in need a Super Admin\'s approval — send them from Edit my profile.';
+
+    // Only empty details filled in, or the super admin's own profile (or no
+    // super admin yet — the database update isn't run): saved now.
+    if (!$diff['changes'] || !profile_edits_need_approval($user)) {
+        $result = $save($diff['fills'] + $diff['changes']);
+        if ($result['ok'] && $pending) withdraw_profile_request($pending['id']); // replaced by what was just saved
+        return $result;
+    }
+    // Completing a profile: the empty details are saved, the changes aren't.
+    if ($completing) {
+        if (!$diff['fills']) return ['ok' => false, 'message' => $later];
+        $result = $save($diff['fills']);
+        return $result['ok'] ? ['ok' => true, 'message' => 'Saved. ' . $later] : $result;
+    }
+    // Everything else waits for the super admin (empty details too, as they may depend on the changes).
+    return send_profile_change_request($diff['fills'] + $diff['changes']);
+}
+
+/** Whether this account's profile changes wait for a Super Admin (not a Super Admin's own). */
+function profile_edits_need_approval(array $user): bool
+{
+    return !is_super_admin_user($user) && approvals_ready();
+}
+
+/** True once migration 20261017120000_super_admin_approvals.sql is run (approvals switched on). */
+function approvals_ready(): bool
+{
+    static $ready = null;
+    if ($ready === null) {
+        supabase_request('profiles', 'select=id&is_super_admin=is.true&limit=1');
+        $ready = supabase_last_error() === '';
+        $GLOBALS['supabase_last_error'] = '';
+    }
+    return $ready;
+}
+
+/** The logged-in user's latest change request ($status: only one with that status), or null. */
+function get_my_profile_request(?string $status = null): ?array
+{
+    $user = current_user();
+    if (!$user) return null;
+    $rows = supabase_user_request('profile_change_requests', 'select=*&user_id=eq.' . urlencode($user['id'])
+        . ($status ? '&status=eq.' . urlencode($status) : '') . '&order=created_at.desc&limit=1');
+    return $rows[0] ?? null;
+}
+
+/** Send changes for approval (a request that's still waiting is updated instead). */
+function send_profile_change_request(array $changes): array
+{
+    $user = current_user();
+    $pending = get_my_profile_request('pending');
+    $rows = $pending
+        ? supabase_user_request('profile_change_requests', 'id=eq.' . urlencode($pending['id']) . '&status=eq.pending', 'PATCH', ['changes' => $changes])
+        : supabase_user_request('profile_change_requests', '', 'POST', ['user_id' => $user['id'], 'changes' => $changes]);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => str_contains(supabase_last_error(), 'profile_change_requests')
+            ? 'Profile edits need the latest database update first. Please ask an admin to run it.'
+            : friendly_error('Could not send your changes. Please try again.')];
+    }
+    return ['ok' => true, 'requested' => true, 'message' => ($pending ? 'Your waiting request was updated.' : 'Sent to a Super Admin for approval.')
+        . ' Your profile keeps its current details until the changes are approved.'];
+}
+
+/** Take back the logged-in user's waiting request. */
+function withdraw_profile_request(string $requestId): array
+{
+    $user = current_user();
+    $rows = is_uuid($requestId) ? supabase_user_request('profile_change_requests',
+        'id=eq.' . urlencode($requestId) . '&user_id=eq.' . urlencode((string) ($user['id'] ?? '')) . '&status=eq.pending', 'PATCH', ['status' => 'withdrawn']) : [];
+    return $rows
+        ? ['ok' => true, 'message' => 'Your request was withdrawn. Your profile stays as it is.']
+        : ['ok' => false, 'message' => friendly_error('That request was already handled or withdrawn.')];
+}
+
+/** Change requests with that status, with the account's current details (Users & Roles › Approvals). */
+function get_profile_requests_admin(string $status = 'pending'): array
+{
+    return supabase_user_request('profile_change_requests',
+        'select=*,profiles(id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at))'
+        . '&status=eq.' . urlencode($status) . '&order=' . ($status === 'pending' ? 'created_at.asc' : 'reviewed_at.desc') . '&limit=300');
+}
+
+/** The super admin approves (the changes are saved to the profile) or rejects a request. */
+function review_profile_request(string $requestId, bool $approve, string $note = ''): array
+{
+    if (!is_super_admin_user()) {
+        return ['ok' => false, 'message' => 'Only a Super Admin can approve or reject profile changes.'];
+    }
+    if (!is_uuid($requestId)) return ['ok' => false, 'message' => 'Unknown request.'];
+    $note = mb_substr(trim($note), 0, 500);
+    $result = supabase_rpc('review_profile_change', ['p_request' => $requestId, 'p_approve' => $approve, 'p_note' => $note !== '' ? $note : null], true);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => friendly_error('Could not save your decision. Please try again.')];
+    }
+    return ['ok' => true, 'message' => $approve ? 'Approved — the changes are saved to their profile.' : 'Rejected — their profile stays as it was.'];
+}
+
+/**
+ * A Super Admin's note on something still waiting for approval (without
+ * deciding yet) — 'event' (events.approval_note) or 'profile'
+ * (note_profile_change()). The person who sent it sees the note; '' removes it.
+ */
+function save_approval_note(string $kind, string $id, string $note): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can leave notes.'];
+    if (!is_uuid($id)) return ['ok' => false, 'message' => 'Unknown request.'];
+    $note = mb_substr(trim($note), 0, 500);
+    if ($kind === 'event') {
+        $rows = supabase_user_request('events', 'id=eq.' . urlencode($id) . '&approval_status=eq.pending', 'PATCH', ['approval_note' => $note !== '' ? $note : null]);
+        $ok = !empty($rows);
+        if (!$ok && supabase_last_error() === '') return ['ok' => false, 'message' => 'That event isn\'t waiting for approval anymore.'];
+    } else {
+        $result = supabase_rpc('note_profile_change', ['p_request' => $id, 'p_note' => $note], true);
+        $ok = $result['ok'];
+        if (!$ok && str_contains(supabase_last_error(), 'note_profile_change')) {
+            return ['ok' => false, 'message' => 'Notes on profile edits need the latest database update first (20261018120000_approval_notes.sql).'];
+        }
+    }
+    if (!$ok) return ['ok' => false, 'message' => friendly_error('Could not save the note. Please try again.')];
+    return ['ok' => true, 'message' => $note !== '' ? 'Note saved — they\'ll see it with their request.' : 'Note removed.'];
+}
+
+/** Protected Super Admin accounts (profiles.is_super_admin — Arian Abergas): can't be demoted or deleted from the site. */
+function protected_account_ids(): array
+{
+    static $ids = null;
+    if ($ids === null) {
+        $ids = array_column(supabase_request('profiles', 'select=id&is_super_admin=is.true'), 'id');
+        $GLOBALS['supabase_last_error'] = '';
+    }
+    return $ids;
+}
+
+/**
+ * How many events and profile edits wait for the super admin — the count on
+ * the sidebar's Approvals link (admins). Kept for a minute in the session so
+ * pages don't ask the database every time; 0 before the database update.
+ */
+function approvals_waiting_count(bool $fresh = false): int
+{
+    // Super Admins: everything waiting. Admins: their own organization's events and their own edits (RLS).
+    if (!is_staff_user()) return 0;
+    $cache = $_SESSION['approvals_waiting'] ?? null;
+    if (!$fresh && is_array($cache) && $cache['at'] > time() - 60) return $cache['count'];
+    $count = count(supabase_user_request('events', 'select=id&approval_status=eq.pending&status=eq.draft&limit=1000'))
+        + count(supabase_user_request('profile_change_requests', 'select=id&status=eq.pending&limit=1000'));
+    $GLOBALS['supabase_last_error'] = '';
+    $_SESSION['approvals_waiting'] = ['count' => $count, 'at' => time()];
+    return $count;
 }
 
 /** Every account with its details, for the admin Users page. */
@@ -1239,15 +1564,63 @@ function set_user_role_admin(string $userId, string $role): array
     if ($role === 'moderator') {
         $target = supabase_user_request('profiles', 'select=organization_id&id=eq.' . urlencode($userId));
         if (empty($target[0]['organization_id'])) {
-            return ['ok' => false, 'message' => 'A moderator runs their organization\'s events, so this account needs an organization first.'];
+            return ['ok' => false, 'message' => 'An Admin runs their organization\'s events, so this account needs an organization first.'];
         }
     }
     $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($userId), 'PATCH', ['role' => $role]);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not change the role.')];
     }
-    $as = ['admin' => 'an admin', 'moderator' => 'a moderator', 'user' => 'a regular ' . strtolower(role_display('user', $rows[0]['account_type'] ?? null)) . ' account'][$role];
+    $as = ['admin' => 'a Super Admin', 'moderator' => 'an Admin', 'user' => 'a regular ' . strtolower(role_display('user', $rows[0]['account_type'] ?? null)) . ' account'][$role];
     return ['ok' => true, 'message' => $rows[0]['full_name'] . ' is now ' . $as . '.'];
+}
+
+/** One account with its details and School ID (Super Admin: Users & Roles › Edit), or null. */
+function get_profile_admin(string $userId): ?array
+{
+    if (!is_uuid($userId)) return null;
+    $rows = supabase_user_request('profiles', 'select=id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
+    if (empty($rows[0])) return null;
+    $row = $rows[0];
+    $row['school_id'] = $row['school_ids']['school_id'] ?? null;
+    $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
+    unset($row['school_ids']);
+    return $row;
+}
+
+/**
+ * Super Admin: save someone's details straight away (no approval needed) —
+ * $fields from validate_account_fields() plus full_name; students' School ID
+ * is saved (and verified or not) when it or its verified mark changed.
+ */
+function update_profile_admin(array $account, array $fields, ?string $schoolId, bool $verified): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can edit other accounts.'];
+    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($account['id']), 'PATCH', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => friendly_error('Could not save the account. Please try again.')];
+    }
+    if ($schoolId !== null && $schoolId !== '' && ($schoolId !== ($account['school_id'] ?? null) || $verified !== !empty($account['school_id_verified']))) {
+        $result = set_school_id_admin($account['id'], $schoolId, $verified);
+        if (!$result['ok']) return ['ok' => false, 'message' => 'The details were saved, but not the School ID: ' . $result['message']];
+    }
+    if ($account['id'] === (current_user()['id'] ?? '')) reload_session_profile();
+    return ['ok' => true, 'message' => $rows[0]['full_name'] . '\'s account was saved.'];
+}
+
+/** Super Admin: delete an account — its login and profile (database: delete_account()). */
+function delete_account_admin(string $userId): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can delete accounts.'];
+    if (!is_uuid($userId)) return ['ok' => false, 'message' => 'Unknown account.'];
+    if ($userId === (current_user()['id'] ?? '')) return ['ok' => false, 'message' => "You can't delete your own account."];
+    $result = supabase_rpc('delete_account', ['p_user' => $userId], true);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => str_contains(supabase_last_error(), 'delete_account')
+            ? 'Deleting accounts needs the latest database update first (20261018090000_three_role_levels.sql).'
+            : friendly_error('Could not delete the account. Please try again.')];
+    }
+    return ['ok' => true, 'message' => (is_string($result['data']) && $result['data'] !== '' ? $result['data'] . '\'s account' : 'The account') . ' was deleted.'];
 }
 
 /**
@@ -1286,7 +1659,7 @@ function set_school_id_admin(string $userId, string $schoolId, bool $verified): 
 {
     $schoolId = normalize_school_id($schoolId);
     if (!valid_school_id($schoolId)) {
-        return ['ok' => false, 'message' => 'Please enter a valid School ID (like ' . SCHOOL_ID_EXAMPLE . ').'];
+        return ['ok' => false, 'message' => 'Please enter the School ID in the format ' . SCHOOL_ID_EXAMPLE . ' (2 digits, 4 digits, then 3 digits).'];
     }
     $fields = ['school_id' => $schoolId, 'verified_at' => $verified ? gmdate('c') : null, 'verified_by' => $verified ? (current_user()['id'] ?? null) : null];
     $existing = supabase_user_request('school_ids', 'select=user_id&user_id=eq.' . urlencode($userId));
@@ -1303,7 +1676,7 @@ function set_school_id_admin(string $userId, string $schoolId, bool $verified): 
 // =============================================================================
 
 /** Columns used for event cards/lists: category + organization joined in. */
-const EVENT_CARD_SELECT = 'select=*,categories(name),organizations(id,name,logo_url)';
+const EVENT_CARD_SELECT = 'select=*,categories(name),organizations!events_organization_id_fkey(id,name,logo_url)';
 
 /**
  * One event by id. Uses the logged-in user's token when there is one, so
@@ -1743,7 +2116,7 @@ function get_all_events_admin(): array
 {
     $user = current_user();
     $scope = ($user['role'] ?? '') === 'admin' ? '' : '&organization_id=eq.' . urlencode((string) ($user['organization_id'] ?? '00000000-0000-0000-0000-000000000000'));
-    return supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url),event_programs(count)&order=created_at.desc' . $scope);
+    return supabase_user_request('events', 'select=*,categories(name),organizations!events_organization_id_fkey(name,logo_url),event_programs(count)&order=created_at.desc' . $scope);
 }
 
 /** Organizations the logged-in user may create events for: all (admin) or their own (moderator). */
@@ -1769,7 +2142,7 @@ function find_schedule_conflicts(array $ev, ?string $excludeId = null): array
     $end = (string) ($ev['end_date'] ?? '') ?: $start;
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) return $out;
 
-    $rows = supabase_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,organizations(name)'
+    $rows = supabase_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,organizations!events_organization_id_fkey(name)'
         . '&status=neq.cancelled&start_date=lte.' . max($start, $end) . '&end_date=gte.' . min($start, $end) . '&order=start_date.asc,start_time.asc.nullslast&limit=100',
         'GET', null, session_access_token());
 
@@ -1821,7 +2194,7 @@ function auto_complete_events(bool $now = false): void
 function get_event_admin(string $eventId): ?array
 {
     if (!is_uuid($eventId)) return null;
-    $rows = supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url,departments(name,code))&id=eq.' . urlencode($eventId) . '&limit=1');
+    $rows = supabase_user_request('events', 'select=*,categories(name),organizations!events_organization_id_fkey(name,logo_url,departments(name,code))&id=eq.' . urlencode($eventId) . '&limit=1');
     return $rows[0] ?? null;
 }
 
@@ -1866,25 +2239,108 @@ function event_organizers_label(array $ev, array $partners = [], string $default
     return $names ? implode(', ', $names) . ' & ' . $last : $last;
 }
 
-/** @return array{ok:bool, message:string, event?:array} */
+/**
+ * A save (POST / PATCH) as the logged-in user that still works when the
+ * database is missing a newer column (a database update that hasn't been
+ * run): those columns are left out and listed in $dropped.
+ */
+function supabase_user_write_lenient(string $table, string $query, string $method, array $fields, ?array &$dropped = null): array
+{
+    $dropped = [];
+    for ($try = 0; $try < 5; $try++) {
+        $rows = supabase_user_request($table, $query, $method, $fields);
+        if ($rows) return $rows;
+        // PostgREST: "Could not find the 'x' column of 'events' in the schema cache" / Postgres: "column events.x does not exist"
+        if (!preg_match("/Could not find the '(\w+)' column|column \w+\.(\w+) does not exist/", supabase_last_error(), $m)) return $rows;
+        $column = ($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? '');
+        if (!array_key_exists($column, $fields)) return $rows;
+        unset($fields[$column]);
+        $dropped[] = $column;
+    }
+    return [];
+}
+
+/** @return array{ok:bool, message:string, event?:array, dropped?:string[]} dropped: columns the database doesn't have yet */
 function create_event_admin(array $fields): array
 {
     $fields['created_by'] = current_user()['id'] ?? null;
-    $rows = supabase_user_request('events', '', 'POST', $fields);
+    $rows = supabase_user_write_lenient('events', '', 'POST', $fields, $dropped);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not create the event. Please check the fields and try again.')];
     }
-    return ['ok' => true, 'message' => 'Event created.', 'event' => $rows[0]];
+    return ['ok' => true, 'message' => 'Event created.', 'event' => $rows[0], 'dropped' => $dropped];
 }
 
-/** @return array{ok:bool, message:string} */
+/** @return array{ok:bool, message:string, event?:array, dropped?:string[]} */
 function update_event_admin(string $eventId, array $fields): array
 {
-    $rows = supabase_user_request('events', 'id=eq.' . urlencode($eventId), 'PATCH', $fields);
+    $rows = supabase_user_write_lenient('events', 'id=eq.' . urlencode($eventId), 'PATCH', $fields, $dropped);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not save changes. Please try again.')];
     }
-    return ['ok' => true, 'message' => 'Event updated.'];
+    return ['ok' => true, 'message' => 'Event updated.', 'event' => $rows[0], 'dropped' => $dropped];
+}
+
+// ---- Admins' new events need a Super Admin's approval ------------------------
+// (migrations 20261017120000_super_admin_approvals.sql, 20261018090000_three_role_levels.sql).
+// events.approval_status: null = no approval needed (Super Admins' events, older
+// events), 'needed' = an Admin's (moderator role) event not sent yet, 'pending' =
+// waiting (still a draft), 'approved', 'rejected' (approval_note says why).
+// Publishing one of these events sends it for approval instead — the database
+// does that (trg_events_approval).
+
+/** True if this event, published by this user now, would wait for a Super Admin. */
+function event_needs_approval(?array $event, array $user): bool
+{
+    if (($user['role'] ?? '') !== 'moderator' || !approvals_ready()) return false;
+    return $event === null || in_array($event['approval_status'] ?? null, ['needed', 'pending', 'rejected'], true);
+}
+
+/** Admins' events with that approval status (Users & Roles › Approvals). */
+function get_event_approvals_admin(string $status = 'pending'): array
+{
+    return supabase_user_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,'
+        . 'send_notification,created_by,approval_status,approval_note,approval_requested_at,approval_reviewed_by,approval_reviewed_at,categories(name),organizations!events_organization_id_fkey(name)'
+        . '&approval_status=eq.' . urlencode($status)
+        . ($status === 'pending' ? '&status=eq.draft&order=approval_requested_at.asc' : '&order=approval_reviewed_at.desc') . '&limit=300');
+}
+
+/**
+ * The super admin approves an event (it's published, and announced if its
+ * organizer ticked "Send Notification") or rejects it (it stays a draft;
+ * its admin can change it and send it again).
+ */
+function review_event_admin(string $eventId, bool $approve, string $note = ''): array
+{
+    if (!is_super_admin_user()) {
+        return ['ok' => false, 'message' => 'Only a Super Admin can approve or reject events.'];
+    }
+    $ev = get_event_admin($eventId);
+    if (!$ev || ($ev['approval_status'] ?? '') !== 'pending') {
+        return ['ok' => false, 'message' => 'That event isn\'t waiting for approval anymore.'];
+    }
+    $note = mb_substr(trim($note), 0, 500);
+    $fields = [
+        'approval_status' => $approve ? 'approved' : 'rejected',
+        'approval_reviewed_by' => current_user()['id'] ?? null,
+        'approval_reviewed_at' => gmdate('c'),
+    ];
+    if ($note !== '') $fields['approval_note'] = $note; // otherwise an earlier note stays
+    if ($approve) $fields += ['status' => 'published', 'is_published' => true];
+    $rows = supabase_user_request('events', 'id=eq.' . urlencode($eventId) . '&approval_status=eq.pending', 'PATCH', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => friendly_error('Could not save your decision. Please try again.')];
+    }
+    if (!$approve) {
+        return ['ok' => true, 'message' => 'Rejected — "' . $ev['title'] . '" stays a draft. Its admin can change it and send it again.'];
+    }
+    $message = 'Approved — "' . $ev['title'] . '" is published.';
+    if (!empty($ev['send_notification'])) {
+        $sent = notify_event($ev['id'], 'all', 'New event: ' . $ev['title'], event_when($ev) . ' · ' . event_place($ev));
+        if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
+    }
+    auto_complete_events(true); // already over: Completed right away
+    return ['ok' => true, 'message' => $message];
 }
 
 /** Delete an event (its registrations, programs and notifications go with it). Admins only. */
@@ -2134,7 +2590,7 @@ function delete_category_admin(string $categoryId): array
 /** All organizations with their department and event / officer counts. */
 function get_all_organizations_admin(): array
 {
-    return supabase_user_request('organizations', 'select=*,departments(name,code),events(count),organization_officers(count)&order=name.asc');
+    return supabase_user_request('organizations', 'select=*,departments(name,code),events!events_organization_id_fkey(count),organization_officers(count)&order=name.asc');
 }
 
 function get_organization_admin(string $organizationId): ?array

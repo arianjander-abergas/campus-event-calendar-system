@@ -1,13 +1,13 @@
 <?php
 /**
- * Admin: event reports. Filter by school year, semester, department,
+ * Admin: event reports. Filter by school year, semester, month, department,
  * organization, audience and venue type (or a date range), then see:
  * totals, events per semester / month / week, per department and
  * organization, and the full event list. Print-ready ("Print report" prints
  * the totals and tables only, no graphs) and downloadable as an Excel
  * workbook. Numbers come from the event_report view.
  *
- *   ?school_year=2026-2027|all &semester=1st|2nd|summer &department=<id>
+ *   ?school_year=2026-2027|all &semester=1st|2nd|summer &month=2026-10 &department=<id>
  *   &organization=<id> &audience=students|faculty|all
  *   &venue_type=on_campus|off_campus|online &from=Y-m-d &to=Y-m-d &export=xlsx
  */
@@ -34,6 +34,7 @@ $filters = [
     'venue_type' => isset(VENUE_TYPES[$param('venue_type')]) ? $param('venue_type') : '',
     'from' => $isDate($param('from')) ? $param('from') : '',
     'to' => $isDate($param('to')) ? $param('to') : '',
+    'month' => '', // checked below, against the months on offer
 ];
 if (!in_array($filters['school_year'], $schoolYears, true) && $filters['school_year'] !== 'all') {
     $schoolYears[] = $filters['school_year'];
@@ -41,6 +42,17 @@ if (!in_array($filters['school_year'], $schoolYears, true) && $filters['school_y
 }
 
 $rows = get_event_report($filters);
+
+// Month: one month of the chosen school year (or semester); with "All school
+// years", the months that have events. Applied to the rows above.
+$monthOptions = $filters['school_year'] !== 'all'
+    ? month_list(...term_range($filters['school_year'], $filters['semester']))
+    : array_keys(group_rows($rows, fn($r) => substr($r['start_date'], 0, 7)));
+sort($monthOptions);
+if (in_array($param('month'), $monthOptions, true)) {
+    $filters['month'] = $param('month');
+    $rows = array_values(array_filter($rows, fn($r) => str_starts_with((string) $r['start_date'], $filters['month'])));
+}
 $totals = report_totals($rows);
 $held = array_values(array_filter($rows, fn($r) => $r['status'] !== 'cancelled'));
 
@@ -50,6 +62,7 @@ $orgName = array_column($organizations, 'name', 'id')[$filters['organization']] 
 $scope = array_filter([
     $filters['school_year'] === 'all' ? 'All school years' : 'SY ' . $filters['school_year'],
     $filters['semester'] !== '' ? SEMESTERS[$filters['semester']] : '',
+    $filters['month'] !== '' ? month_label($filters['month']) : '',
     $filters['from'] !== '' || $filters['to'] !== '' ? trim(($filters['from'] !== '' ? format_event_date($filters['from']) : '…') . ' to ' . ($filters['to'] !== '' ? format_event_date($filters['to']) : '…')) : '',
     $deptName ? 'Department: ' . department_label($deptName) : '',
     $orgName !== '' ? 'Organization: ' . $orgName : '',
@@ -57,7 +70,7 @@ $scope = array_filter([
     $filters['venue_type'] !== '' ? VENUE_TYPES[$filters['venue_type']] : '',
 ]);
 $scopeText = implode(' · ', $scope);
-$isFiltered = $filters['semester'] !== '' || $filters['department'] !== '' || $filters['organization'] !== ''
+$isFiltered = $filters['semester'] !== '' || $filters['month'] !== '' || $filters['department'] !== '' || $filters['organization'] !== ''
     || $filters['audience'] !== '' || $filters['venue_type'] !== '' || $filters['from'] !== '' || $filters['to'] !== ''
     || $filters['school_year'] !== $current['school_year'];
 
@@ -75,8 +88,10 @@ if (get_param('export') === 'xlsx') {
         ], $rows));
 }
 
-// ---- Months covered: the chosen dates, the school year (or semester), or the events' own range ----
-if ($filters['from'] !== '' || $filters['to'] !== '') {
+// ---- Months covered: the chosen month, the chosen dates, the school year (or semester), or the events' own range ----
+if ($filters['month'] !== '') {
+    $rangeFrom = $rangeTo = $filters['month'] . '-01';
+} elseif ($filters['from'] !== '' || $filters['to'] !== '') {
     $rangeFrom = $filters['from'] ?: ($rows[0]['start_date'] ?? date('Y-m-d'));
     $rangeTo = $filters['to'] ?: (end($rows)['start_date'] ?? date('Y-m-d'));
 } elseif ($filters['school_year'] !== 'all') {
@@ -181,6 +196,14 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
           <option value="">Whole school year</option>
           <?php foreach (SEMESTERS as $key => $label): ?>
             <option value="<?= $key ?>" <?= $filters['semester'] === $key ? 'selected' : '' ?>><?= $label ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <label>Month
+        <select name="month">
+          <option value="">All months</option>
+          <?php foreach ($monthOptions as $m): ?>
+            <option value="<?= $m ?>" <?= $filters['month'] === $m ? 'selected' : '' ?>><?= htmlspecialchars(month_label($m)) ?></option>
           <?php endforeach; ?>
         </select>
       </label>

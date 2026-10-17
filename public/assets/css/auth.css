@@ -676,6 +676,10 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .register-form .acct-option:hover span { border-color: rgba(var(--p-hi-rgb), 0.5); transform: translateY(-1px); }
 .login-glass .register-form .acct-option strong { color: var(--glass-text); }
 .login-glass .register-form .acct-option small { color: var(--glass-muted); font-weight: 400; }
+.login-glass .acct-hint { color: var(--glass-muted); } /* School ID format, under the field */
+.login-glass .acct-hint.is-error { color: #fca5a5; }
+.login-glass .login-input.is-invalid,
+.login-glass .login-input.is-invalid:focus { border-color: #f87171; box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.22); }
 .login-glass .register-form .acct-option input:checked + span {
   background: rgba(var(--p-hi-rgb), 0.1);
   border-color: var(--glass-gold);

@@ -52,6 +52,8 @@ const ASSISTANT_BASIC_PAGES = [
     'sign_up' => ['sign up', 'signup', 'create account', 'create an account', 'make an account', 'register an account'],
     'log_in' => ['log in', 'login', 'sign in', 'signin'],
     'my_events' => ['my events', 'my event', 'my registrations', 'my registration', 'my registered events', 'registered events'],
+    'edit_profile' => ['edit my profile', 'edit profile', 'edit my details', 'update my profile', 'change my details'],
+    'approvals' => ['approvals', 'approvals tab'],
     'my_profile' => ['my profile', 'profile', 'my account', 'account', 'change password', 'change my password', 'password'],
     'create_event' => ['create event', 'create an event', 'create events', 'new event', 'add event', 'add an event', 'make an event', 'event form'],
     'update_events' => ['update events', 'update event', 'manage events', 'manage event', 'edit events', 'edit event', 'event list', 'events list'],
@@ -572,7 +574,7 @@ function assistant_basic_howto(string $m, ?array $user): ?array
     if ($event && assistant_basic_has($m, ['create', 'make', 'add', 'post', 'publish', 'set up', 'organize', 'gumawa'])) {
         return $staff
             ? assistant_basic_say('Go to **Manage Events → Create Event**, fill in the form (category, organizers, dates, venue, audience and registration) and publish it. Want me to open Create Event?', null, ['page' => 'create_event'])
-            : assistant_basic_say("Only moderators and admins can create events. If your organization wants to post one, ask its moderator.");
+            : assistant_basic_say("Only Admins and Super Admins can create events. If your organization wants to post one, ask its Admin.");
     }
     if ($staff && $event && assistant_basic_has($m, ['edit', 'update', 'change', 'delete', 'remove'])) {
         return assistant_basic_say('On **Update Events**, find the event and open its **Edit ▾** menu: **Update** changes the details, and you can mark it cancelled or completed there.'
@@ -597,10 +599,10 @@ function assistant_basic_howto(string $m, ?array $user): ?array
     if (assistant_basic_has($m, ['moderator', 'admin', 'role', 'roles'])) {
         return $role === 'admin'
             ? assistant_basic_say('You change roles on **Users & Roles**. Want me to open it?', null, ['page' => 'users_roles'])
-            : assistant_basic_say('Roles are given by admins on the Users & Roles page. Ask an admin if you need to be a moderator.');
+            : assistant_basic_say('Roles are given by Super Admins on the Users & Roles page. Ask a Super Admin if you need to be an Admin.');
     }
     if (assistant_basic_has($m, ['profile', 'school id', 'department', 'course', 'year level', 'irregular', 'my details', 'my info'])) {
-        return assistant_basic_say('Your department, organization, School ID, course and year level are on **My Profile**.' . $guestNote
+        return assistant_basic_say('Your department, organization, School ID, course and year level are on **My Profile**; change them with **Edit my profile** (a Super Admin approves changes before they\'re saved).' . $guestNote
             . ($user ? ' Want me to open it?' : ''), null, $user ? ['page' => 'my_profile'] : null);
     }
     if (assistant_basic_has($m, ['search', 'find', 'filter', 'look for', 'hanapin'])) {

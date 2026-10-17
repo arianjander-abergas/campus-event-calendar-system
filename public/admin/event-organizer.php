@@ -25,7 +25,7 @@ $departments = get_departments(); // the clickable headings in the Organization 
 $editId = get_param('edit');
 $editEvent = is_uuid($editId) ? get_event_admin($editId) : null;
 if ($editId !== '' && (!$editEvent || !can_manage_event($editEvent, $user))) {
-    flash('error', $editEvent ? "Moderators can only edit their own organization's events." : "That event doesn't exist anymore.");
+    flash('error', $editEvent ? "Admins can only edit their own organization's events." : "That event doesn't exist anymore.");
     header('Location: event-organizer.php');
     exit;
 }
@@ -133,6 +133,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'status' => $intent === 'publish' ? 'published' : 'draft',
     ];
 
+    // Saving as a draft takes back a request for a Super Admin's approval
+    // (publishing sends it again; the database turns that into a request).
+    if ($intent === 'draft' && ($previous['approval_status'] ?? null) === 'pending') {
+        $fields['approval_status'] = 'needed';
+    }
+
     // Only send year levels when used (or being cleared), so saving still works
     // on a database that doesn't have the column yet.
     if (!$fields['year_levels'] && empty($previous['year_levels'])) unset($fields['year_levels']);
@@ -149,6 +155,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (mb_strlen($fields['description']) > 2000) $errors[] = 'Description must be 2000 characters or fewer.';
     if ($fields['start_date'] === '') $errors[] = 'Start date is required.';
     if ($fields['end_date'] === '') $errors[] = 'End date is required.';
+    // No events in the past: a new event (or a date being changed) can't be before today.
+    // An existing event's own dates may stay as they are.
+    $today = date('Y-m-d');
+    foreach (['start_date' => 'start date', 'end_date' => 'end date', 'registration_deadline' => 'registration deadline'] as $key => $label) {
+        $date = (string) ($fields[$key] ?? '');
+        if ($date !== '' && $date < $today && $date !== (string) ($previous[$key] ?? '')) {
+            $errors[] = 'The ' . $label . ' can\'t be before today (' . format_event_date($today) . ').';
+        }
+    }
     if ($fields['start_date'] !== '' && $fields['end_date'] !== '' && $fields['end_date'] < $fields['start_date']) {
         $errors[] = "End date can't be before the start date.";
     }
@@ -191,11 +206,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         $result = $previous ? update_event_admin($previous['id'], $fields) : create_event_admin($fields);
         if ($result['ok']) {
             $eventId = $previous['id'] ?? $result['event']['id'];
-            $message = $previous ? 'Event updated.' : ($intent === 'publish' ? 'Event published.' : 'Draft saved.');
+            // An Admin's (moderator role) event is published once a Super Admin approves it (the database keeps it a draft till then).
+            $waiting = $intent === 'publish' && ($result['event']['approval_status'] ?? null) === 'pending';
+            $fields['status'] = $result['event']['status'] ?? $fields['status'];
+            $message = $waiting
+                ? 'Sent to a Super Admin for approval. It stays a draft until it\'s approved' . ($sendNotification ? '; everyone is notified when it\'s published.' : '.')
+                : ($previous ? 'Event updated.' : ($intent === 'publish' ? 'Event published.' : 'Draft saved.'));
+            if (($previous['approval_status'] ?? null) === 'pending' && ($fields['approval_status'] ?? null) === 'needed') {
+                $message = 'Draft saved. It was taken back from approval — publish it to send it again.';
+            }
 
+            // What the database couldn't store yet (a database update not run): the event
+            // is saved without it, and the message says what's missing.
+            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels'];
+            $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $result['dropped'] ?? []);
             // Co-organizers (also cleared when an event stops being multi-organization).
             if (($partnerOrgs || $previous) && !set_event_partner_orgs($eventId, $partnerOrgs) && $partnerOrgs) {
-                $message .= ' (The other organizations couldn\'t be saved — an admin needs to run the latest database update.)';
+                $notSaved[] = 'the other organizations';
+            }
+            if ($notSaved) {
+                flash('error', 'Not saved yet: ' . implode(' and ', $notSaved) . '. The database is missing an update — a Super Admin can run it from Database update (link in the red banner), then edit the event to add these.');
             }
 
             // "Send Notification to Users": a newly published event goes to
@@ -240,6 +270,10 @@ if ($editEvent) {
     $editEvent['partner_ids'] = array_column(get_event_partner_orgs([$editEvent['id']])[$editEvent['id']] ?? [], 'id');
     $editEvent['multi_org'] = (bool) $editEvent['partner_ids'];
 }
+
+// Will publishing wait for a Super Admin? (Admins' — moderator role — new events do.)
+$savedEvent = $editEvent;
+$needsApproval = $view !== 'update' && event_needs_approval($savedEvent, $user);
 
 // A form with errors from the save just above (shown once).
 $state = recall_form('event');
@@ -288,6 +322,11 @@ if (!$isAdmin) $f['organization_id'] = $user['organization_id'];
 $val = fn(string $key, $default = '') => htmlspecialchars((string) ($f[$key] ?? $default));
 $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0, 5)); // "13:30:00" -> "13:30"
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
+// Earliest date the pickers allow: today — or an existing event's own earlier date, so it can be kept.
+$minDate = function (string $key) use ($savedEvent): string {
+    $saved = (string) ($savedEvent[$key] ?? '');
+    return $saved !== '' && $saved < date('Y-m-d') ? $saved : date('Y-m-d');
+};
 $formLevels = parse_year_levels($f['year_levels'] ?? []);
 
 $myOrgName = $organizations[0]['name'] ?? '';
@@ -316,11 +355,18 @@ $breadcrumbs[] = [$pageTitle, null];
   <main class="dash-main">
     <h1 class="page-title"><?= $view === 'create' ? 'Create New Event' : $pageTitle ?></h1>
     <?php if (!$isAdmin): ?>
-      <p class="admin-note">You're a <strong>moderator</strong> for <strong><?= htmlspecialchars($myOrgName) ?></strong>: you can create, publish, edit and cancel its events, and manage their schedules, registrations and attendance. Only admins can delete events.</p>
+      <p class="admin-note">You're an <strong>Admin</strong> for <strong><?= htmlspecialchars($myOrgName) ?></strong>: you can create, publish, edit and cancel its events, and manage their schedules, registrations and attendance. Only admins can delete events.</p>
     <?php endif; ?>
 
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
+    <?php if ($view !== 'update' && ($savedEvent['approval_status'] ?? null) === 'pending' && ($savedEvent['status'] ?? '') === 'draft'): ?>
+      <div class="admin-note approval-banner"><strong>Waiting for approval</strong> since <?= htmlspecialchars(format_timestamp($savedEvent['approval_requested_at'] ?? null)) ?>. A Super Admin publishes it once it's approved. Saving it as a draft takes the request back.<?php if (!empty($savedEvent['approval_note'])): ?><br><strong>Note from a Super Admin:</strong> “<?= htmlspecialchars($savedEvent['approval_note']) ?>”<?php endif; ?></div>
+    <?php elseif ($view !== 'update' && ($savedEvent['approval_status'] ?? null) === 'rejected' && ($savedEvent['status'] ?? '') === 'draft'): ?>
+      <div class="flash flash-error approval-banner" role="status"><strong>Not approved</strong> (<?= htmlspecialchars(format_timestamp($savedEvent['approval_reviewed_at'] ?? null)) ?>)<?= !empty($savedEvent['approval_note']) ? ': “' . htmlspecialchars($savedEvent['approval_note']) . '”' : '.' ?> Change what's needed and send it again.</div>
+    <?php elseif ($needsApproval && $view === 'create'): ?>
+      <div class="admin-note approval-banner">New events by Admins are published once a Super Admin approves them — <em>Send for Approval</em> sends this one.</div>
+    <?php endif; ?>
 
     <?php if ($view !== 'update'): ?>
     <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset>
@@ -415,7 +461,7 @@ $breadcrumbs[] = [$pageTitle, null];
           <?php endif; ?>
           <p class="admin-hint" data-org-hint>
             <?= $isAdmin
-              ? 'Click a department to see its organizations. For a multi-organization event, the main organizer\'s moderators run the event; the others are shown as co-organizers.'
+              ? 'Click a department to see its organizations. For a multi-organization event, the main organizer\'s Admins run the event; the others are shown as co-organizers.'
               : 'Your organization runs the event. Tick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
           </p>
         </div>
@@ -444,7 +490,7 @@ $breadcrumbs[] = [$pageTitle, null];
         <div class="admin-four-col">
           <div>
             <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
-            <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" required>
+            <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" min="<?= $minDate('start_date') ?>" required>
           </div>
           <div>
             <label class="admin-label" for="start_time">Start Time</label>
@@ -452,7 +498,7 @@ $breadcrumbs[] = [$pageTitle, null];
           </div>
           <div>
             <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
-            <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" required>
+            <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" min="<?= $minDate('end_date') ?>" data-min="<?= $minDate('end_date') ?>" required>
           </div>
           <div>
             <label class="admin-label" for="end_time">End Time</label>
@@ -510,7 +556,7 @@ $breadcrumbs[] = [$pageTitle, null];
           <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>">
 
           <label class="admin-label" for="registration_deadline">Registration Deadline</label>
-          <input type="date" id="registration_deadline" name="registration_deadline" class="admin-input" value="<?= $val('registration_deadline') ?>">
+          <input type="date" id="registration_deadline" name="registration_deadline" class="admin-input" value="<?= $val('registration_deadline') ?>" min="<?= $minDate('registration_deadline') ?>">
 
           <label class="admin-label" for="contact_email">Contact Email</label>
           <input type="email" id="contact_email" name="contact_email" class="admin-input" placeholder="Enter email" value="<?= $val('contact_email') ?>">
@@ -534,7 +580,7 @@ $breadcrumbs[] = [$pageTitle, null];
       <div class="admin-actions">
         <a href="<?= $editId ? $listUrl : 'event-organizer.php' ?>" class="btn btn-outline">Cancel</a>
         <button type="submit" name="intent" value="draft" class="btn btn-muted">Save Draft</button>
-        <button type="submit" name="intent" value="publish" class="btn btn-primary"><?= $editId ? 'Save &amp; Publish' : 'Publish Event' ?></button>
+        <button type="submit" name="intent" value="publish" class="btn btn-primary"><?= $needsApproval ? ($editId ? 'Save &amp; Send for Approval' : 'Send for Approval') : ($editId ? 'Save &amp; Publish' : 'Publish Event') ?></button>
       </div>
     </form>
     <?php else: ?>
@@ -619,7 +665,16 @@ $breadcrumbs[] = [$pageTitle, null];
               </td>
               <td class="admin-nowrap"><?= htmlspecialchars(format_event_date($ev['start_date'] ?? null)) ?></td>
               <td><?= (int) ($counts[$ev['id']] ?? 0) ?><?= !empty($ev['registration_limit']) ? ' / ' . (int) $ev['registration_limit'] : '' ?></td>
-              <td><span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span></td>
+              <td>
+                <?php if ($status === 'draft' && ($ev['approval_status'] ?? null) === 'pending'): ?>
+                  <span class="admin-status admin-status-pending" title="Waiting for a Super Admin's approval">Awaiting approval</span>
+                  <?php if (!empty($ev['approval_note'])): ?><div class="admin-table-sub" title="<?= htmlspecialchars($ev['approval_note']) ?>">Note: <?= htmlspecialchars(excerpt($ev['approval_note'], 40)) ?></div><?php endif; ?>
+                <?php elseif ($status === 'draft' && ($ev['approval_status'] ?? null) === 'rejected'): ?>
+                  <span class="admin-status admin-status-cancelled" title="<?= htmlspecialchars($ev['approval_note'] ?? '') ?>">Not approved</span>
+                <?php else: ?>
+                  <span class="admin-status admin-status-<?= htmlspecialchars($status) ?>"><?= htmlspecialchars(ucfirst($status)) ?></span>
+                <?php endif; ?>
+              </td>
               <td>
                 <div class="admin-row-actions admin-row-actions-nowrap">
                 <?php /* Two menus keep every row on one line:
@@ -699,6 +754,17 @@ $breadcrumbs[] = [$pageTitle, null];
 (function () {
   var form = document.getElementById('event-form');
   if (!form) return; // Update Events list: no form on the page
+
+  // Dates: nothing before today (the pickers' min); the end date can't be before the start date.
+  var startDate = document.getElementById('start_date');
+  var endDate = document.getElementById('end_date');
+  function syncEndMin() {
+    var base = endDate.getAttribute('data-min') || '';
+    endDate.min = startDate.value && startDate.value > base ? startDate.value : base;
+    if (endDate.value && endDate.value < endDate.min) endDate.value = endDate.min;
+  }
+  startDate.addEventListener('change', syncEndMin);
+  syncEndMin();
 
   // Venue type decides which field is required: the venue (on/off-campus) or the link (online).
   var venue = document.getElementById('venue');
