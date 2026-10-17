@@ -95,6 +95,7 @@ $manageMenu = fn(): string =>
       <?php if (!empty($navUser['organization_id'])): ?>
         <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>
         <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
+        <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
       <?php endif; ?>
     </nav>
   <?php elseif ($navRole === 'admin'): ?>
@@ -114,4 +115,6 @@ $manageMenu = fn(): string =>
 </aside>
 <div class="nav-backdrop" data-nav-close hidden></div>
 <?php /* The Event Hub Assistant chat box in the bottom-right corner — every page with this sidebar. */ ?>
+<?php /* The site's confirmation pop-up (data-confirm on forms, cehConfirm() / cehAlert()) — every page with this sidebar. */ ?>
+<script src="<?= BASE_URL ?>/assets/js/confirm.js?v=<?= filemtime(__DIR__ . '/../public/assets/js/confirm.js') ?>" defer></script>
 <?php include __DIR__ . '/assistant-widget.php'; ?>

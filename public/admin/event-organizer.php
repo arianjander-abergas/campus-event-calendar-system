@@ -78,12 +78,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $categoryName = (string) (array_column($categories, 'name', 'id')[post_param('category_id')] ?? '');
     $eventType = strtolower(trim($categoryName));
     $categoryOther = is_other_category($categoryName) ? post_param('category_other') : '';
-    $audience = post_param('audience', 'students');
-    $audience = isset(EVENT_AUDIENCES[$audience]) ? $audience : 'students';
+    // Who it's for: any of Students, Faculty, Outsiders (events.audiences);
+    // events.audience keeps the older single value for the reports.
+    $audiences = array_values(array_intersect(array_keys(AUDIENCE_GROUPS), array_filter((array) ($_POST['audiences'] ?? []), 'is_string')));
+    $audience = audience_value($audiences);
     $venueType = post_param('venue_type', 'on_campus');
     $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
-    // Year levels that may register (none or all picked = every year level; not used for faculty-only events).
-    $yearLevels = $audience === 'faculty' ? [] : parse_year_levels($_POST['year_levels'] ?? []);
+    // Year levels that may register (none or all picked = every year level; only for events open to students).
+    $yearLevels = in_array('students', $audiences, true) ? parse_year_levels($_POST['year_levels'] ?? []) : [];
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
 
     // Organizations: one, or two or more for a multi-organization event. The
@@ -111,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'organization_id' => $leadOrg,
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
         'audience' => $audience,
+        'audiences' => $audiences ?: null,
         'year_levels' => $yearLevels ?: null,
         'venue_type' => $venueType,
         'description' => post_param('description'),
@@ -147,6 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
     if ($fields['title'] === '') $errors[] = 'Event title is required.';
     if (!in_array($fields['category_id'], array_column($categories, 'id'), true)) $errors[] = 'Please choose a category.';
+    if (!$audiences) $errors[] = 'Choose who the event is for: Students, Faculty, Outsiders, or any of them together.';
     if (is_other_category($categoryName) && $categoryOther === '') $errors[] = 'For the "Other" category, type what kind of event it is.';
     if (mb_strlen($categoryOther) > 60) $errors[] = 'The event type must be 60 characters or fewer.';
     if (!in_array($fields['organization_id'], array_column($organizations, 'id'), true)) $errors[] = 'Please choose an organization.';
@@ -218,8 +222,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
             // What the database couldn't store yet (a database update not run): the event
             // is saved without it, and the message says what's missing.
-            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels'];
-            $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $result['dropped'] ?? []);
+            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience'];
+            // Without the audiences column, Students / Faculty still go in the older audience field; only Outsiders is lost.
+            $dropped = array_filter($result['dropped'] ?? [], fn($c) => $c !== 'audiences' || in_array('outsiders', $audiences, true));
+            $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $dropped);
             // Co-organizers (also cleared when an event stops being multi-organization).
             if (($partnerOrgs || $previous) && !set_event_partner_orgs($eventId, $partnerOrgs) && $partnerOrgs) {
                 $notSaved[] = 'the other organizations';
@@ -309,7 +315,7 @@ if ($view === 'update') {
         return matches_search($q, [$ev['title'] ?? '', event_organizers_label($ev, $evPartners, ''), event_category_label($ev, ''), $ev['venue'] ?? '']);
     }));
 
-    $pager = paginate($events, 5, (int) get_param('page'));
+    $pager = paginate($events, 10, (int) get_param('page'));
     $events = $pager['rows'];
     $total = $pager['total'];
     $pageUrl = fn(int $p): string => $listUrl . (($qs = http_build_query($filters + ($p > 1 ? ['page' => $p] : []))) !== '' ? '&' . $qs : '');
@@ -369,7 +375,7 @@ $breadcrumbs[] = [$pageTitle, null];
     <?php endif; ?>
 
     <?php if ($view !== 'update'): ?>
-    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset>
+    <form method="POST" action="event-organizer.php<?= $editId ? '?edit=' . urlencode($editId) : '' ?>" class="admin-form" id="event-form" enctype="multipart/form-data" autocomplete="off" data-autoreset<?= $needsApproval ? ' data-needs-approval' : '' ?>>
       <input type="hidden" name="action" value="save">
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
@@ -466,12 +472,15 @@ $breadcrumbs[] = [$pageTitle, null];
           </p>
         </div>
 
-        <span class="admin-label">Audience <span class="req">*</span></span>
-        <div class="admin-radio-row">
-          <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
-            <label class="admin-radio"><input type="radio" name="audience" value="<?= $key ?>" <?= ($f['audience'] ?? 'students') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+        <span class="admin-label" id="audience-label">Audience <span class="req">*</span> <span class="admin-muted">— tick everyone it's for</span></span>
+        <?php $formAudiences = isset($f['audiences']) || isset($f['audience']) ? event_audiences($f) : ['students']; ?>
+        <div class="admin-radio-row" role="group" aria-labelledby="audience-label" data-audiences>
+          <?php foreach (AUDIENCE_GROUPS as $key => $label): ?>
+            <label class="admin-radio"><input type="checkbox" name="audiences[]" value="<?= $key ?>" <?= in_array($key, $formAudiences, true) ? 'checked' : '' ?>> <?= $label ?></label>
           <?php endforeach; ?>
         </div>
+        <p class="admin-hint">Outsiders: guests from outside LCUP. Students and faculty register on the site; outsiders are shown the event as open to them.</p>
+        <p class="admin-hint admin-hint-error" data-audience-error hidden>Tick at least one: Students, Faculty or Outsiders.</p>
 
         <div data-year-levels>
           <span class="admin-label">Open to Year Levels</span>
@@ -585,7 +594,7 @@ $breadcrumbs[] = [$pageTitle, null];
     </form>
     <?php else: ?>
 
-    <!-- Update existing events: search + filters, 5 per page -->
+    <!-- Update existing events: search + filters, 10 per page -->
     <form method="get" action="event-organizer.php" class="admin-search events-filter" role="search">
       <input type="hidden" name="view" value="update">
       <input type="search" name="q" class="admin-input" placeholder="Title, organization, category or venue" value="<?= htmlspecialchars($q) ?>" aria-label="Search events">
@@ -650,7 +659,7 @@ $breadcrumbs[] = [$pageTitle, null];
             <tr>
               <td>
                 <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="admin-table-title"><?= htmlspecialchars($ev['title']) ?></a>
-                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([event_category_label($ev, ''), label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')]))) ?></div>
+                <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([event_category_label($ev, ''), label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . event_audience_label($ev)]))) ?></div>
               </td>
               <td>
                 <?php if (!empty($ev['organizations']['name'])): ?>
@@ -686,7 +695,7 @@ $breadcrumbs[] = [$pageTitle, null];
                     <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Update</a>
 
                     <?php if (in_array($status, ['draft', 'published'], true)): ?>
-                      <form method="POST" action="event-organizer.php" onsubmit="return confirm('Cancel this event? Everyone registered will be notified.');">
+                      <form method="POST" action="event-organizer.php" data-confirm="Cancel this event? Everyone registered will be notified." data-confirm-title="Cancel event" data-confirm-ok="Cancel event" data-confirm-cancel="Keep it" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="set_status">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                         <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
@@ -716,7 +725,7 @@ $breadcrumbs[] = [$pageTitle, null];
                     <?php endif; ?>
 
                     <?php if ($isAdmin): ?>
-                      <form method="POST" action="event-organizer.php" class="row-more-danger" onsubmit="return confirm('Delete this event? Its registrations and schedule are deleted too. This cannot be undone.');">
+                      <form method="POST" action="event-organizer.php" class="row-more-danger" data-confirm="Delete this event? Its registrations and schedule are deleted too. This can't be undone." data-confirm-title="Delete event" data-confirm-ok="Delete" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                         <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
@@ -840,10 +849,21 @@ $breadcrumbs[] = [$pageTitle, null];
 
   // Year levels only apply to events students can join.
   var levels = document.querySelector('[data-year-levels]');
+  // Year levels only when Students is ticked; at least one audience is needed.
+  var audienceBoxes = form.querySelectorAll('input[name="audiences[]"]');
+  var audienceError = form.querySelector('[data-audience-error]');
   function syncAudience() {
-    var checked = document.querySelector('input[name="audience"]:checked');
-    levels.hidden = checked && checked.value === 'faculty';
+    var students = form.querySelector('input[name="audiences[]"][value="students"]');
+    levels.hidden = !(students && students.checked);
+    if (form.querySelector('input[name="audiences[]"]:checked')) audienceError.hidden = true;
   }
+  form.addEventListener('submit', function (e) {
+    if (form.querySelector('input[name="audiences[]"]:checked')) return;
+    e.preventDefault();
+    audienceError.hidden = false;
+    audienceBoxes[0].focus();
+    audienceBoxes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, true);
 
   // Other events on the chosen dates, and whether this one would clash
   // (same title on the same date, or the same venue at the same time).
@@ -879,6 +899,72 @@ $breadcrumbs[] = [$pageTitle, null];
 
   form.addEventListener('change', function () { syncCategory(); syncVenue(); syncAudience(); checkSchedule(); });
   ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
+
+  // Saving: ask first (the site's pop-up, assets/js/confirm.js), then send it
+  // once — the buttons lock so a second click can't save the event twice, and
+  // a new event's form is cleared as soon as it's sent (the server fills it
+  // in again only if something needs fixing).
+  var isNew = !form.querySelector('input[name="id"]') || !form.querySelector('input[name="id"]').value;
+  var sending = false;
+  form.addEventListener('submit', function (e) {
+    if (e.defaultPrevented) return; // another check (organizations) stopped it
+    e.preventDefault();
+    if (sending) return;
+    var submitter = e.submitter && e.submitter.name === 'intent' ? e.submitter : form.querySelector('button[name="intent"][value="publish"]');
+    var intent = submitter.value;
+    var data = new FormData(form);
+    var title = (data.get('title') || '').trim();
+    var start = data.get('start_date');
+    var when = start ? new Date(start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    var venueType = data.get('venue_type');
+    var place = venueType === 'online' ? 'Online' : (data.get('venue') || '').trim();
+    var needsApproval = form.hasAttribute('data-needs-approval');
+    var what = intent === 'draft'
+      ? 'It\'s saved as a draft — only admins can see it until it\'s published.'
+      : needsApproval
+        ? 'It goes to a Super Admin for approval and is published once approved.'
+        : 'It will be published on the Event Calendar' + (data.get('send_notification') ? ' and everyone will be notified.' : '.');
+    var message = '“' + title + '”' + (when ? ' — ' + when : '') + (place ? ' · ' + place : '') + '\n\n' + what
+      + (isNew ? '\n\nThe form is cleared once it\'s sent.' : '');
+    var options = {
+      title: intent === 'draft' ? 'Save as draft?' : (needsApproval ? 'Send for approval?' : (isNew ? 'Publish this event?' : 'Save and publish?')),
+      ok: submitter.textContent.trim(),
+      cancel: 'Keep editing',
+    };
+    var ask = window.cehConfirm ? window.cehConfirm(message, options) : Promise.resolve(window.confirm(options.title + '\n\n' + message));
+    ask.then(function (yes) {
+      if (!yes || sending) return;
+      sending = true;
+      // The pressed button's choice travels in a hidden field (disabled buttons aren't sent).
+      var keep = document.createElement('input');
+      keep.type = 'hidden'; keep.name = 'intent'; keep.value = intent; keep.setAttribute('data-sending', '');
+      submitter.setAttribute('data-label', submitter.textContent);
+      form.appendChild(keep);
+      clearTimeout(timer);
+      form.querySelectorAll('button[name="intent"]').forEach(function (b) { b.disabled = true; });
+      submitter.textContent = 'Saving…';
+      form.setAttribute('aria-busy', 'true');
+      form.submit(); // what's typed is captured here, so the form can be cleared right after
+      if (isNew) {
+        setTimeout(function () {
+          form.reset();
+          keep.value = intent; // a reset doesn't touch hidden fields' values, but be sure
+          hint.hidden = true;
+        }, 0);
+      }
+    });
+  });
+  // Back to this page from the browser's history after sending: ready to use again.
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    sending = false;
+    form.removeAttribute('aria-busy');
+    form.querySelectorAll('input[data-sending]').forEach(function (i) { i.remove(); });
+    form.querySelectorAll('button[name="intent"]').forEach(function (b) {
+      b.disabled = false;
+      if (b.hasAttribute('data-label')) { b.textContent = b.getAttribute('data-label'); b.removeAttribute('data-label'); }
+    });
+  });
   syncCategory();
   syncVenue();
   syncAudience();

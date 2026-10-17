@@ -174,7 +174,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
                     <td class="num"><a href="reports.php?school_year=<?= urlencode($sy) ?>&amp;semester=<?= urlencode($t['semester']) ?>"><?= $eventCounts[$sy . '|' . $t['semester']] ?? 0 ?></a></td>
                     <td class="admin-row-actions">
                       <a href="school-calendar.php?edit=<?= urlencode($t['id']) ?>" class="btn-sm">Edit</a>
-                      <form method="POST" action="school-calendar.php" onsubmit="return confirm('Delete this term? Its dates will follow the default calendar.');">
+                      <form method="POST" action="school-calendar.php" data-confirm="Delete this term? Its dates will follow the default calendar." data-confirm-title="Delete term" data-confirm-ok="Delete" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="delete_term">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($t['id']) ?>">
                         <button type="submit" class="btn-sm btn-sm-danger">Delete</button>

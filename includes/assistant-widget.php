@@ -8,7 +8,7 @@
  *
  * The conversation lives in the PHP session, so it's the same on every page
  * until "New chat" or logging out. Without an Anthropic API key (see
- * config/assistant.local.example.php) it answers in basic mode, and says so.
+ * config/assistant.local.example.php) it answers without AI (includes/assistant-basic.php).
  */
 require_once __DIR__ . '/assistant.php';
 
@@ -35,7 +35,7 @@ $assistantSpark = '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5
       <span class="assistant-avatar"><?= $assistantSvg($assistantSpark, 20) ?></span>
       <div class="assistant-head-text">
         <h2 class="assistant-title" id="assistantTitle">Event Hub Assistant</h2>
-        <p class="assistant-sub"><?php if (!$assistantAi): ?><span class="assistant-mode">Basic mode</span> <?php endif; ?>Ask about events and the site</p>
+        <p class="assistant-sub">Ask about events and the site (in English)</p>
       </div>
       <button type="button" class="assistant-icon-btn" data-assistant-reset title="New chat" aria-label="Start a new chat">
         <?= $assistantSvg('<path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>', 18) ?>
@@ -58,7 +58,7 @@ $assistantSpark = '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5
       <?php if ($assistantAi): ?>
         AI answers can be wrong, so check the event's page. The assistant only reads the site; it can't change anything.
       <?php else: ?>
-        Basic mode understands common questions about events and pages. It only reads the site; it can't change anything.
+        The assistant understands common questions about events and pages, in English. It only reads the site; it can't change anything.
         <?php if (($assistantUser['role'] ?? '') === 'admin'): ?>
           Admins: add an Anthropic API key in <code>config/assistant.local.php</code> for the full AI.
         <?php endif; ?>

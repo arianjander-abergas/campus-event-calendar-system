@@ -11,7 +11,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post_param('action');
     $programId = post_param('id');
 
-    if ($action === 'save') {
+    if ($action === 'save' && form_once_repeat()) {
+        // The same form again (sent twice): it's already saved.
+        header('Location: ' . $back);
+        exit;
+    } elseif ($action === 'save') {
         $fields = [
             'title' => post_param('title'),
             'speaker' => post_param('speaker') ?: null,
@@ -22,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $result = is_uuid($programId) ? update_program_admin($programId, $fields) : create_program_admin($eventId, $fields);
             if ($result['ok']) {
+                form_once_saved();
                 flash('success', $result['message']);
                 header('Location: ' . $back);
                 exit;
@@ -86,6 +91,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
     <div class="admin-split">
       <form method="POST" action="<?= htmlspecialchars($back) ?>" class="admin-card" data-autoreset>
         <input type="hidden" name="action" value="save">
+        <?= form_once_field() ?>
         <?php if (!empty($editing['id'])): ?><input type="hidden" name="id" value="<?= $val('id') ?>"><?php endif; ?>
         <h2 class="admin-card-title"><?= !empty($editing['id']) ? 'Edit program' : 'Add a program' ?></h2>
 
@@ -129,7 +135,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
                     <button type="submit" name="action" value="down" class="btn-sm" <?= $i === count($programs) - 1 ? 'disabled' : '' ?> aria-label="Move down">↓</button>
                   </form>
                   <a href="<?= htmlspecialchars($back) ?>&amp;edit=<?= urlencode($p['id']) ?>" class="btn-sm">Edit</a>
-                  <form method="POST" action="<?= htmlspecialchars($back) ?>" onsubmit="return confirm('Delete this program?');">
+                  <form method="POST" action="<?= htmlspecialchars($back) ?>" data-confirm="Delete this program from the schedule?" data-confirm-title="Delete program" data-confirm-ok="Delete" data-confirm-tone="danger">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                     <button type="submit" class="btn-sm btn-sm-danger">Delete</button>

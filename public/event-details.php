@@ -54,8 +54,7 @@ $schedule = $event ? get_event_programs($eventId) : [];
 // happening today always shows up first.
 $programCards = get_upcoming_events(3, $eventId ?: null);
 
-$notifications = get_my_notifications();
-$unreadCount = unread_count($notifications);
+$breadcrumbs = [['Dashboard', 'enduser/dashboard.php'], ['Events', 'events.php'], ['Event Details', null]];
 
 // Admins, and moderators of the event's organization, get the management links.
 $canManage = $event && can_manage_event($event, $user);
@@ -89,47 +88,7 @@ if ($event) {
 
   <?php include __DIR__ . '/../includes/nav.php'; ?>
 
-  <!-- Top bar -->
-  <header class="dash-topbar ed-topbar">
-    <?php include __DIR__ . '/../includes/topbar-start.php'; ?>
-    <nav class="ed-breadcrumb" aria-label="Breadcrumb">
-      <a href="enduser/dashboard.php">Dashboard</a>
-      <span class="ed-crumb-sep">&gt;</span>
-      <a href="events.php">Events</a>
-      <span class="ed-crumb-sep">&gt;</span>
-      <span class="ed-crumb-current">Event Details</span>
-    </nav>
-
-    <div class="ed-topbar-right">
-      <?php include __DIR__ . '/../includes/theme-switch.php'; ?>
-      <div class="ed-notif" data-notifications>
-        <button class="ed-bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
-          <?= icon('bell', 20) ?>
-          <span class="ed-bell-count" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
-        </button>
-        <div class="ed-notif-dropdown" data-notif-dropdown hidden>
-          <div class="ed-notif-head">Notifications</div>
-          <div class="ed-notif-list" data-notif-list><div class="ed-notif-empty">No notifications yet.</div></div>
-        </div>
-      </div>
-
-      <details class="ed-user-menu">
-        <summary>
-          <span class="avatar ed-avatar"><?= htmlspecialchars(initials($user['full_name'] ?? '')) ?></span>
-          <span class="ed-user-text">
-            <span class="ed-user-name"><?= htmlspecialchars($user['full_name']) ?></span>
-            <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></span>
-          </span>
-          <?= icon('chevron-down', 12, 'ed-user-chevron') ?>
-        </summary>
-        <div class="ed-user-dropdown">
-          <a href="enduser/profile.php">My Profile</a>
-          <a href="events.php?mine=1">My Events</a>
-          <a href="auth/logout.php">Log out</a>
-        </div>
-      </details>
-    </div>
-  </header>
+  <?php include __DIR__ . '/../includes/topbar.php'; ?>
 
   <!-- Main content -->
   <main class="dash-main ed-main">
@@ -138,9 +97,7 @@ if ($event) {
       Back to All Events
     </a>
 
-    <?php foreach (take_flashes() as $f): ?>
-      <div class="ed-flash <?= $f['type'] === 'success' ? 'ed-flash-ok' : ($f['type'] === 'error' ? 'ed-flash-error' : 'ed-flash-info') ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= htmlspecialchars($f['message']) ?></div>
-    <?php endforeach; ?>
+    <?= render_flashes() ?>
 
     <?php if (!$event): ?>
     <section class="ed-hero ed-not-found">
@@ -172,7 +129,7 @@ if ($event) {
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
           <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
-          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?><?= $openTo !== '' && ($event['audience'] ?? '') !== 'faculty' ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
+          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(event_audience_label($event)) ?><?= $openTo !== '' && in_array('students', event_audiences($event), true) ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
           <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
             <div class="ed-meta-row"><?= icon('link', 12) ?> <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
           <?php endif; ?>
@@ -216,7 +173,7 @@ if ($event) {
                 <button class="ed-btn" disabled><?= $evaluated ? 'Completed ✓' : ($reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓') ?></button>
               <?php endif; ?>
               <?php if ($reg['can_cancel']): ?>
-                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" onsubmit="return confirm('Cancel your registration for this event?');">
+                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" data-confirm="Cancel your registration for this event?" data-confirm-title="Cancel registration" data-confirm-ok="Cancel registration" data-confirm-cancel="Stay registered" data-confirm-tone="danger">
                   <input type="hidden" name="action" value="cancel_registration">
                   <button type="submit" class="ed-btn ed-btn-outline">Cancel registration</button>
                 </form>
@@ -284,7 +241,6 @@ if ($event) {
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<?= notifications_bootstrap($notifications) ?>
 <script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
 <script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
 <?= presence_script_tag() ?>

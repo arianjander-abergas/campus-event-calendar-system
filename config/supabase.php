@@ -462,7 +462,7 @@ function event_categories_line(array $ev): string
 {
     $parts = [];
     if (!empty($ev['venue_type'])) $parts[] = label_of(VENUE_TYPES, $ev['venue_type'], '');
-    if (!empty($ev['audience'])) $parts[] = 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'], '');
+    if (!empty($ev['audience']) || !empty($ev['audiences'])) $parts[] = 'For ' . event_audience_label($ev);
     return implode(' · ', array_filter($parts));
 }
 
@@ -498,6 +498,7 @@ const DB_UPDATES = [
     '20261017120000_super_admin_approvals.sql' => ['Approvals of new events and profile edits', 'profiles', 'select=is_super_admin&limit=1'],
     '20261018090000_three_role_levels.sql' => ['Admin / Super Admin roles and deleting accounts', 'rpc', 'delete_account', ['p_user' => '00000000-0000-0000-0000-000000000000']],
     '20261018120000_approval_notes.sql' => ['Super Admins\' notes on waiting profile edits', 'rpc', 'note_profile_change', ['p_request' => '00000000-0000-0000-0000-000000000000', 'p_note' => '']],
+    '20261018150000_audiences_and_evaluation_form.sql' => ['Students / Faculty / Outsiders audiences, and Admins editing the evaluation form', 'events', 'select=audiences&limit=1'],
 ];
 
 /**
@@ -585,8 +586,49 @@ function is_uuid(?string $value): bool
 
 const EVENT_TYPES = ['academic' => 'Academic', 'seminar' => 'Seminar', 'workshop' => 'Workshop', 'sports' => 'Sports', 'cultural' => 'Cultural', 'other' => 'Other'];
 
-/** Who an event is for (events.audience). */
+/** Who an event is for (events.audience — the older single choice, kept for the reports). */
 const EVENT_AUDIENCES = ['students' => 'Students', 'faculty' => 'Faculty', 'all' => 'Students & Faculty'];
+
+/**
+ * Who an event is for, any of these (events.audiences — migration
+ * 20261018150000_audiences_and_evaluation_form.sql). Outsiders: people from
+ * outside the school.
+ */
+const AUDIENCE_GROUPS = ['students' => 'Students', 'faculty' => 'Faculty', 'outsiders' => 'Outsiders'];
+
+/** An event's audiences: events.audiences, or (older events) what events.audience says. @return string[] */
+function event_audiences(array $ev): array
+{
+    $groups = array_values(array_intersect(array_keys(AUDIENCE_GROUPS), (array) ($ev['audiences'] ?? [])));
+    if ($groups) return $groups;
+    return match ($ev['audience'] ?? 'students') {
+        'all' => ['students', 'faculty'],
+        'faculty' => ['faculty'],
+        default => ['students'],
+    };
+}
+
+/** "Students, Faculty & Outsiders". */
+function event_audience_label(array $ev): string
+{
+    $labels = array_map(fn($g) => AUDIENCE_GROUPS[$g], event_audiences($ev));
+    $last = array_pop($labels);
+    return ($labels ? implode(', ', $labels) . ' & ' : '') . $last;
+}
+
+/** The older single value for these audiences: students | faculty | all (Outsiders only counts as all). */
+function audience_value(array $groups): string
+{
+    $students = in_array('students', $groups, true);
+    $faculty = in_array('faculty', $groups, true);
+    return $students && !$faculty ? 'students' : ($faculty && !$students ? 'faculty' : 'all');
+}
+
+/** True once events.audiences exists (the database update has been run). */
+function audiences_ready(): bool
+{
+    return !isset(pending_db_updates()['20261018150000_audiences_and_evaluation_form.sql']);
+}
 
 /** Where an event happens (events.venue_type). Online = webinar. */
 const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', 'online' => 'Online (Webinar)'];
@@ -728,6 +770,41 @@ function recall_form(string $key): ?array
     $state = $_SESSION['form_state'][$key] ?? null;
     unset($_SESSION['form_state'][$key]);
     return is_array($state) ? $state : null;
+}
+
+// ---- Forms: save once -------------------------------------------------------
+// A form that adds something carries a one-time token (form_once_field()).
+// After it's saved, form_once_saved() remembers the token with what was
+// sent; if the very same form arrives again (a double click got through),
+// form_once_repeat() says so and the page skips saving it a second time.
+
+function form_once_field(): string
+{
+    return '<input type="hidden" name="form_once" value="' . bin2hex(random_bytes(12)) . '">';
+}
+
+/** The token and what was sent with it (minus the token). */
+function form_once_key(): ?string
+{
+    $token = $_POST['form_once'] ?? '';
+    if (!is_string($token) || !preg_match('/^[0-9a-f]{24}$/', $token)) return null;
+    $sent = $_POST;
+    unset($sent['form_once']);
+    return $token . ':' . md5(serialize($sent));
+}
+
+function form_once_repeat(): bool
+{
+    session_start_once();
+    $key = form_once_key();
+    return $key !== null && in_array($key, $_SESSION['form_once'] ?? [], true);
+}
+
+function form_once_saved(): void
+{
+    session_start_once();
+    if (($key = form_once_key()) === null) return;
+    $_SESSION['form_once'] = array_slice(array_merge($_SESSION['form_once'] ?? [], [$key]), -30);
 }
 
 // =============================================================================
@@ -1015,17 +1092,46 @@ function theme_attr(): string
  * The logged-in user (id, email, full_name, role, account_type,
  * department_id, organization_id, year_level, course, student_type,
  * irregular_year_levels, school_id, school_id_verified), or null. The role
- * is re-checked every 5 minutes so an admin change takes effect without
- * logging out.
+ * and organization are checked once per page load (check_session_role()),
+ * so a role change takes effect on the next click — a demoted admin loses
+ * access straight away. The rest of the profile is re-read every 5 minutes.
  */
 function current_user(): ?array
 {
+    static $checked = false;
     session_start_once();
     if (empty($_SESSION['user'])) return null;
-    if (($_SESSION['user_checked_at'] ?? 0) < time() - 300) {
-        reload_session_profile();
+    if (!$checked) {
+        $checked = true;
+        if (($_SESSION['user_checked_at'] ?? 0) < time() - 300) {
+            reload_session_profile();
+        } else {
+            check_session_role();
+        }
     }
     return $_SESSION['user'];
+}
+
+/**
+ * One small read per page load: the account's current role and
+ * organization. If a Super Admin changed either, the whole profile is
+ * re-read; if the account was deleted, it loses every staff right.
+ */
+function check_session_role(): void
+{
+    if (empty($_SESSION['user']['id']) || empty($_SESSION['access_token'])) return;
+    $rows = supabase_request('profiles', 'select=role,organization_id&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, session_access_token());
+    $row = $rows[0] ?? null;
+    if (!is_array($row)) {
+        // No row and no error: the account is gone (a failed read changes nothing).
+        if (supabase_last_error() === '') $_SESSION['user']['role'] = 'user';
+        return;
+    }
+    if (($row['role'] ?? null) !== ($_SESSION['user']['role'] ?? null)
+        || ($row['organization_id'] ?? null) !== ($_SESSION['user']['organization_id'] ?? null)) {
+        reload_session_profile();
+        unset($_SESSION['approvals_waiting']); // the sidebar count depends on the role
+    }
 }
 
 function is_admin_user(): bool
@@ -1732,7 +1838,14 @@ function find_events(array $filters, string $from = '', string $to = '', int $li
 
     if (is_uuid($filters['category'] ?? null)) $parts[] = 'category_id=eq.' . $filters['category'];
     if (is_uuid($filters['organization'] ?? null)) $parts[] = 'organization_id=eq.' . $filters['organization'];
-    if (in_array($filters['audience'] ?? '', ['students', 'faculty'], true)) $parts[] = 'audience=in.(' . $filters['audience'] . ',all)';
+    $audience = (string) ($filters['audience'] ?? '');
+    if (isset(AUDIENCE_GROUPS[$audience]) && audiences_ready()) {
+        // events.audiences, or the older events.audience on events saved before it.
+        $old = $audience === 'outsiders' ? '' : ',and(audiences.is.null,audience.in.(' . $audience . ',all))';
+        $parts[] = 'and=(or(audiences.cs.%7B' . $audience . '%7D' . $old . '))';
+    } elseif (in_array($audience, ['students', 'faculty'], true)) {
+        $parts[] = 'audience=in.(' . $audience . ',all)';
+    }
     if (isset(VENUE_TYPES[$filters['venue_type'] ?? ''])) $parts[] = 'venue_type=eq.' . $filters['venue_type'];
 
     $term = trim(preg_replace('/[^\p{L}\p{N}\s\-\'&]/u', ' ', (string) ($filters['q'] ?? '')));
@@ -1866,9 +1979,10 @@ function registration_restriction(array $ev, ?array $user): string
 {
     if (!$user || can_manage_event($ev, $user)) return '';
     $type = $user['account_type'] ?? null;
-    $audience = $ev['audience'] ?? 'students';
-    if ($audience === 'faculty' && $type === 'student') return 'This event is for faculty only.';
-    if ($audience === 'students' && $type === 'faculty') return 'This event is for students only.';
+    $groups = event_audiences($ev);
+    if (($type === 'student' && !in_array('students', $groups, true)) || ($type === 'faculty' && !in_array('faculty', $groups, true))) {
+        return 'This event is for ' . event_audience_label($ev) . ' only.';
+    }
 
     $levels = parse_year_levels($ev['year_levels'] ?? []);
     if ($levels && $type !== 'faculty') {

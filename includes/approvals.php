@@ -79,7 +79,7 @@ $decisions = ['pending' => 'Waiting', 'approved' => 'Approved', 'rejected' => 'R
               </td>
               <td class="admin-row-actions">
                 <?php if ($isSuper && $decision === 'pending'): ?>
-                  <form method="POST" action="users.php" onsubmit="return confirm('Approve and publish “<?= htmlspecialchars(addslashes($ev['title'])) ?>”?<?= !empty($ev['send_notification']) ? ' Everyone will be notified.' : '' ?>');">
+                  <form method="POST" action="users.php" data-confirm="Approve and publish “<?= htmlspecialchars($ev['title']) ?>”?<?= !empty($ev['send_notification']) ? ' Everyone will be notified.' : '' ?>" data-confirm-title="Approve event" data-confirm-ok="Approve &amp; publish">
                     <input type="hidden" name="action" value="review_event">
                     <input type="hidden" name="decision" value="approve">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
@@ -131,7 +131,7 @@ $decisions = ['pending' => 'Waiting', 'approved' => 'Approved', 'rejected' => 'R
               </td>
               <td class="admin-row-actions">
                 <?php if ($isSuper && $decision === 'pending'): ?>
-                  <form method="POST" action="users.php" onsubmit="return confirm('Approve these changes to <?= htmlspecialchars(addslashes($who['full_name'] ?? 'this account')) ?>\'s profile?');">
+                  <form method="POST" action="users.php" data-confirm="Approve these changes to <?= htmlspecialchars($who['full_name'] ?? 'this account') ?>’s profile? They’re saved right away." data-confirm-title="Approve profile changes" data-confirm-ok="Approve">
                     <input type="hidden" name="action" value="review_profile">
                     <input type="hidden" name="decision" value="approve">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($req['id']) ?>">

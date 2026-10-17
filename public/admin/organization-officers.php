@@ -213,7 +213,7 @@ $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organiz
                     <td><span class="admin-status admin-status-<?= !empty($o['is_active']) ? 'published' : 'draft' ?>"><?= !empty($o['is_active']) ? 'Active' : 'Inactive' ?></span></td>
                     <td class="admin-row-actions">
                       <a href="<?= htmlspecialchars($back) ?>&amp;edit=<?= urlencode($o['id']) ?>" class="btn-sm">Edit</a>
-                      <form method="POST" action="<?= htmlspecialchars($back) ?>" onsubmit="return confirm('Remove this officer?');">
+                      <form method="POST" action="<?= htmlspecialchars($back) ?>" data-confirm="Remove this officer from the list?" data-confirm-title="Remove officer" data-confirm-ok="Remove" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($o['id']) ?>">
                         <button type="submit" class="btn-sm btn-sm-danger">Remove</button>

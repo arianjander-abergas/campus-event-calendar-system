@@ -128,8 +128,6 @@ textarea.admin-input { resize: vertical; }
 .approval-note-label { font-style: normal; font-weight: 700; color: var(--p-accent-deep); }
 :root:is([data-theme="dark"], [data-theme="dim"]) .approval-note-label { color: var(--text-main); }
 .approvals-table .admin-row-actions form { display: inline; }
-.btn-danger { background: #dc2626; color: #fff; border: none; }
-.btn-danger:hover { background: #b91c1c; color: #fff; }
 /* Users & Roles: role, Edit and Delete on one line */
 .user-actions { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
 .user-actions form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }

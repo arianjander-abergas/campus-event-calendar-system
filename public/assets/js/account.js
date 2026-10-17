@@ -147,10 +147,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function open() {
     if (!year?.value) {
-      alert("Choose your highest year level first.");
       form.querySelector('input[name="student_type"][value="regular"]').checked = true;
-      year?.focus();
       updateSummary();
+      const message = "Choose your highest year level first, then pick Irregular.";
+      // The site's pop-up (assets/js/confirm.js); the browser's box if it isn't loaded.
+      if (window.cehAlert) window.cehAlert(message, { title: "Highest year level needed" }).then(() => year?.focus());
+      else { alert(message); year?.focus(); }
       return;
     }
     saved = [...levelBoxes].map((b) => b.checked);

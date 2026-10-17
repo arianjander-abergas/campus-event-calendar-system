@@ -257,7 +257,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                   <td><a href="../events.php?category=<?= urlencode($c['id']) ?>"><?= $used ?></a></td>
                   <td class="admin-row-actions">
                     <a href="<?= htmlspecialchars($back) ?>&amp;edit_category=<?= urlencode($c['id']) ?>" class="btn-sm">Edit</a>
-                    <form method="POST" action="admin-taxonomy.php?tab=categories" onsubmit="return confirm('Delete the category &quot;<?= htmlspecialchars(addslashes($c['name'])) ?>&quot;?');">
+                    <form method="POST" action="admin-taxonomy.php?tab=categories" data-confirm="Delete the category “<?= htmlspecialchars($c['name']) ?>”?" data-confirm-title="Delete category" data-confirm-ok="Delete" data-confirm-tone="danger">
                       <input type="hidden" name="action" value="delete_category">
                       <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                       <input type="hidden" name="id" value="<?= htmlspecialchars($c['id']) ?>">
@@ -315,7 +315,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                   <td class="admin-row-actions">
                     <a href="<?= htmlspecialchars($back) ?>&amp;edit_department=<?= urlencode($d['id']) ?>" class="btn-sm" data-edit-open="dept-modal"
                        data-edit="<?= $editData(['id' => $d['id'], 'name' => $d['name'], 'code' => $d['code'] ?? '', 'description' => $d['description'] ?? '']) ?>">Edit</a>
-                    <form method="POST" action="admin-taxonomy.php?tab=departments" onsubmit="return confirm('Delete the department &quot;<?= htmlspecialchars(addslashes($d['name'])) ?>&quot;?');">
+                    <form method="POST" action="admin-taxonomy.php?tab=departments" data-confirm="Delete the department “<?= htmlspecialchars($d['name']) ?>”?" data-confirm-title="Delete department" data-confirm-ok="Delete" data-confirm-tone="danger">
                       <input type="hidden" name="action" value="delete_department">
                       <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                       <input type="hidden" name="id" value="<?= htmlspecialchars($d['id']) ?>">
@@ -426,7 +426,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                     <a href="organization-officers.php?org=<?= urlencode($o['id']) ?>" class="btn-sm btn-sm-accent">Officers</a>
                     <a href="<?= htmlspecialchars($back) ?>&amp;edit_org=<?= urlencode($o['id']) ?>" class="btn-sm" data-edit-open="org-modal"
                        data-edit="<?= $editData(['id' => $o['id'], 'name' => $o['name'], 'department_id' => $o['department_id'] ?? '', 'description' => $o['description'] ?? '', 'logo_url' => $o['logo_url'] ?? '', 'logo_preview' => !empty($o['logo_url']) ? asset_url($o['logo_url']) : '']) ?>">Edit</a>
-                    <form method="POST" action="admin-taxonomy.php?tab=organizations" onsubmit="return confirm('Delete the organization &quot;<?= htmlspecialchars(addslashes($o['name'])) ?>&quot; and its officer list?');">
+                    <form method="POST" action="admin-taxonomy.php?tab=organizations" data-confirm="Delete the organization “<?= htmlspecialchars($o['name']) ?>” and its officer list?" data-confirm-title="Delete organization" data-confirm-ok="Delete" data-confirm-tone="danger">
                       <input type="hidden" name="action" value="delete_organization">
                       <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
                       <input type="hidden" name="id" value="<?= htmlspecialchars($o['id']) ?>">

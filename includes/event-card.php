@@ -36,7 +36,7 @@ $cardOrg = $ev['organizations'] ?? null;
       <div class="event-meta"><?= icon('location', 14) ?> <?= htmlspecialchars(event_place($ev)) ?><?= !empty($ev['venue_type']) ? ' · ' . htmlspecialchars(label_of(VENUE_TYPES, $ev['venue_type'], '')) : '' ?></div>
     <?php endif; ?>
     <?php if (!empty($ev['audience'])): ?>
-      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'], '')) ?><?= $cardLevels !== '' ? ' · ' . htmlspecialchars($cardLevels) : '' ?></div>
+      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $cardLevels !== '' ? ' · ' . htmlspecialchars($cardLevels) : '' ?></div>
     <?php endif; ?>
     <div class="event-meta"><?= icon('people', 14) ?> <?= get_registration_count((string) $ev['id']) ?> going</div>
     <?php if (!empty($cardOrg['name'])): ?>

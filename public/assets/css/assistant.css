@@ -173,12 +173,6 @@
   font-size: 0.68rem; line-height: 1.35; text-align: center;
 }
 .assistant-note code { font-size: 0.66rem; overflow-wrap: anywhere; }
-/* "Basic mode" (no API key: answers without AI). */
-.assistant-mode {
-  display: inline-block; margin-right: 4px; padding: 1px 7px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5); color: var(--p-on-main);
-  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em;
-}
 
 /* ---- Motion (off when the device asks for less) ---- */
 @media (prefers-reduced-motion: no-preference) {

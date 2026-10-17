@@ -80,7 +80,7 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
     <div><dt>Event</dt><dd><?= htmlspecialchars($event['title']) ?></dd></div>
     <div><dt>Date &amp; time</dt><dd><?= htmlspecialchars(event_when($event)) ?></dd></div>
     <div><dt>Venue</dt><dd><?= htmlspecialchars(event_place($event)) ?><?= !empty($event['address']) ? ', ' . htmlspecialchars($event['address']) : '' ?> (<?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null)) ?>)</dd></div>
-    <div><dt>Audience</dt><dd><?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null)) ?></dd></div>
+    <div><dt>Audience</dt><dd><?= htmlspecialchars(event_audience_label($event)) ?></dd></div>
     <div><dt>Category</dt><dd><?= htmlspecialchars(event_category_label($event, '—')) ?></dd></div>
   </dl>
 
