@@ -584,7 +584,7 @@ function assistant_basic_howto(string $m, ?array $user): ?array
             . ($user ? ' Want me to open My Events?' : ''), null, $user ? ['page' => 'my_events'] : null);
     }
     if (preg_match('/ (evaluat\w*|feedback|rate|rating) /', $m)) {
-        return assistant_basic_say('Once the organizers mark you **Attended**, **Evaluate this event** appears on the event\'s page and on your Dashboard. You evaluate each event once, rating it from 5 (Excellent) to 1 (Poor) and adding comments; answers are anonymous.' . $guestNote
+        return assistant_basic_say('Once the organizers mark you **Attended**, **Evaluate this event** appears on the event\'s page and on your Dashboard. You evaluate each event once, rating it from 1 (Needs Improvement) to 5 (Excellent) stars and adding comments; answers are anonymous.' . $guestNote
             . ($user ? ' Want me to open your Dashboard?' : ''), null, $user ? ['page' => 'dashboard'] : null);
     }
     if ($event && assistant_basic_has($m, ['create', 'make', 'add', 'post', 'publish', 'set up', 'organize', 'gumawa'])) {

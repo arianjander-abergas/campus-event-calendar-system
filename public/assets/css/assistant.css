@@ -4,7 +4,7 @@
    assets/js/assistant.js). Loaded after style.css, so it uses the
    palette roles from there:
      launcher, header, send button  the main colour (--p-main) with
-                                    dark text on it (--p-on-main)
+                                    white text on it (--p-on-main)
      message area                   the cream page colour (--p-bg)
      the user's own messages        deep plum (--p-dark), white text
      links and quick questions      deeper lavender (--p-accent-text)

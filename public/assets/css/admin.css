@@ -58,8 +58,8 @@
 }
 .admin-input:focus { border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(var(--p-accent-rgb), 0.15); }
 .admin-input[type="file"] { padding: 9px 10px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer; }
-/* "Choose File": a main-colour (lavender) button instead of the browser's grey one (it
-   didn't fit the cream or the dark cards), dark text on it in every theme. */
+/* "Choose File": a main-colour (royal blue) button instead of the browser's grey one (it
+   didn't fit the lavender or the dark cards), white text on it in every theme. */
 .admin-input[type="file"]::file-selector-button {
   margin-right: 12px; padding: 7px 14px;
   border: none; border-radius: 8px;
@@ -81,6 +81,24 @@ textarea.admin-input { resize: vertical; }
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+/* ---- Create / Edit Event: the form in numbered sections ----
+   Each part (Basic Information, Organizers, Audience…) starts with a lavender
+   band, a royal-blue edge and its number; a dashed line separates the parts. */
+.form-section + .form-section { margin-top: 26px; padding-top: 22px; border-top: 1px dashed rgba(var(--p-hi-rgb), 0.8); }
+.form-section-head {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 0 16px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(var(--p-hi-rgb), 0.2); border-left: 4px solid var(--p-accent);
+  font-size: 1rem; color: var(--navy); line-height: 1.25;
+}
+.form-section-head small { display: block; margin-top: 3px; font-size: 0.74rem; font-weight: 500; color: var(--text-muted); }
+.form-section-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--p-accent); color: #fff; font-size: 0.85rem; font-weight: 800;
+}
+.form-section-head + * { margin-top: 0; }
+
 .admin-radio-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 6px; }
 .admin-radio { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
 .admin-checkbox-row { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 16px; }
@@ -435,29 +453,45 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
   .report-events .admin-status { padding: 2px 6px; font-size: 8px; }
 }
 
-/* ---- Evaluation form (includes/evaluation-fields.php) ---- */
-.eval-section { border: none; margin: 0 0 8px; padding: 0; min-width: 0; }
-.eval-section .eval-section-title { width: 100%; padding: 0 0 6px; }
-.eval-question { margin: 0 0 18px; }
-.eval-q-text { display: block; margin: 0 0 8px; font-size: 0.9rem; font-weight: 600; color: var(--text-main); line-height: 1.4; }
+/* ---- Evaluation form (includes/evaluation-fields.php) ----
+   Each part (Part I, Part II…) gets a header band, the 1–5 scale under it,
+   and every question in its own box. Ratings are stars: the chosen star and
+   the ones before it fill in royal blue; hovering previews in lavender. */
+.eval-section { border: none; margin: 0 0 22px; padding: 0; min-width: 0; }
+.eval-section .eval-section-title {
+  display: block; width: 100%; margin: 0; padding: 10px 14px; border-radius: 10px;
+  background: rgba(var(--p-hi-rgb), 0.2); border-left: 4px solid var(--p-accent);
+  font-size: 0.95rem; font-weight: 800; color: var(--navy); line-height: 1.35;
+}
+.eval-optional {
+  display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; vertical-align: 1px;
+  background: rgba(var(--p-hi-rgb), 0.45); color: var(--text-main); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
+}
+.eval-section-scale { margin: 8px 2px 12px; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; }
+.eval-question { margin: 0 0 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg); }
+.eval-section-title + .eval-question { margin-top: 12px; }
+.eval-q-text { display: block; margin: 0 0 10px; font-size: 0.9rem; font-weight: 600; color: var(--text-main); line-height: 1.4; }
 .eval-q-text .req { color: var(--red); }
-.eval-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; max-width: 620px; }
+.eval-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; max-width: 460px; }
 .eval-option {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-height: 58px; padding: 8px 4px; border: 1.5px solid var(--border); border-radius: 10px;
-  background: #fff; text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease;
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 4px 2px 6px; border-radius: 10px; text-align: center; cursor: pointer;
 }
 .eval-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.eval-option-num { font-size: 1.1rem; font-weight: 800; color: var(--navy); line-height: 1; }
-.eval-option-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); line-height: 1.2; }
-.eval-option:hover { border-color: var(--blue-accent); }
-.eval-option:has(input:checked) { background: var(--navy); border-color: var(--navy); }
-.eval-option:has(input:checked) .eval-option-num,
-.eval-option:has(input:checked) .eval-option-label { color: #fff; }
+.eval-option-num { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); line-height: 1; }
+.eval-star {
+  width: 30px; height: 30px; fill: transparent; stroke: var(--text-muted); stroke-width: 1.6; stroke-linejoin: round;
+  transition: fill 0.15s ease, stroke 0.15s ease, transform 0.15s ease;
+}
+.eval-scale:not(:has(input:disabled)) .eval-option:hover .eval-star,
+.eval-scale:not(:has(input:disabled)) .eval-option:has(~ .eval-option:hover) .eval-star { fill: var(--p-hi); stroke: var(--p-hi); }
+.eval-scale:not(:has(input:disabled)) .eval-option:hover .eval-star { transform: scale(1.12); }
+.eval-option:has(input:checked) .eval-star,
+.eval-option:has(~ .eval-option input:checked) .eval-star { fill: var(--p-accent); stroke: var(--p-accent); }
+.eval-option:has(input:checked) .eval-option-num { color: var(--orange-text); font-weight: 800; }
 .eval-option:has(input:focus-visible) { outline: 3px solid rgba(var(--p-accent-rgb), 0.45); outline-offset: 2px; }
-.eval-option:has(input:disabled) { cursor: default; }
-.eval-option:has(input:disabled):hover { border-color: var(--border); }
-.eval-option input:disabled { cursor: default; }
+.eval-option:has(input:disabled), .eval-option input:disabled { cursor: default; }
+.eval-question .admin-input { max-width: 640px; }
 .eval-scale-legend { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 16px; }
 .eval-event { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
 .eval-event-poster { width: 74px; height: 74px; border-radius: 10px; background-color: var(--p-accent-deeper); background-size: cover; background-position: center; flex-shrink: 0; }
@@ -469,9 +503,9 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .eval-state h2 { margin: 0 0 8px; color: var(--navy); }
 .eval-state p { margin: 0 0 16px; color: var(--text-muted); }
 @media (max-width: 560px) {
-  .eval-scale { gap: 4px; }
-  .eval-option { min-height: 64px; padding: 6px 2px; }
-  .eval-option-label { font-size: 0.7rem; }
+  .eval-question { padding: 12px; }
+  .eval-scale { gap: 2px; }
+  .eval-star { width: 28px; height: 28px; }
 }
 
 /* ---- Evaluation results ---- */
@@ -480,6 +514,8 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .eval-comments { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .eval-comments li { background: #f8f9fb; border-radius: 8px; padding: 10px 12px; font-size: 0.84rem; line-height: 1.45; }
 .question-order { display: inline-flex; gap: 2px; }
+/* Section rows (Part I, Part II…) in the evaluation tables. */
+.admin-section-row td { background: rgba(var(--p-hi-rgb), 0.2); color: var(--navy); border-left: 4px solid var(--p-accent); }
 .question-order .btn-sm { padding: 4px 8px; }
 .admin-row-hidden td { opacity: 0.55; }
 
