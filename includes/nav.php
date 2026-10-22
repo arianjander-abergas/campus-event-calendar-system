@@ -27,7 +27,11 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
 <aside class="sidebar" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
+<<<<<<< Updated upstream
       <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
+=======
+      <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="brand-logo" width="44" height="44">
+>>>>>>> Stashed changes
       <span class="brand-text">
         <span class="campus">CAMPUS</span>
         <span class="hub">EVENT HUB</span>

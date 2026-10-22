@@ -29,6 +29,8 @@ const SCHOOL_NAME = 'La Consolacion University Philippines';
 // IMAGE SLOT: school logo | file: public/assets/images/school-logo.png | square, 256×256 or larger
 // Replace the file with a new logo (keep the file name). Transparent PNG works best.
 const SCHOOL_LOGO = 'assets/images/school-logo.png';
+/** Light (Orange) version for dark backgrounds: sidebar, phone top bar, footer, login cards. */
+const SCHOOL_LOGO_LIGHT = 'assets/images/school-logo-light.png';
 
 // ---- Site base URL ----------------------------------------------------------
 // Web path of the public/ folder, e.g. '/campus-event-calendar-system/public'
@@ -337,10 +339,11 @@ function css_url(string $url): string
  * last-modified time (?v=...) so browsers fetch the new logo as soon as the
  * file is replaced, instead of showing an old cached copy.
  */
-function school_logo_url(): string
+function school_logo_url(bool $light = false): string
 {
-    $url = asset_url(SCHOOL_LOGO);
-    $file = __DIR__ . '/../public/' . SCHOOL_LOGO;
+    $path = $light ? SCHOOL_LOGO_LIGHT : SCHOOL_LOGO;
+    $url = asset_url($path);
+    $file = __DIR__ . '/../public/' . $path;
     return is_file($file) ? $url . '?v=' . filemtime($file) : $url;
 }
 

@@ -91,7 +91,11 @@ $flashes = render_flashes();
   <div class="login-pane">
   <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
     <!-- IMAGE SLOT 1: School logo, top of the card | file: assets/images/school-logo.png (config SCHOOL_LOGO) -->
+<<<<<<< Updated upstream
     <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="88" height="88">
+=======
+    <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="login-logo-mark" width="88" height="88">
+>>>>>>> Stashed changes
     <span class="login-logo-text">
       <span class="campus">CAMPUS</span>
       <span class="hub">EVENT HUB</span>
