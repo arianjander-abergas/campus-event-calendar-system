@@ -9,7 +9,7 @@
 <div class="topbar-start">
   <button type="button" class="nav-toggle" data-nav-toggle aria-controls="sidebar" aria-expanded="false" aria-label="Open menu"><?= icon('menu', 22) ?></button>
   <a href="<?= BASE_URL ?>/index.php" class="brand topbar-brand">
-    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="" width="36" height="36">
+    <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="" width="36" height="36">
     <span class="brand-text">
       <span class="campus">CAMPUS</span>
       <span class="hub">EVENT HUB</span>

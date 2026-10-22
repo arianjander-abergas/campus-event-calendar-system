@@ -4,6 +4,7 @@
    auth.css (login / sign-up / password pages), event-details.css.
    ============================================================ */
 
+<<<<<<< Updated upstream
 :root {
   --navy: #0e2a5e;
   --navy-dark: #0a1f47;
@@ -15,6 +16,70 @@
   --bg: #f2f3f5;
   --card-bg: #ffffff;
   --text-main: #1c2333;
+=======
+/* ============================================================
+   PALETTE — "Harbor": Blue is the main colour.
+   Source palette: #F4F2EF · #213E60 · #E68C3A · #D8D1BD
+     MAIN       BLUE #213E60 — the sidebar, the strip under the home hero,
+                the calendar header and the main buttons (--p-main), white
+                text on it (10.9:1).
+     STRUCTURE  DEEP NAVY #162B44 — headings, phone top bar, footer, login
+                card, event card pictures (--p-dark; white 14.4:1).
+     HIGHLIGHT  ORANGE #E68C3A — big highlights on blue (stats, headline;
+                large text 4.3:1) and the current-page pill with navy text
+                (5.6:1) (--p-hi, --p-pill-*). White FAILS on it (2.6:1).
+                Small orange text on blue uses #F5B47A (6.1:1, --p-hi-light).
+     ACCENT     BURNT ORANGE #A85A14 — fills with white text ("Today",
+                badges, the open menu group; 5.1:1) and links on the light
+                page (4.5:1) (--p-accent*).
+     BASE       #F4F2EF page, white cards, SAND #D8D1BD lines / soft fills.
+     INK        #162B44 body text, #4D5866 secondary.
+   Every rule uses these --p-* roles (see the names below).
+   ============================================================ */
+:root {
+  --p-main: #213e60; --p-main-hover: #2b4d75; --p-on-main: #ffffff; --p-on-main-rgb: 255, 255, 255;
+  --p-main-shadow-rgb: 22, 43, 68;
+  --p-on-main-icon: brightness(0) invert(1);
+  --p-dark: #162b44; --p-darker: #0f1f33; --p-dark-hi: #213e60; --p-dark-2: #1c3653;
+  --p-text: #162b44; --p-neu-text: #162b44; --p-neu-muted: #4d5866;
+  --p-accent: #a85a14; --p-accent-text: #a85a14; --p-accent-deep: #8c4a0f; --p-accent-deeper: #723c0c;
+  --p-accent-hi: #c26a1e; --p-accent-mid: #d8964f;
+  --p-hi: #e68c3a; --p-hi-light: #f5b47a; --p-hi-soft: #f2c08f;
+  --p-pill-to: #e68c3a; --p-pill-text: #162b44; --p-pill-icon: brightness(0); /* orange pill, navy text 5.6:1 */
+  --p-group-to: #a85a14; /* the open group: burnt orange with white text */
+  --p-sub-bg: #f9e6d3; --p-sub-text: #162b44; --p-sub-icon: brightness(0);
+  --p-tint-1: #fdf1e6; --p-tint-2: #fae3cd; --p-tint-3: #f2c79f; --p-tint-4: #f6d7b8;
+  --p-soft-1: #ebe7dd; --p-soft-2: #efece5; --p-soft-3: #f8f6f3; --p-soft-4: #e6e1d4; --p-soft-5: #d8d1bd;
+  --p-soft-6: #cdc5ae; --p-soft-7: #e0dacb; --p-soft-8: #e8e3d8; --p-soft-9: #f6f4f0; --p-soft-10: #c4bba2;
+  --p-soft-11: #e3ded1; --p-soft-12: #eeeae2; --p-soft-13: #e7e2d6; --p-soft-14: #bdb39a; --p-soft-15: #9e9581;
+  --p-soft-16: #6f6a5d; --p-soft-17: #5a564b; --p-soft-18: #dfd9ca; --p-soft-19: #c9c1aa;
+  --p-bg: #f4f2ef; --p-card: #ffffff;
+  --p-accent-rgb: 168, 90, 20; --p-dark-rgb: 22, 43, 68; --p-hi-rgb: 230, 140, 58; --p-line-rgb: 216, 209, 189;
+  --p-darker-rgb: 15, 31, 51; --p-dark-hi-rgb: 33, 62, 96; --p-shadow-rgb: 196, 190, 176; --p-soft-rgb: 236, 230, 214;
+  --p-dark-2-rgb: 28, 54, 83; --p-mid-rgb: 168, 162, 148; --p-dark-mid-rgb: 22, 40, 62; --p-pill-inset-rgb: 22, 43, 68;
+  --p-n-rgb: 246, 244, 241;
+  --p-dk-bg: #0b1522; --p-dk-card: #121f30; --p-dk-surface: #1a2a3f; --p-dk-border: #2c3f57;
+  --p-dk-text: #eef0f3; --p-dk-muted: #a9b4c2; --p-dk-ink: #a85a14; --p-dk-ink-hover: #c26a1e;
+  --p-dm-bg: #1a2636; --p-dm-card: #223043; --p-dm-surface: #2b3b50; --p-dm-border: #3f5067;
+  --p-dm-text: #eef0f3; --p-dm-muted: #b3bdca; --p-dm-ink: #a85a14; --p-dm-link: #f5b47a;
+}
+
+/* The site's own names for the colours, now pointing at the palette roles.
+   (--red is the separate "danger / cancelled" red.) */
+:root {
+  --navy: var(--p-dark);              /* dark surfaces, headings */
+  --navy-dark: var(--p-darker);
+  --orange: var(--p-accent);          /* buttons, active links, selected days */
+  --orange-dark: var(--p-accent-deep);  /* hover on accent fills */
+  --orange-strong: var(--p-accent);   /* behind white text (pills, badges) */
+  --orange-text: var(--p-accent-text); /* small accent text on light backgrounds */
+  --highlight: var(--p-hi);             /* the highlight: glows, big type on dark */
+  --highlight-on-dark: var(--p-hi-light); /* small highlight text on dark */
+  --blue-accent: var(--p-accent-text); /* links, accent buttons */
+  --bg: var(--p-bg);
+  --card-bg: var(--p-card);
+  --text-main: var(--p-text);
+>>>>>>> Stashed changes
   --text-muted: #4b5563;
   --border: #e5e7eb;
   --green: #15803d;
@@ -221,7 +286,11 @@ button { font-family: inherit; cursor: pointer; }
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
+<<<<<<< Updated upstream
 .btn-login:hover { background: #3d92c4; }
+=======
+.btn-login:hover { background: var(--p-main-hover); }
+>>>>>>> Stashed changes
 .btn-login.btn-logout { background: #6b7280; padding: 10px 18px; }
 .btn-login.btn-logout:hover { background: #4b5563; }
 
@@ -1336,11 +1405,19 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   --neu-out: 6px 6px 14px var(--neu-dark), -6px -6px 14px var(--neu-light);
   --neu-out-sm: 3px 3px 8px var(--neu-dark), -3px -3px 8px var(--neu-light);
   --neu-in: inset 3px 3px 7px var(--neu-dark), inset -3px -3px 7px var(--neu-light);
+<<<<<<< Updated upstream
   --neu-blue: #2f5fa8;      /* darker than before so white text / blue text stay readable */
   --neu-blue-hi: #3d74c9;
   --neu-blue-glow: 4px 4px 12px rgba(61, 116, 201, 0.35), -4px -4px 12px var(--neu-light);
   --neu-text: #3b4a63;
   --neu-muted: #4f5d75;
+=======
+  --neu-blue: var(--p-accent);      /* accent fill: white text on it reads well */
+  --neu-link: var(--neu-blue);  /* accent text on the soft pages (the light highlight in Dim / Dark) */
+  --neu-blue-glow: 0 6px 14px rgba(var(--p-main-shadow-rgb), 0.35); /* a soft blue-navy drop shadow (no orange glow) */
+  --neu-text: var(--p-neu-text);
+  --neu-muted: var(--p-neu-muted);
+>>>>>>> Stashed changes
   background: var(--neu-bg);
 }
 .neu .dashboard-shell { background: none; }
@@ -1354,12 +1431,18 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   --sb-text: #dbe7ff;
   --sb-muted: rgba(191, 210, 245, 0.72);
   --sb-surface: rgba(255, 255, 255, 0.05);
+<<<<<<< Updated upstream
   --sb-out: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
   --sb-in: inset 3px 3px 7px rgba(2, 8, 24, 0.6), inset -3px -3px 7px rgba(80, 130, 220, 0.14);
   background:
     radial-gradient(circle at 15% 8%, rgba(37, 99, 235, 0.35), transparent 45%),
     radial-gradient(circle at 90% 95%, rgba(59, 91, 219, 0.3), transparent 50%),
     linear-gradient(170deg, #0e2a6b 0%, #0b2257 55%, #061430 100%);
+=======
+  --sb-out: 4px 4px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --sb-in: inset 3px 3px 7px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  background: var(--p-dark);
+>>>>>>> Stashed changes
   color: var(--sb-text);
   box-shadow: 6px 0 24px rgba(6, 20, 48, 0.35);
   z-index: 2;
@@ -1400,8 +1483,13 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
 }
 .neu .side-nav a.active .icon {
+<<<<<<< Updated upstream
   background: rgba(255, 255, 255, 0.16);
   box-shadow: inset 2px 2px 5px rgba(120, 40, 0, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+=======
+  background: rgba(var(--p-dark-rgb), 0.1);
+  box-shadow: inset 0 2px 5px rgba(var(--p-pill-inset-rgb), 0.35);
+>>>>>>> Stashed changes
 }
 /* Events group: pressed in while open. */
 .neu .submenu-toggle.is-current,
@@ -1536,7 +1624,11 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .stats-block { border-top-color: rgba(147, 197, 253, 0.18); }
 .neu .feature-strip .feature-icon {
   background: rgba(255, 255, 255, 0.05);
+<<<<<<< Updated upstream
   box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
+=======
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+>>>>>>> Stashed changes
 }
 .neu .feature-strip .ui-icon { filter: brightness(0) invert(1); }
 
@@ -1549,9 +1641,15 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.06); color: #fff; box-shadow: var(--sb-out); }
 /* Log in: the sidebar's dark shadow instead of the white neumorphic glow,
    which showed as a halo on the dark blue. */
+<<<<<<< Updated upstream
 .neu .sidebar .side-auth .btn-primary { box-shadow: var(--sb-out); }
 .neu .sidebar .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
 .neu .sidebar .side-auth .btn:active { box-shadow: var(--sb-in); }
+=======
+.neu .sidebar .side-auth .btn-primary, .sidebar.neu .side-auth .btn-primary { box-shadow: var(--sb-out); }
+.neu .sidebar .side-auth .btn-primary:hover, .sidebar.neu .side-auth .btn-primary:hover { box-shadow: 6px 6px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+.neu .sidebar .side-auth .btn:active, .sidebar.neu .side-auth .btn:active { box-shadow: var(--sb-in); }
+>>>>>>> Stashed changes
 
 @media (max-width: 1100px) {
   .neu .right-rail .rail-card { background: var(--neu-bg); box-shadow: var(--neu-out); }
@@ -1845,11 +1943,17 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
     --tb-text: #dbe7ff;
     --tb-muted: rgba(191, 210, 245, 0.75);
     --tb-surface: rgba(255, 255, 255, 0.07);
+<<<<<<< Updated upstream
     --tb-out: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16);
     --tb-in: inset 3px 3px 7px rgba(2, 8, 24, 0.6), inset -3px -3px 7px rgba(80, 130, 220, 0.14);
     background:
       radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.35), transparent 55%),
       linear-gradient(170deg, #0e2a6b 0%, #0b2257 60%, #061430 100%);
+=======
+    --tb-out: 4px 4px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --tb-in: inset 3px 3px 7px rgba(0, 0, 0, 0.6), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    background: var(--p-dark);
+>>>>>>> Stashed changes
     border-bottom: none;
     box-shadow: 0 8px 22px rgba(6, 20, 48, 0.35);
     color: var(--tb-text);
@@ -1892,9 +1996,15 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 
   /* LOG IN: dark shadow like the sidebar's buttons (the white neumorphic
      glow is meant for light backgrounds and showed as a halo here). */
+<<<<<<< Updated upstream
   body .dash-topbar .btn-login { box-shadow: 4px 4px 10px rgba(2, 8, 24, 0.55), -3px -3px 9px rgba(80, 130, 220, 0.16); }
   body .dash-topbar .btn-login:hover { box-shadow: 6px 6px 14px rgba(2, 8, 24, 0.6), -3px -3px 9px rgba(80, 130, 220, 0.2); }
   body .dash-topbar .btn-login:active { box-shadow: inset 3px 3px 7px rgba(2, 8, 24, 0.5); }
+=======
+  body .dash-topbar .btn-login { box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+  body .dash-topbar .btn-login:hover { box-shadow: 6px 6px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+  body .dash-topbar .btn-login:active { box-shadow: inset 3px 3px 7px rgba(0, 0, 0, 0.5); }
+>>>>>>> Stashed changes
 
   /* Search: a darker field pressed into the bar, light text. */
   body .dash-topbar .search-box { background: rgba(2, 8, 24, 0.28); box-shadow: var(--tb-in); color: var(--tb-muted); }
@@ -2118,11 +2228,19 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
 .event-details-page.neu .submenu-toggle.is-current {
   background: linear-gradient(135deg, #c2410c 0%, #9a3412 100%);
   color: #fff;
+<<<<<<< Updated upstream
   box-shadow: 0 8px 20px rgba(194, 65, 12, 0.35), -3px -3px 9px rgba(80, 130, 220, 0.12);
 }
 .neu .side-nav .submenu-toggle.is-current .icon {
   background: rgba(255, 255, 255, 0.16);
   box-shadow: inset 2px 2px 5px rgba(120, 40, 0, 0.35), inset -2px -2px 5px rgba(255, 255, 255, 0.2);
+=======
+  box-shadow: 0 8px 20px rgba(var(--p-accent-rgb), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.neu .side-nav .submenu-toggle.is-current .icon {
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.35);
+>>>>>>> Stashed changes
 }
 .neu .side-nav .event-submenu a.active {
   background: linear-gradient(135deg, rgba(96, 165, 250, 0.45) 0%, rgba(59, 130, 246, 0.35) 100%);
@@ -2154,7 +2272,11 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
   width: 30px; height: 30px; border-radius: 50%; border: none;
   background: rgba(255, 255, 255, 0.08); color: #fff;
   font-size: 1.1rem; font-weight: 800; line-height: 1;
+<<<<<<< Updated upstream
   box-shadow: 3px 3px 8px rgba(2, 8, 24, 0.5), -2px -2px 6px rgba(80, 130, 220, 0.15);
+=======
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+>>>>>>> Stashed changes
 }
 .neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
 .neu .rail-card .cal-head button:active { box-shadow: inset 2px 2px 6px rgba(2, 8, 24, 0.55); }
@@ -2230,3 +2352,297 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
   /* Footer org logos and links. */
   .site-footer-links a { transition: color 0.2s ease; }
 }
+<<<<<<< Updated upstream
+=======
+
+/* ============================================================
+   APPEARANCE: Light (default) · Dim · Dark
+   <html data-theme="dim|dark"> — set by the switcher next to the bell
+   (includes/theme-switch.php) and kept in the "theme" cookie.
+   Each theme only sets colours (tokens); the shared rules below swap
+   the light surfaces, tints and dark-on-light text for them. The sidebar
+   already has its own colours, so it stays as it is.
+   Selectors start with :root[...] so they outrank the page styles
+   (admin.css, calendar.css, event-details.css) loaded after this file.
+   ============================================================ */
+
+/* ---- Switcher (all themes) ---- */
+.theme-menu { position: relative; }
+.theme-menu > summary { list-style: none; }
+.theme-menu > summary::-webkit-details-marker { display: none; }
+.theme-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #f3f4f6; color: var(--navy); cursor: pointer;
+}
+.theme-btn:hover { background: #e5e7eb; }
+.theme-btn-icon { display: inline-flex; line-height: 0; }
+.neu .theme-btn { width: 42px; height: 42px; background: var(--neu-bg); box-shadow: var(--neu-out-sm); transition: box-shadow 0.25s ease; }
+.neu .theme-btn:hover { background: var(--neu-bg); box-shadow: var(--neu-out); }
+.neu .theme-menu[open] > .theme-btn { box-shadow: var(--neu-in); }
+.theme-dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 45;
+  min-width: 170px; padding: 6px;
+  background: #fff; border-radius: 12px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+.neu .theme-dropdown { background: var(--neu-bg); box-shadow: var(--neu-out); border-radius: 16px; }
+.theme-dropdown-head { padding: 6px 10px 8px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.theme-option {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: none; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 0.88rem; color: var(--text-main); cursor: pointer; text-align: left;
+}
+.theme-option:hover { background: rgba(127, 140, 150, 0.12); }
+.theme-option .theme-check { margin-left: auto; visibility: hidden; color: var(--orange); font-weight: 800; }
+.theme-option[aria-pressed="true"] { font-weight: 700; }
+.theme-option[aria-pressed="true"] .theme-check { visibility: visible; }
+@media (max-width: 760px) {
+  .theme-btn, .neu .theme-btn { width: 38px; height: 38px; }
+}
+
+/* ---- Tokens ---- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: var(--p-dk-bg);
+  --card-bg: var(--p-dk-card);
+  --surface-2: var(--p-dk-surface);
+  --border: var(--p-dk-border);
+  --text-main: var(--p-dk-text);
+  --text-muted: var(--p-dk-muted);
+  --navy: var(--p-dk-text);   /* headings: light text now */
+  --ink: var(--p-dk-ink);     /* where the dark palette colour was a fill behind white text */
+  --ink-hover: var(--p-dk-ink-hover);
+  --orange-text: var(--p-hi-light);
+  --blue-accent: var(--p-hi-light); /* links on dark */
+  --focus: var(--p-hi-light);
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --tint-red: rgba(var(--p-hi-rgb), 0.16);
+  --tint-info: rgba(var(--p-soft-rgb), 0.12);
+  --tint-ok: rgba(34, 197, 94, 0.14);
+  --neu-dark-shadow: rgba(0, 0, 0, 0.6);
+  --neu-light-shadow: rgba(255, 255, 255, 0.035);
+}
+:root[data-theme="dim"] {
+  color-scheme: dark;
+  --bg: var(--p-dm-bg);
+  --card-bg: var(--p-dm-card);
+  --surface-2: var(--p-dm-surface);
+  --border: var(--p-dm-border);
+  --text-main: var(--p-dm-text);
+  --text-muted: var(--p-dm-muted);
+  --navy: var(--p-dm-text);
+  --ink: var(--p-dm-ink);
+  --ink-hover: var(--p-dk-ink-hover);
+  --orange-text: var(--p-dm-link);
+  --blue-accent: var(--p-dm-link);
+  --focus: var(--p-dm-link);
+  --shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.42);
+  --tint-red: rgba(var(--p-hi-rgb), 0.2);
+  --tint-info: rgba(var(--p-soft-rgb), 0.14);
+  --tint-ok: rgba(34, 197, 94, 0.18);
+  --neu-dark-shadow: rgba(0, 0, 0, 0.4);
+  --neu-light-shadow: rgba(255, 255, 255, 0.05);
+}
+
+/* ---- Page, and the soft (neumorphic) pages ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) body { background: var(--bg); color: var(--text-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) body.neu {
+  --neu-bg: var(--bg);
+  --neu-dark: var(--neu-dark-shadow);
+  --neu-light: var(--neu-light-shadow);
+  --neu-text: var(--text-main);
+  --neu-muted: var(--text-muted);
+  --neu-link: var(--p-hi-light);  /* dark accent text would vanish on the dark surfaces */
+  background: var(--bg);
+}
+
+/* ---- Light surfaces become cards ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .site-header, .about-section, .filter-bar, .org-card, .notif-dropdown, .user-dropdown,
+  .theme-dropdown, .right-rail .rail-card, .acct-option span, .admin-input, .admin-tab, .btn-sm,
+  .report-filters select, .filters-card select, .row-more-menu, .cal-matches a, .admin-stat,
+  .eval-callout-item, .acct-modal, .ed-hero, .ed-program-card,
+  .ed-schedule, .filter-bar input, .filter-bar select
+) { background: var(--card-bg); color: var(--text-main); }
+/* :where() keeps this weaker than the phone top bar (espresso bar, ≤ 760px). */
+:root:is([data-theme="dark"], [data-theme="dim"]) :where(.dash-topbar) { background: var(--card-bg); border-bottom-color: var(--border); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(input, textarea)::placeholder { color: var(--text-muted); opacity: 0.8; }
+/* Icons are drawn in espresso: shown light on the dark surfaces. (The sidebar's
+   pills and the phone top bar set their own, more specific, icon colours.) */
+:root:is([data-theme="dark"], [data-theme="dim"]) .ui-icon { filter: brightness(0) invert(0.88); }
+
+/* ---- Subtle surfaces: table heads, round buttons, hovers ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .admin-table th, .admin-table tfoot td, .bell, .nav-toggle, .nav-close, .cal-head button, .cal-step, .btn-muted,
+  .theme-btn, .schedule-hint, .eval-comments li, .event-line-date, .import-count, .cal-tag, .cal-tag-muted,
+  .cal-day, .cal-cell.has-events .cal-day, .admin-status-draft, .admin-status-registered, .role-user) { background: var(--surface-2); color: var(--text-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .bell:hover, .nav-toggle:hover, .theme-btn:hover, .cal-step:hover, .cal-head button:hover,
+  .user-menu > summary:hover, a.notif-item:hover, .user-dropdown a:hover,
+  .theme-option:hover, .cal-day:hover, .btn-sm:hover
+) { background: var(--border); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .admin-table tr:hover td { background: rgba(255, 255, 255, 0.025); }
+
+/* Soft pages: their surfaces follow --neu-bg already; these were fixed light colours. */
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .cal-cell.has-events .cal-day { background: var(--surface-2); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .acct-modal { background: var(--card-bg); }
+
+/* ---- Where the dark colour was a fill behind white text ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .event-tag, .row-more[open] > summary,
+  .cal-cell.is-today .cal-num, .cal-chip-on_campus, .cal-grid .day.today
+) { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* ---- Tints: messages, statuses, badges ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.flash-success, .ed-flash-ok, .admin-status-published, .admin-status-attended) {
+  background: var(--tint-ok); color: #86efac; border-color: rgba(34, 197, 94, 0.3);
+}
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.flash-error, .ed-flash-error, .admin-status-cancelled, .admin-status-no_show) {
+  background: rgba(239, 68, 68, 0.16); color: #fca5a5; border-color: rgba(239, 68, 68, 0.35);
+}
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .flash-info, .ed-flash-info, .admin-note, .acct-rules, .admin-status-completed, .admin-status-waitlisted,
+  .role-admin, .perm-some, .notif-item.unread) { background: var(--tint-info); color: var(--text-main); border-color: var(--border); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .eval-callout, .role-moderator, .cal-cell.is-selected .cal-day, .acct-option input:checked + span,
+  .acct-levels label:has(input:checked)
+) { background: var(--tint-red); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.eval-callout, .role-moderator) { color: var(--text-main); border-color: rgba(var(--p-hi-rgb), 0.35); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.btn-sm-danger:hover:not(:disabled), .ed-btn-outline:hover:not(:disabled)) { background: rgba(239, 68, 68, 0.14); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .btn-sm-accent:hover:not(:disabled) { background: var(--tint-info); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .ed-btn-outline { background: transparent; color: #fca5a5; border-color: rgba(239, 68, 68, 0.45); }
+
+/* ---- Dark text that was fixed for white backgrounds ---- */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  .about-text p, .org-card-head p, .acct-modal p, .acct-rules ul, .schedule-hint ul, .import-help ul, .ed-desc, .ed-program-time, .ed-reg-note,
+  .ed-not-found p, .ed-eval-note, .header-user-name
+) { color: var(--text-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.ed-meta-row, .ed-org-text, .ed-program-sub) { color: var(--text-muted); }
+
+/* Borders that were light grey. */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.admin-input, .btn-sm, .admin-tab, .org-dept, .cal-day, .filter-bar input, .filter-bar select) { border-color: var(--border); }
+
+/* ============================================================
+   MAIN COLOUR (--p-main: royal blue)
+   The sidebar, the strip under the home hero, the calendar header and the
+   main buttons use it in every theme. It's a strong colour, so everything
+   on it is white (--p-on-main); lavender (--p-hi) marks highlights on it.
+   The support colours cover the rest (headings,
+   small fills, login and the phone top bar). Last in the file so these win.
+   ============================================================ */
+
+/* ---- Main buttons ---- */
+body .btn-primary, .neu .btn-primary, .neu .btn-login, .neu .btn-accent,
+.neu .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate), body .admin-tab.active {
+  background: var(--p-main); border-color: var(--p-main); color: var(--p-on-main);
+}
+body .btn-primary:hover, .neu .btn-primary:hover, .neu .btn-login:hover, .neu .btn-accent:hover,
+.neu .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate):hover:not(:disabled) { background: var(--p-main-hover); }
+:root body :is(.btn-primary, .btn-accent, .btn-login, .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate)) .ui-icon { filter: brightness(0) invert(1); } /* white icons, like the text */
+
+/* ---- Sidebar ---- */
+.neu .sidebar,
+.sidebar.neu {
+  --sb-text: var(--p-on-main);
+  --sb-muted: rgba(var(--p-on-main-rgb), 0.72);
+  --sb-surface: rgba(var(--p-on-main-rgb), 0.08);
+  --sb-out: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12); /* dark drop + thin light rim (no white haze on dark) */
+  --sb-in: inset 0 3px 7px rgba(0, 0, 0, 0.4), inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+  background: var(--p-main);
+  box-shadow: 6px 0 24px rgba(var(--p-main-shadow-rgb), 0.25);
+}
+.neu .sidebar .brand, .sidebar.neu .brand,
+.neu .sidebar .brand-text .hub, .sidebar.neu .brand-text .hub { color: var(--p-on-main); }
+.neu .sidebar .brand-text .campus, .sidebar.neu .brand-text .campus { color: var(--p-hi); }
+.neu .side-nav a:not(.active):hover, .neu .submenu-toggle:hover, .neu .submenu-toggle[aria-expanded="true"],
+.neu .side-nav .event-submenu a:hover { color: var(--p-on-main); }
+.neu .side-admin { border-top-color: rgba(var(--p-on-main-rgb), 0.2); }
+.sidebar :focus-visible { outline-color: var(--p-on-main); }
+/* Icons: white on the royal blue — dark on the lavender pills. */
+:root .neu .sidebar .ui-icon, :root .sidebar.neu .ui-icon { filter: brightness(0) invert(1); }
+:root .neu .side-nav a.active .ui-icon { filter: var(--p-pill-icon); }
+:root .neu .side-nav .submenu-toggle.is-current .ui-icon { filter: brightness(0) invert(1); }
+:root .neu .side-nav .event-submenu a.active .ui-icon { filter: var(--p-sub-icon); }
+/* Visitors' Log in / Sign up at the bottom of the phone menu. */
+.neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.7); color: var(--p-on-main); }
+.neu .sidebar .side-auth .btn-primary, .sidebar.neu .side-auth .btn-primary { background: var(--p-dark); border-color: var(--p-dark); color: #fff; }
+
+/* ---- Strip under the home hero (features + stats) ---- */
+.neu .feature-strip { background: var(--p-main); box-shadow: 0 14px 30px rgba(var(--p-main-shadow-rgb), 0.25); }
+.neu .feature-title { color: var(--p-on-main); }
+.neu .feature-sub, .neu .stat-label { color: rgba(var(--p-on-main-rgb), 0.78); }
+.neu .stat-value { color: var(--p-hi-light); }
+.neu .feature-item { border-right-color: rgba(var(--p-on-main-rgb), 0.18); }
+.neu .stats-block { border-top-color: rgba(var(--p-on-main-rgb), 0.18); }
+.neu .feature-strip .feature-icon { background: rgba(255, 255, 255, 0.12); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18); }
+:root .neu .feature-strip .ui-icon { filter: brightness(0) invert(1); }
+.feature-strip :focus-visible { outline-color: var(--p-on-main); }
+
+/* ---- Dashboard calendar header ---- */
+.neu .rail-card .cal-head { background: var(--p-main); box-shadow: 0 8px 18px rgba(var(--p-main-shadow-rgb), 0.22); color: var(--p-on-main); }
+.neu .cal-head .cal-head-title,
+.neu .rail-card .cal-head-month #calendar-month { color: var(--p-on-main); }
+.neu .rail-card .cal-head button,
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .rail-card .cal-head button {
+  background: rgba(255, 255, 255, 0.18); color: var(--p-on-main);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.neu .rail-card .cal-head button:hover,
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.3); color: var(--p-on-main); }
+.neu .rail-card .cal-head :focus-visible { outline-color: var(--p-on-main); }
+
+/* Main actions use the main colour (Blue) with white text (Explore
+   Events, Apply, Publish, Log in…). */
+.btn-primary, .neu .btn-primary, .neu .btn-accent {
+  background: var(--p-main); color: var(--p-on-main);
+  box-shadow: 0 8px 20px rgba(var(--p-main-shadow-rgb), 0.28);
+}
+.btn-primary:hover, .neu .btn-primary:hover, .neu .btn-accent:hover { background: var(--p-main-hover); color: var(--p-on-main); }
+.neu .hero .btn-primary { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+.event-thumb, .mini-thumb, .upcoming-thumb { background-color: var(--p-dark); }
+
+/* Logo only — no white circle, ring or shadow around it. On the dark
+   surfaces (sidebar, phone top bar, footer) it's the Glow Peach version
+   (school_logo_url(true), assets/images/school-logo-light.png). */
+body .brand-logo,
+body .sidebar .brand-logo,
+body .topbar-brand img,
+body .dash-topbar .topbar-brand img,
+body .site-footer-logo {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: contain;
+}
+/* (stronger than the .neu sidebar rule that drew a ring around it) */
+:root body .sidebar .brand-logo,
+:root body.neu .sidebar .brand-logo,
+:root body .neu .sidebar .brand-logo { background: none; padding: 0; border: 0; border-radius: 0; box-shadow: none; outline: 0; }
+
+/* ---- On the main colour: white text and icons (--p-on-main / --p-on-main-icon). ---- */
+:root .neu .sidebar .ui-icon, :root .sidebar.neu .ui-icon,
+:root .neu .feature-strip .ui-icon,
+:root body :is(.btn-primary, .btn-accent, .btn-login) .ui-icon,
+:root .assistant-launcher .ui-icon { filter: var(--p-on-main-icon); }
+/* ...except where the background is dark again: the current-page pill (espresso)
+   and the open group (burnt orange) keep light icons. */
+:root .neu .side-nav a.active .ui-icon { filter: var(--p-pill-icon); }
+:root .neu .side-nav .submenu-toggle.is-current .ui-icon { filter: brightness(0) invert(1); }
+:root .neu .side-nav .event-submenu a.active .ui-icon { filter: var(--p-sub-icon); }
+/* "CAMPUS" on blue: light orange (small text, 6.1:1); the big stat numbers: orange (large text). */
+.neu .sidebar .brand-text .campus, .sidebar.neu .brand-text .campus { color: var(--p-hi-light); }
+.neu .feature-strip .stat-value { color: var(--p-hi); }
+/* Dark surfaces (phone top bar, footer): "CAMPUS" glows amber. */
+body .dash-topbar .topbar-brand .brand-text .campus, .site-footer-brand strong { color: var(--p-hi); }
+
+/* Top bar LOG IN / Sign up: no orange — blue shadow, Sign up in blue
+   (white on the dark themes and the phone's blue top bar). */
+.neu .btn-login, body .dash-topbar .btn-login { box-shadow: 0 6px 14px rgba(var(--p-main-shadow-rgb), 0.35); }
+.topbar-signup, .neu .topbar-signup { color: var(--p-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .topbar-signup,
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .topbar-signup { color: #fff; }
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .btn-login { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45); }
+>>>>>>> Stashed changes
