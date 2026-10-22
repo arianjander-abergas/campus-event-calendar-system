@@ -80,7 +80,11 @@ $_SESSION['callback_nonce'] = $_SESSION['callback_nonce'] ?? bin2hex(random_byte
 <body class="login-page">
 
 <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
+<<<<<<< Updated upstream
   <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
+=======
+  <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="login-logo-mark" width="72" height="68">
+>>>>>>> Stashed changes
   <span class="login-logo-text">
     <span class="campus">CAMPUS</span>
     <span class="hub">EVENT HUB</span>
