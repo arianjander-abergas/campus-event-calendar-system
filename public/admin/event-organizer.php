@@ -380,175 +380,190 @@ $breadcrumbs[] = [$pageTitle, null];
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
       <div class="admin-card">
-        <h2 class="admin-card-title">Event Details</h2>
+        <section class="form-section" aria-labelledby="sec-basic">
+          <h2 class="form-section-head" id="sec-basic"><span class="form-section-num">1</span><span>Basic Information<small>Title, type of event and description</small></span></h2>
+          <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
+          <input type="text" id="title" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
 
-        <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
-        <input type="text" id="title" name="title" class="admin-input" placeholder="Enter event title" value="<?= $val('title') ?>" required>
-
-        <div>
           <div>
-            <label class="admin-label" for="category_id">Category <span class="req">*</span></label>
-            <select id="category_id" name="category_id" class="admin-input" required>
-              <option value="">Select a category</option>
-              <?php foreach ($categories as $c): ?>
-                <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?><?= is_other_category($c['name']) ? ' data-other' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
-              <?php endforeach; ?>
-            </select>
-            <?php if (empty($categories)): ?>
-              <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> first.</p>
-            <?php endif; ?>
-            <div data-category-other hidden>
-              <label class="admin-label" for="category_other">Type of Event <span class="req">*</span></label>
-              <input type="text" id="category_other" name="category_other" class="admin-input" maxlength="60" placeholder="e.g. Hackathon, Outreach, Film Showing" value="<?= $val('category_other') ?>">
-            </div>
-          </div>
-        </div>
-
-        <?php /* Organization picker: departments from Categories & Orgs (e.g. CITE) are
-                 clickable and open to show their organizations (JPSSITE, SIES, ACpES…).
-                 One organization, or two or more with "Multi-organization event". */
-        $pickedIds = array_values(array_filter(array_merge([(string) ($f['organization_id'] ?? '')], $f['partner_ids'] ?? [])));
-        $isMulti = !empty($f['multi_org']);
-        $orgGroups = [];
-        foreach ($departments as $d) {
-            $members = array_values(array_filter($allOrganizations, fn($o) => ($o['department_id'] ?? '') === $d['id']));
-            if ($members) $orgGroups[] = [$d['code'] ?: $d['name'], $d['name'], $members];
-        }
-        $ungrouped = array_values(array_filter($allOrganizations, fn($o) => !in_array($o['department_id'] ?? '', array_column($departments, 'id'), true)));
-        if ($ungrouped) $orgGroups[] = ['Other organizations', '', $ungrouped];
-        $ownOrg = $isAdmin ? '' : (string) $user['organization_id'];
-        ?>
-        <div class="org-field" data-org-field>
-          <span class="admin-label" id="org-label">Organization <span class="req">*</span></span>
-          <label class="admin-checkbox org-multi-toggle">
-            <input type="checkbox" name="multi_org" data-multi-org <?= $isMulti ? 'checked' : '' ?>>
-            Multi-organization event <span class="admin-muted">— two or more organizations hold it together</span>
-          </label>
-          <?php if (!$isAdmin): ?>
-            <input type="hidden" name="organization_ids[]" value="<?= htmlspecialchars($ownOrg) ?>">
-          <?php endif; ?>
-
-          <div class="org-picker" role="group" aria-labelledby="org-label">
-            <?php foreach ($orgGroups as [$heading, $fullName, $members]):
-              $groupPicked = count(array_intersect(array_column($members, 'id'), $pickedIds)); ?>
-              <details class="org-dept"<?= $groupPicked ? ' open' : '' ?>>
-                <summary>
-                  <span class="org-dept-name"><?= htmlspecialchars($heading) ?></span>
-                  <?php if ($fullName !== '' && $fullName !== $heading): ?><span class="org-dept-full"><?= htmlspecialchars($fullName) ?></span><?php endif; ?>
-                  <span class="org-dept-count" data-dept-count><?= $groupPicked ? $groupPicked . ' selected' : count($members) . ' org' . (count($members) === 1 ? '' : 's') ?></span>
-                </summary>
-                <div class="org-dept-list">
-                  <?php foreach ($members as $o):
-                    $isOwn = $o['id'] === $ownOrg;
-                    $isPicked = in_array($o['id'], $pickedIds, true) || $isOwn; ?>
-                    <label class="org-option<?= $isOwn ? ' is-locked' : '' ?>">
-                      <input type="checkbox" <?= $isOwn ? 'disabled data-own' : 'name="organization_ids[]"' ?> value="<?= htmlspecialchars($o['id']) ?>" data-org-name="<?= htmlspecialchars($o['name']) ?>" <?= $isPicked ? 'checked' : '' ?>>
-                      <?php if (!empty($o['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
-                      <span><?= htmlspecialchars($o['name']) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
-                    </label>
-                  <?php endforeach; ?>
-                </div>
-              </details>
-            <?php endforeach; ?>
-            <?php if (empty($allOrganizations)): ?>
-              <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
-            <?php endif; ?>
-          </div>
-
-          <?php if ($isAdmin): ?>
-            <div class="org-lead" data-org-lead<?= $isMulti ? '' : ' hidden' ?>>
-              <label class="admin-label" for="organization_id">Main Organizer <span class="req">*</span></label>
-              <select id="organization_id" name="organization_id" class="admin-input" data-lead-select>
-                <?php foreach ($allOrganizations as $o): ?>
-                  <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+            <div>
+              <label class="admin-label" for="category_id">Category <span class="req">*</span></label>
+              <select id="category_id" name="category_id" class="admin-input" required>
+                <option value="">Select a category</option>
+                <?php foreach ($categories as $c): ?>
+                  <option value="<?= htmlspecialchars($c['id']) ?>" <?= ($f['category_id'] ?? '') === $c['id'] ? 'selected' : '' ?><?= is_other_category($c['name']) ? ' data-other' : '' ?>><?= htmlspecialchars($c['name']) ?></option>
                 <?php endforeach; ?>
               </select>
+              <?php if (empty($categories)): ?>
+                <p class="admin-hint">No categories yet — <a href="admin-taxonomy.php">add one</a> first.</p>
+              <?php endif; ?>
+              <div data-category-other hidden>
+                <label class="admin-label" for="category_other">Type of Event <span class="req">*</span></label>
+                <input type="text" id="category_other" name="category_other" class="admin-input" maxlength="60" placeholder="e.g. Hackathon, Outreach, Film Showing" value="<?= $val('category_other') ?>">
+              </div>
             </div>
-          <?php endif; ?>
-          <p class="admin-hint" data-org-hint>
-            <?= $isAdmin
-              ? 'Click a department to see its organizations. For a multi-organization event, the main organizer\'s Admins run the event; the others are shown as co-organizers.'
-              : 'Your organization runs the event. Tick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
-          </p>
-        </div>
+          </div>
 
-        <span class="admin-label" id="audience-label">Audience <span class="req">*</span> <span class="admin-muted">— tick everyone it's for</span></span>
-        <?php $formAudiences = isset($f['audiences']) || isset($f['audience']) ? event_audiences($f) : ['students']; ?>
-        <div class="admin-radio-row" role="group" aria-labelledby="audience-label" data-audiences>
-          <?php foreach (AUDIENCE_GROUPS as $key => $label): ?>
-            <label class="admin-radio"><input type="checkbox" name="audiences[]" value="<?= $key ?>" <?= in_array($key, $formAudiences, true) ? 'checked' : '' ?>> <?= $label ?></label>
-          <?php endforeach; ?>
-        </div>
-        <p class="admin-hint">Outsiders: guests from outside LCUP. Students and faculty register on the site; outsiders are shown the event as open to them.</p>
-        <p class="admin-hint admin-hint-error" data-audience-error hidden>Tick at least one: Students, Faculty or Outsiders.</p>
+          <label class="admin-label" for="description">Description <span class="req">*</span></label>
+          <textarea id="description" name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
+        </section>
 
-        <div data-year-levels>
-          <span class="admin-label">Open to Year Levels</span>
-          <div class="admin-radio-row">
-            <?php foreach (YEAR_LEVELS as $y => $label): ?>
-              <label class="admin-radio"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
+        <section class="form-section" aria-labelledby="sec-org">
+          <h2 class="form-section-head" id="sec-org"><span class="form-section-num">2</span><span>Organizers<small>The organization holding the event, and any co-organizers</small></span></h2>
+          <?php /* Organization picker: departments from Categories & Orgs (e.g. CITE) are
+                   clickable and open to show their organizations (JPSSITE, SIES, ACpES…).
+                   One organization, or two or more with "Multi-organization event". */
+          $pickedIds = array_values(array_filter(array_merge([(string) ($f['organization_id'] ?? '')], $f['partner_ids'] ?? [])));
+          $isMulti = !empty($f['multi_org']);
+          $orgGroups = [];
+          foreach ($departments as $d) {
+              $members = array_values(array_filter($allOrganizations, fn($o) => ($o['department_id'] ?? '') === $d['id']));
+              if ($members) $orgGroups[] = [$d['code'] ?: $d['name'], $d['name'], $members];
+          }
+          $ungrouped = array_values(array_filter($allOrganizations, fn($o) => !in_array($o['department_id'] ?? '', array_column($departments, 'id'), true)));
+          if ($ungrouped) $orgGroups[] = ['Other organizations', '', $ungrouped];
+          $ownOrg = $isAdmin ? '' : (string) $user['organization_id'];
+          ?>
+          <div class="org-field" data-org-field>
+            <span class="admin-label" id="org-label">Organization <span class="req">*</span></span>
+            <label class="admin-checkbox org-multi-toggle">
+              <input type="checkbox" name="multi_org" data-multi-org <?= $isMulti ? 'checked' : '' ?>>
+              Multi-organization event <span class="admin-muted">— two or more organizations hold it together</span>
+            </label>
+            <?php if (!$isAdmin): ?>
+              <input type="hidden" name="organization_ids[]" value="<?= htmlspecialchars($ownOrg) ?>">
+            <?php endif; ?>
+
+            <div class="org-picker" role="group" aria-labelledby="org-label">
+              <?php foreach ($orgGroups as [$heading, $fullName, $members]):
+                $groupPicked = count(array_intersect(array_column($members, 'id'), $pickedIds)); ?>
+                <details class="org-dept"<?= $groupPicked ? ' open' : '' ?>>
+                  <summary>
+                    <span class="org-dept-name"><?= htmlspecialchars($heading) ?></span>
+                    <?php if ($fullName !== '' && $fullName !== $heading): ?><span class="org-dept-full"><?= htmlspecialchars($fullName) ?></span><?php endif; ?>
+                    <span class="org-dept-count" data-dept-count><?= $groupPicked ? $groupPicked . ' selected' : count($members) . ' org' . (count($members) === 1 ? '' : 's') ?></span>
+                  </summary>
+                  <div class="org-dept-list">
+                    <?php foreach ($members as $o):
+                      $isOwn = $o['id'] === $ownOrg;
+                      $isPicked = in_array($o['id'], $pickedIds, true) || $isOwn; ?>
+                      <label class="org-option<?= $isOwn ? ' is-locked' : '' ?>">
+                        <input type="checkbox" <?= $isOwn ? 'disabled data-own' : 'name="organization_ids[]"' ?> value="<?= htmlspecialchars($o['id']) ?>" data-org-name="<?= htmlspecialchars($o['name']) ?>" <?= $isPicked ? 'checked' : '' ?>>
+                        <?php if (!empty($o['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                        <span><?= htmlspecialchars($o['name']) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
+                      </label>
+                    <?php endforeach; ?>
+                  </div>
+                </details>
+              <?php endforeach; ?>
+              <?php if (empty($allOrganizations)): ?>
+                <p class="admin-hint">No organizations yet — <a href="admin-taxonomy.php?tab=organizations">add one</a> first.</p>
+              <?php endif; ?>
+            </div>
+
+            <?php if ($isAdmin): ?>
+              <div class="org-lead" data-org-lead<?= $isMulti ? '' : ' hidden' ?>>
+                <label class="admin-label" for="organization_id">Main Organizer <span class="req">*</span></label>
+                <select id="organization_id" name="organization_id" class="admin-input" data-lead-select>
+                  <?php foreach ($allOrganizations as $o): ?>
+                    <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            <?php endif; ?>
+            <p class="admin-hint" data-org-hint>
+              <?= $isAdmin
+                ? 'Click a department to see its organizations. For a multi-organization event, the main organizer\'s Admins run the event; the others are shown as co-organizers.'
+                : 'Your organization runs the event. Tick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
+            </p>
+          </div>
+        </section>
+
+        <section class="form-section" aria-labelledby="sec-audience">
+          <h2 class="form-section-head" id="sec-audience"><span class="form-section-num">3</span><span>Audience<small>Who the event is for</small></span></h2>
+          <span class="admin-label" id="audience-label">Open to <span class="req">*</span> <span class="admin-muted">— tick everyone it's for</span></span>
+          <?php $formAudiences = isset($f['audiences']) || isset($f['audience']) ? event_audiences($f) : ['students']; ?>
+          <div class="admin-radio-row" role="group" aria-labelledby="audience-label" data-audiences>
+            <?php foreach (AUDIENCE_GROUPS as $key => $label): ?>
+              <label class="admin-radio"><input type="checkbox" name="audiences[]" value="<?= $key ?>" <?= in_array($key, $formAudiences, true) ? 'checked' : '' ?>> <?= $label ?></label>
             <?php endforeach; ?>
           </div>
-          <p class="admin-hint">Pick none to open the event to every year level. Students outside the picked year levels can't register; irregular students can if any of their subjects' year levels is picked.</p>
-        </div>
+          <p class="admin-hint">Outsiders: guests from outside LCUP. Students and faculty register on the site; outsiders are shown the event as open to them.</p>
+          <p class="admin-hint admin-hint-error" data-audience-error hidden>Tick at least one: Students, Faculty or Outsiders.</p>
 
-        <label class="admin-label" for="description">Description <span class="req">*</span></label>
-        <textarea id="description" name="description" class="admin-input" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea>
+          <div data-year-levels>
+            <span class="admin-label">Open to Year Levels</span>
+            <div class="admin-radio-row">
+              <?php foreach (YEAR_LEVELS as $y => $label): ?>
+                <label class="admin-radio"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
+              <?php endforeach; ?>
+            </div>
+            <p class="admin-hint">Pick none to open the event to every year level. Students outside the picked year levels can't register; irregular students can if any of their subjects' year levels is picked.</p>
+          </div>
+        </section>
 
-        <div class="admin-section-label">Date, Time &amp; Venue</div>
-        <div class="admin-four-col">
-          <div>
-            <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
-            <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" min="<?= $minDate('start_date') ?>" required>
+        <section class="form-section" aria-labelledby="sec-when">
+          <h2 class="form-section-head" id="sec-when"><span class="form-section-num">4</span><span>Date &amp; Time<small>When it starts and ends</small></span></h2>
+          <div class="admin-four-col">
+            <div>
+              <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
+              <input type="date" id="start_date" name="start_date" class="admin-input" value="<?= $val('start_date') ?>" min="<?= $minDate('start_date') ?>" required>
+            </div>
+            <div>
+              <label class="admin-label" for="start_time">Start Time</label>
+              <input type="time" id="start_time" name="start_time" class="admin-input" value="<?= $time('start_time') ?>">
+            </div>
+            <div>
+              <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
+              <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" min="<?= $minDate('end_date') ?>" data-min="<?= $minDate('end_date') ?>" required>
+            </div>
+            <div>
+              <label class="admin-label" for="end_time">End Time</label>
+              <input type="time" id="end_time" name="end_time" class="admin-input" value="<?= $time('end_time') ?>">
+            </div>
           </div>
-          <div>
-            <label class="admin-label" for="start_time">Start Time</label>
-            <input type="time" id="start_time" name="start_time" class="admin-input" value="<?= $time('start_time') ?>">
-          </div>
-          <div>
-            <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
-            <input type="date" id="end_date" name="end_date" class="admin-input" value="<?= $val('end_date') ?>" min="<?= $minDate('end_date') ?>" data-min="<?= $minDate('end_date') ?>" required>
-          </div>
-          <div>
-            <label class="admin-label" for="end_time">End Time</label>
-            <input type="time" id="end_time" name="end_time" class="admin-input" value="<?= $time('end_time') ?>">
-          </div>
-        </div>
-        <!-- Other events on these dates, and clashes (filled by the script below) -->
-        <div class="schedule-hint" data-schedule-hint hidden></div>
+          <!-- Other events on these dates, and clashes (filled by the script below) -->
+          <div class="schedule-hint" data-schedule-hint hidden></div>
+        </section>
 
-        <span class="admin-label">Venue Type <span class="req">*</span></span>
-        <div class="admin-radio-row">
-          <?php foreach (VENUE_TYPES as $key => $label): ?>
-            <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($f['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $label ?></label>
-          <?php endforeach; ?>
-        </div>
-
-        <div class="admin-two-col">
-          <div>
-            <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
-            <input type="text" id="venue" name="venue" class="admin-input" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>">
+        <section class="form-section" aria-labelledby="sec-venue">
+          <h2 class="form-section-head" id="sec-venue"><span class="form-section-num">5</span><span>Venue<small>Where it happens: on campus, off campus or online</small></span></h2>
+          <span class="admin-label">Venue Type <span class="req">*</span></span>
+          <div class="admin-radio-row">
+            <?php foreach (VENUE_TYPES as $key => $label): ?>
+              <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($f['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $label ?></label>
+            <?php endforeach; ?>
           </div>
-          <div>
-            <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
-            <input type="url" id="online_event_link" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
+
+          <div class="admin-two-col">
+            <div>
+              <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
+              <input type="text" id="venue" name="venue" class="admin-input" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>">
+            </div>
+            <div>
+              <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
+              <input type="url" id="online_event_link" name="online_event_link" class="admin-input" placeholder="https://…" value="<?= $val('online_event_link') ?>">
+            </div>
           </div>
-        </div>
-        <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
+          <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
 
-        <label class="admin-label" for="address">Address (if applicable)</label>
-        <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
+          <label class="admin-label" for="address">Address (if applicable)</label>
+          <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
+        </section>
 
-        <div class="admin-checkbox-row">
-          <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
-          <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
-        </div>
-        <p class="admin-hint">With "Send Notification" on: publishing a new event notifies every user; saving changes to a published event notifies the people registered for it.</p>
+        <section class="form-section" aria-labelledby="sec-options">
+          <h2 class="form-section-head" id="sec-options"><span class="form-section-num">6</span><span>Publishing Options<small>Registration and notifications</small></span></h2>
+          <div class="admin-checkbox-row">
+            <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
+            <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
+          </div>
+          <p class="admin-hint">With "Send Notification" on: publishing a new event notifies every user; saving changes to a published event notifies the people registered for it.</p>
+        </section>
       </div>
 
       <div class="admin-side-cards">
         <div class="admin-card">
-          <h2 class="admin-card-title">Event Poster</h2>
+          <h2 class="form-section-head" id="sec-poster"><span class="form-section-num">7</span><span>Event Poster<small>Shown on the event page and the event cards</small></span></h2>
           <?php if (!empty($f['poster_url'])): ?>
             <img src="<?= htmlspecialchars(asset_url($f['poster_url'])) ?>" alt="Current poster" class="admin-image-preview">
           <?php endif; ?>
@@ -560,7 +575,7 @@ $breadcrumbs[] = [$pageTitle, null];
         </div>
 
         <div class="admin-card">
-          <h2 class="admin-card-title">Registration &amp; Contact</h2>
+          <h2 class="form-section-head" id="sec-contact"><span class="form-section-num">8</span><span>Registration &amp; Contact<small>Limits, deadline and who to ask</small></span></h2>
           <label class="admin-label" for="registration_limit">Registration Limit</label>
           <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>">
 

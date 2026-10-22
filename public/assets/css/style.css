@@ -5,54 +5,54 @@
    ============================================================ */
 
 /* ============================================================
-   PALETTE — "Lavender + Powder Blue + Soft Cream"
-     MAIN       LAVENDER #B9A5D6 — the sidebar, the strip under the home
-                hero, the calendar header and the main buttons (--p-main).
-                It's a light colour, so text on it is deep plum #2E2445 (6.5:1);
-                links and small accent text use the deeper lavender #6A4F9C,
-                which reads on cream (5.8:1).
-     SECONDARY  SOFT CREAM #F3EFE6 — the page (#F5F1E8), cards, and the chosen
-                item inside an open sidebar group.
-     SUPPORT    DEEP PLUM #3B3555 — headings, icons, login, the phone top bar,
-                and the sidebar's current page (a plum pill, lavender text);
-                POWDER BLUE #9DAEDC — soft accents, and as the deeper
-                #5B6AA8 for small fills with white text (5.2:1).
+   PALETTE — "Royal Blue + Lavender"
+     PRIMARY    ROYAL BLUE #4169E1 — the sidebar, the strip under the home
+                hero, the calendar header and the main buttons (--p-main),
+                with white text on it (4.9:1); also the accent fills
+                (--p-accent). Links and small accent text use the deeper
+                #3454C4, which reads on the lavender-white page (5.9:1).
+     SECONDARY  LAVENDER #B9A5D6 — highlights (--p-hi), the sidebar's current
+                page (a lavender pill, navy text), section bands, hover
+                previews and tints; the page and cards are lavender-white
+                (#F3F1FA / #FDFCFF).
+     SUPPORT    DEEP ROYAL NAVY #1D2A66 — headings, login, the phone top bar
+                and the open sidebar group (white text).
    Flat colours only — no gradients. Every rule uses these --p-* roles:
      --p-main*    the main colour and the text on it
-     --p-dark*    deep-plum surfaces and headings
+     --p-dark*    deep-navy surfaces and headings
      --p-text     body text;  --p-neu-*  text on the soft pages
      --p-accent*  fills with white text; --p-accent-text is links / small accent text
-     --p-hi*      the highlight on plum (hero headline, "CAMPUS" at login, stats)
+     --p-hi*      the lavender highlight (hero headline, "CAMPUS", stats, bands)
      --p-pill-*   the sidebar's current page; --p-group-* / --p-sub-* the open group
      --p-tint-*   light lavender tints;  --p-soft-*, --p-bg, --p-card  the
                   light neutrals;  --p-dk-* / --p-dm-*  Dark / Dim themes
      *-rgb        the same colours as "r, g, b" for rgba(var(--…), alpha)
    ============================================================ */
 :root {
-  --p-main: #b9a5d6; --p-main-hover: #c7b6e0; --p-on-main: #2e2445; --p-on-main-rgb: 46, 36, 69;
-  --p-main-shadow-rgb: 90, 70, 130;
-  --p-dark: #3b3555; --p-darker: #2a2540; --p-dark-hi: #4d4670; --p-dark-2: #443d63;
-  --p-text: #2e2a3d; --p-neu-text: #3b3555; --p-neu-muted: #5f5a74;
-  --p-accent: #5b6aa8; --p-accent-text: #6a4f9c; --p-accent-deep: #48568e; --p-accent-deeper: #3a4675;
-  --p-accent-hi: #6f7dbb; --p-accent-mid: #8b7ab8;
-  --p-hi: #b9a5d6; --p-hi-light: #d9cdeb; --p-hi-soft: #9daedc;
-  --p-pill-to: #3b3555; --p-pill-text: #e4daf2; --p-pill-icon: brightness(0) invert(1); /* plum pill on the lavender sidebar, light lavender text 8.9:1 */
-  --p-group-to: #5b6aa8; /* deep powder blue with white text, set apart from the lavender sidebar */
-  --p-sub-bg: #f5f1e8; --p-sub-text: #3b3555; --p-sub-icon: brightness(0);
+  --p-main: #4169e1; --p-main-hover: #3557c8; --p-on-main: #ffffff; --p-on-main-rgb: 255, 255, 255;
+  --p-main-shadow-rgb: 28, 46, 120;
+  --p-dark: #1d2a66; --p-darker: #141d4a; --p-dark-hi: #2b3b85; --p-dark-2: #24337a;
+  --p-text: #1f2340; --p-neu-text: #1d2a66; --p-neu-muted: #555b78;
+  --p-accent: #4169e1; --p-accent-text: #3454c4; --p-accent-deep: #2f4cb8; --p-accent-deeper: #233a8f;
+  --p-accent-hi: #6a8bea; --p-accent-mid: #9d8fd6;
+  --p-hi: #b9a5d6; --p-hi-light: #dcd0f0; --p-hi-soft: #8e80cf;
+  --p-pill-to: #d4c6ee; --p-pill-text: #1d2a66; --p-pill-icon: brightness(0); /* lavender pill on the royal-blue sidebar, navy text 9:1 */
+  --p-group-to: #1d2a66; /* deep navy with white text, set apart from the royal-blue sidebar */
+  --p-sub-bg: #efe9fa; --p-sub-text: #1d2a66; --p-sub-icon: brightness(0);
   --p-tint-1: #f3eefa; --p-tint-2: #ece4f6; --p-tint-3: #d6c8ea; --p-tint-4: #e0d5ef;
-  --p-soft-1: #f1ece2; --p-soft-2: #f4f0e7; --p-soft-3: #f8f5ee; --p-soft-4: #efe9dd; --p-soft-5: #e3dccd;
-  --p-soft-6: #dcd4c3; --p-soft-7: #e6e0d3; --p-soft-8: #ede7db; --p-soft-9: #f6f2ea; --p-soft-10: #c4bad6;
-  --p-soft-11: #ece6d9; --p-soft-12: #f2ede3; --p-soft-13: #ece6da; --p-soft-14: #bdb4cc; --p-soft-15: #a39cb3;
-  --p-soft-16: #776f8a; --p-soft-17: #625b74; --p-soft-18: #e6dfd2; --p-soft-19: #c3b9d4;
-  --p-bg: #f5f1e8; --p-card: #fffdf9;
-  --p-accent-rgb: 91, 106, 168; --p-dark-rgb: 59, 53, 85; --p-hi-rgb: 185, 165, 214; --p-line-rgb: 217, 205, 235;
-  --p-darker-rgb: 42, 37, 64; --p-dark-hi-rgb: 77, 70, 112; --p-shadow-rgb: 190, 182, 200; --p-soft-rgb: 225, 215, 240;
-  --p-dark-2-rgb: 68, 61, 99; --p-mid-rgb: 163, 156, 179; --p-dark-mid-rgb: 50, 45, 74; --p-pill-inset-rgb: 46, 36, 69;
-  --p-n-rgb: 248, 245, 238;
-  --p-dk-bg: #12101a; --p-dk-card: #1b1826; --p-dk-surface: #231f31; --p-dk-border: #343048;
-  --p-dk-text: #ece8f4; --p-dk-muted: #aaa3bf; --p-dk-ink: #4b5a96; --p-dk-ink-hover: #5b6aa8;
-  --p-dm-bg: #24212f; --p-dm-card: #2d2a3b; --p-dm-surface: #363246; --p-dm-border: #48435d;
-  --p-dm-text: #e6e2ef; --p-dm-muted: #b4aec7; --p-dm-ink: #5b6aa8; --p-dm-link: #d9cdeb;
+  --p-soft-1: #ebe8f5; --p-soft-2: #efecf7; --p-soft-3: #f5f3fb; --p-soft-4: #e7e3f2; --p-soft-5: #d9d5e9;
+  --p-soft-6: #cfcae1; --p-soft-7: #dfdbec; --p-soft-8: #e6e2f1; --p-soft-9: #f2f0f9; --p-soft-10: #c4bad6;
+  --p-soft-11: #e4e0f0; --p-soft-12: #ece9f6; --p-soft-13: #e5e2f1; --p-soft-14: #bdb4cc; --p-soft-15: #a39cb3;
+  --p-soft-16: #776f8a; --p-soft-17: #625b74; --p-soft-18: #dedaeb; --p-soft-19: #c3b9d4;
+  --p-bg: #f3f1fa; --p-card: #fdfcff;
+  --p-accent-rgb: 65, 105, 225; --p-dark-rgb: 29, 42, 102; --p-hi-rgb: 185, 165, 214; --p-line-rgb: 220, 208, 240;
+  --p-darker-rgb: 20, 29, 74; --p-dark-hi-rgb: 43, 59, 133; --p-shadow-rgb: 184, 180, 208; --p-soft-rgb: 225, 215, 240;
+  --p-dark-2-rgb: 36, 51, 122; --p-mid-rgb: 160, 158, 186; --p-dark-mid-rgb: 30, 40, 90; --p-pill-inset-rgb: 29, 42, 102;
+  --p-n-rgb: 247, 246, 252;
+  --p-dk-bg: #0f111c; --p-dk-card: #171a29; --p-dk-surface: #1f2336; --p-dk-border: #30354d;
+  --p-dk-text: #e9ebf6; --p-dk-muted: #a7abc4; --p-dk-ink: #3a5bd0; --p-dk-ink-hover: #4169e1;
+  --p-dm-bg: #1f2233; --p-dm-card: #282c40; --p-dm-surface: #31364c; --p-dm-border: #444a64;
+  --p-dm-text: #e4e6f2; --p-dm-muted: #b0b4cb; --p-dm-ink: #4169e1; --p-dm-link: #d9cdeb;
 }
 
 /* The site's own names for the colours, now pointing at the palette roles.
@@ -2345,7 +2345,7 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(
   .site-header, .about-section, .filter-bar, .org-card, .notif-dropdown, .user-dropdown,
   .theme-dropdown, .right-rail .rail-card, .acct-option span, .admin-input, .admin-tab, .btn-sm,
-  .report-filters select, .filters-card select, .eval-option, .row-more-menu, .cal-matches a, .admin-stat,
+  .report-filters select, .filters-card select, .row-more-menu, .cal-matches a, .admin-stat,
   .eval-callout-item, .acct-modal, .ed-hero, .ed-program-card,
   .ed-schedule, .filter-bar input, .filter-bar select
 ) { background: var(--card-bg); color: var(--text-main); }
@@ -2374,7 +2374,7 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
 
 /* ---- Where the dark colour was a fill behind white text ---- */
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(
-  .event-tag, .row-more[open] > summary, .eval-option:has(input:checked),
+  .event-tag, .row-more[open] > summary,
   .cal-cell.is-today .cal-num, .cal-chip-on_campus, .cal-grid .day.today
 ) { background: var(--ink); border-color: var(--ink); color: #fff; }
 
@@ -2405,13 +2405,13 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(.ed-meta-row, .ed-org-text, .ed-program-sub) { color: var(--text-muted); }
 
 /* Borders that were light grey. */
-:root:is([data-theme="dark"], [data-theme="dim"]) :is(.admin-input, .btn-sm, .admin-tab, .org-dept, .cal-day, .eval-option, .filter-bar input, .filter-bar select) { border-color: var(--border); }
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(.admin-input, .btn-sm, .admin-tab, .org-dept, .cal-day, .filter-bar input, .filter-bar select) { border-color: var(--border); }
 
 /* ============================================================
-   MAIN COLOUR (--p-main: lavender)
+   MAIN COLOUR (--p-main: royal blue)
    The sidebar, the strip under the home hero, the calendar header and the
-   main buttons use it in every theme. It's a light colour, so everything
-   on it is dark (--p-on-main) — white would be unreadable.
+   main buttons use it in every theme. It's a strong colour, so everything
+   on it is white (--p-on-main); lavender (--p-hi) marks highlights on it.
    The support colours cover the rest (headings,
    small fills, login and the phone top bar). Last in the file so these win.
    ============================================================ */
@@ -2423,7 +2423,7 @@ body .btn-primary, .neu .btn-primary, .neu .btn-login, .neu .btn-accent,
 }
 body .btn-primary:hover, .neu .btn-primary:hover, .neu .btn-login:hover, .neu .btn-accent:hover,
 .neu .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate):hover:not(:disabled) { background: var(--p-main-hover); }
-:root body :is(.btn-primary, .btn-accent, .btn-login, .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate)) .ui-icon { filter: none; } /* dark icons, not white */
+:root body :is(.btn-primary, .btn-accent, .btn-login, .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate)) .ui-icon { filter: brightness(0) invert(1); } /* white icons, like the text */
 
 /* ---- Sidebar ---- */
 .neu .sidebar,
@@ -2438,29 +2438,29 @@ body .btn-primary:hover, .neu .btn-primary:hover, .neu .btn-login:hover, .neu .b
 }
 .neu .sidebar .brand, .sidebar.neu .brand,
 .neu .sidebar .brand-text .hub, .sidebar.neu .brand-text .hub { color: var(--p-on-main); }
-.neu .sidebar .brand-text .campus, .sidebar.neu .brand-text .campus { color: var(--p-dark); }
+.neu .sidebar .brand-text .campus, .sidebar.neu .brand-text .campus { color: var(--p-hi-light); }
 .neu .side-nav a:not(.active):hover, .neu .submenu-toggle:hover, .neu .submenu-toggle[aria-expanded="true"],
 .neu .side-nav .event-submenu a:hover { color: var(--p-on-main); }
 .neu .side-admin { border-top-color: rgba(var(--p-on-main-rgb), 0.2); }
 .sidebar :focus-visible { outline-color: var(--p-on-main); }
-/* Icons: drawn dark, so no white filter here — except on the dark pills. */
-:root .neu .sidebar .ui-icon, :root .sidebar.neu .ui-icon { filter: none; }
+/* Icons: white on the royal blue — dark on the lavender pills. */
+:root .neu .sidebar .ui-icon, :root .sidebar.neu .ui-icon { filter: brightness(0) invert(1); }
 :root .neu .side-nav a.active .ui-icon { filter: var(--p-pill-icon); }
 :root .neu .side-nav .submenu-toggle.is-current .ui-icon { filter: brightness(0) invert(1); }
 :root .neu .side-nav .event-submenu a.active .ui-icon { filter: var(--p-sub-icon); }
 /* Visitors' Log in / Sign up at the bottom of the phone menu. */
-.neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.35); color: var(--p-on-main); }
+.neu .side-auth .btn-outline { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.7); color: var(--p-on-main); }
 .neu .sidebar .side-auth .btn-primary, .sidebar.neu .side-auth .btn-primary { background: var(--p-dark); border-color: var(--p-dark); color: #fff; }
 
 /* ---- Strip under the home hero (features + stats) ---- */
 .neu .feature-strip { background: var(--p-main); box-shadow: 0 14px 30px rgba(var(--p-main-shadow-rgb), 0.25); }
 .neu .feature-title { color: var(--p-on-main); }
 .neu .feature-sub, .neu .stat-label { color: rgba(var(--p-on-main-rgb), 0.78); }
-.neu .stat-value { color: var(--p-dark); }
+.neu .stat-value { color: var(--p-hi-light); }
 .neu .feature-item { border-right-color: rgba(var(--p-on-main-rgb), 0.18); }
 .neu .stats-block { border-top-color: rgba(var(--p-on-main-rgb), 0.18); }
 .neu .feature-strip .feature-icon { background: rgba(255, 255, 255, 0.2); box-shadow: 4px 4px 10px rgba(var(--p-main-shadow-rgb), 0.3), -3px -3px 9px rgba(255, 255, 255, 0.25); }
-:root .neu .feature-strip .ui-icon { filter: none; }
+:root .neu .feature-strip .ui-icon { filter: brightness(0) invert(1); }
 .feature-strip :focus-visible { outline-color: var(--p-on-main); }
 
 /* ---- Dashboard calendar header ---- */
@@ -2469,9 +2469,9 @@ body .btn-primary:hover, .neu .btn-primary:hover, .neu .btn-login:hover, .neu .b
 .neu .rail-card .cal-head-month #calendar-month { color: var(--p-on-main); }
 .neu .rail-card .cal-head button,
 :root:is([data-theme="dark"], [data-theme="dim"]) .neu .rail-card .cal-head button {
-  background: rgba(255, 255, 255, 0.3); color: var(--p-on-main);
+  background: rgba(255, 255, 255, 0.18); color: var(--p-on-main);
   box-shadow: 3px 3px 8px rgba(var(--p-main-shadow-rgb), 0.3), -2px -2px 6px rgba(255, 255, 255, 0.3);
 }
 .neu .rail-card .cal-head button:hover,
-:root:is([data-theme="dark"], [data-theme="dim"]) .neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.5); color: var(--p-on-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .rail-card .cal-head button:hover { background: rgba(255, 255, 255, 0.3); color: var(--p-on-main); }
 .neu .rail-card .cal-head :focus-visible { outline-color: var(--p-on-main); }

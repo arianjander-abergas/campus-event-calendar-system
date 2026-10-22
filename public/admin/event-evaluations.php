@@ -122,7 +122,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
         <div class="admin-panel-head">
           <div>
             <h2>Ratings</h2>
-            <p>Mean of each statement (5 = Excellent). Interpretation: 4.21–5.00 Excellent · 3.41–4.20 Very Satisfactory · 2.61–3.40 Satisfactory · 1.81–2.60 Fair · 1.00–1.80 Poor.</p>
+            <p>Mean of each statement (5 = Excellent). Interpretation: 4.21–5.00 Excellent · 3.41–4.20 Very Satisfactory · 2.61–3.40 Satisfactory · 1.81–2.60 Fair · 1.00–1.80 Needs Improvement.</p>
           </div>
         </div>
         <div style="padding:0 22px 8px">
@@ -136,14 +136,14 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
           <table class="admin-table admin-table-compact">
             <thead>
               <tr>
-                <th>Statement</th><th class="num">N</th><th class="num">Mean</th><th>Interpretation</th><th>Spread (Poor ← → Excellent)</th>
+                <th>Statement</th><th class="num">N</th><th class="num">Mean</th><th>Interpretation</th><th>Spread (Needs Improvement ← → Excellent)</th>
                 <?php foreach (array_keys(RATING_SCALE) as $value): ?><th class="num"><?= $value ?></th><?php endforeach; ?>
               </tr>
             </thead>
             <tbody>
               <?php $lastSection = null; foreach ($ratingQuestions as $q): ?>
                 <?php if ($q['section'] !== $lastSection): $lastSection = $q['section']; ?>
-                  <tr><td colspan="10" style="background:#f8f9fb"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
+                  <tr class="admin-section-row"><td colspan="10"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
                 <?php endif; ?>
                 <tr>
                   <td><?= htmlspecialchars($q['question']) ?><?= empty($q['is_active']) ? '<div class="admin-table-sub">No longer on the form</div>' : '' ?></td>

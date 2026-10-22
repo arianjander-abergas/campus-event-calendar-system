@@ -26,7 +26,7 @@ date_default_timezone_set('Asia/Manila');
 // ---- School identity --------------------------------------------------------
 // Shown in the header, sidebar, footer, login pages and on every printout.
 const SCHOOL_NAME = 'La Consolacion University Philippines';
-// IMAGE SLOT: school logo | file: public/assets/images/school-logo.png | square, 256×256 or larger
+// IMAGE SLOT: site logo (Campus Event Hub hand + magnifier) | file: public/assets/images/school-logo.png | square, 512×512
 // Replace the file with a new logo (keep the file name). Transparent PNG works best.
 const SCHOOL_LOGO = 'assets/images/school-logo.png';
 
@@ -491,6 +491,7 @@ function take_flashes(): array
 /**
  * This version's database updates (supabase/migrations), oldest first: file =>
  * [what it switches on, a quick check — table + query, or 'rpc' + function name + its arguments].
+ * A table check with 'rows' at the end is for data-only updates: needed until the query finds a row.
  */
 const DB_UPDATES = [
     '20260930120000_solis_suggestions.sql' => ['Admins, School IDs, year levels and the duplicate checks', 'profiles', 'select=account_type&limit=1'],
@@ -499,6 +500,7 @@ const DB_UPDATES = [
     '20261018090000_three_role_levels.sql' => ['Admin / Super Admin roles and deleting accounts', 'rpc', 'delete_account', ['p_user' => '00000000-0000-0000-0000-000000000000']],
     '20261018120000_approval_notes.sql' => ['Super Admins\' notes on waiting profile edits', 'rpc', 'note_profile_change', ['p_request' => '00000000-0000-0000-0000-000000000000', 'p_note' => '']],
     '20261018150000_audiences_and_evaluation_form.sql' => ['Students / Faculty / Outsiders audiences, and Admins editing the evaluation form', 'events', 'select=audiences&limit=1'],
+    '20261022120000_evaluation_form_parts.sql' => ['The school\'s evaluation form (Parts I–IV)', 'evaluation_questions', 'select=id&is_active=eq.true&section=eq.Part%20I%3A%20Activity%20Experience&limit=1', 'rows'],
 ];
 
 /**
@@ -519,8 +521,8 @@ function pending_db_updates(bool $fresh = false): array
             supabase_rpc($check, $args);
             $missing = str_contains(supabase_last_error(), 'Could not find the function');
         } else {
-            supabase_request($table, $check);
-            $missing = supabase_last_error() !== '';
+            $rows = supabase_request($table, $check);
+            $missing = supabase_last_error() !== '' || ($args === 'rows' && !$rows);
         }
         if ($missing) $pending[$file] = $label;
     }
@@ -3238,12 +3240,12 @@ function week_label(string $monday): string
 // =============================================================================
 
 /** The 1-5 rating scale, best first (labels on the form and in the results). */
-const RATING_SCALE = [5 => 'Excellent', 4 => 'Very Satisfactory', 3 => 'Satisfactory', 2 => 'Fair', 1 => 'Poor'];
+const RATING_SCALE = [5 => 'Excellent', 4 => 'Very Satisfactory', 3 => 'Satisfactory', 2 => 'Fair', 1 => 'Needs Improvement'];
 
 /**
  * Verbal interpretation of a mean rating, in equal intervals of 0.80:
  * 4.21–5.00 Excellent · 3.41–4.20 Very Satisfactory · 2.61–3.40 Satisfactory
- * · 1.81–2.60 Fair · 1.00–1.80 Poor.
+ * · 1.81–2.60 Fair · 1.00–1.80 Needs Improvement.
  */
 function rating_interpretation(?float $mean): string
 {
@@ -3254,7 +3256,7 @@ function rating_interpretation(?float $mean): string
         $mean >= 3.41 => 'Very Satisfactory',
         $mean >= 2.61 => 'Satisfactory',
         $mean >= 1.81 => 'Fair',
-        default => 'Poor',
+        default => 'Needs Improvement',
     };
 }
 

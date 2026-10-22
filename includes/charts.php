@@ -12,7 +12,7 @@
 /** Series colors for venue types (checked for color-blind safety). */
 const VENUE_TYPE_COLORS = ['on_campus' => '#2a78d6', 'off_campus' => '#eb6834', 'online' => '#1baf7a'];
 
-/** Rating colors, Excellent (5) to Poor (1): blue side = good, neutral gray = 3, red side = poor. */
+/** Rating colors, Excellent (5) to Needs Improvement (1): blue side = good, neutral gray = 3, red side = poor. */
 const RATING_COLORS = [5 => '#256abf', 4 => '#86b6ef', 3 => '#d6d4cd', 2 => '#ee9594', 1 => '#c93b3b'];
 
 /** A round axis maximum for counts: 3 -> 4, 7 -> 8, 13 -> 15, 42 -> 50. */
@@ -123,7 +123,7 @@ function chart_stacked_columns(array $columns, array $series, string $caption, s
 }
 
 /**
- * Diverging bar for 1-5 ratings: Poor/Fair to the left of a center line,
+ * Diverging bar for 1-5 ratings: Needs Improvement/Fair to the left of a center line,
  * Excellent/Very Satisfactory to the right, Satisfactory straddling it.
  * @param array $distribution [5 => n, 4 => n, 3 => n, 2 => n, 1 => n]
  */

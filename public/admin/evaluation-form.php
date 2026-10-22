@@ -110,8 +110,8 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
       <div class="admin-note"><strong>View only for now.</strong> Admins can edit the evaluation form once a Super Admin runs the latest database update (Database update page).</div>
     <?php endif; ?>
 
-    <p class="admin-note">Replace the default questions below with the school's official event evaluation form.
-      Rating questions use the scale <strong>5 Excellent · 4 Very Satisfactory · 3 Satisfactory · 2 Fair · 1 Poor</strong>.
+    <p class="admin-note">The school's evaluation form, in parts (Part I, Part II…): questions with the same <strong>Section</strong> are shown together.
+      Rating questions are 1 to 5 stars: <strong>1 – Needs Improvement · 2 – Fair · 3 – Satisfactory · 4 – Very Satisfactory · 5 – Excellent</strong>.
       Once someone has answered a question it can't be deleted, only hidden, so past results stay complete.</p>
 
     <div class="admin-split">
@@ -121,7 +121,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
         <h2 class="admin-card-title"><?= $isEditing ? 'Edit Question' : 'Add Question' ?></h2>
 
         <label class="admin-label" for="section">Section</label>
-        <input type="text" id="section" name="section" class="admin-input" list="sectionList" maxlength="80" placeholder="e.g. Resource Speaker" value="<?= $val('section') ?>">
+        <input type="text" id="section" name="section" class="admin-input" list="sectionList" maxlength="80" placeholder="e.g. Part I: Activity Experience" value="<?= $val('section') ?>">
         <datalist id="sectionList">
           <?php foreach ($sections as $s): ?><option value="<?= htmlspecialchars($s) ?>"><?php endforeach; ?>
         </datalist>
@@ -131,7 +131,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
 
         <span class="admin-label">Answer type</span>
         <div class="admin-radio-row">
-          <label class="admin-radio"><input type="radio" name="question_type" value="rating" <?= ($f['question_type'] ?? 'rating') === 'rating' ? 'checked' : '' ?>> Rating (5 to 1)</label>
+          <label class="admin-radio"><input type="radio" name="question_type" value="rating" <?= ($f['question_type'] ?? 'rating') === 'rating' ? 'checked' : '' ?>> Rating (1 to 5 stars)</label>
           <label class="admin-radio"><input type="radio" name="question_type" value="text" <?= ($f['question_type'] ?? '') === 'text' ? 'checked' : '' ?>> Written answer</label>
         </div>
         <?php if ($isEditing && ($answeredById[$f['id']] ?? 0) > 0): ?>
@@ -157,7 +157,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
             <?php endif; ?>
             <?php $lastSection = null; foreach ($questions as $i => $q): $answered = (int) ($q['event_evaluation_answers'][0]['count'] ?? 0); ?>
               <?php if ($q['section'] !== $lastSection): $lastSection = $q['section']; ?>
-                <tr><td colspan="5" style="background:#f8f9fb"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
+                <tr class="admin-section-row"><td colspan="5"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
               <?php endif; ?>
               <tr class="<?= $q['is_active'] ? '' : 'admin-row-hidden' ?>">
                 <td>
@@ -170,7 +170,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
                   <?= htmlspecialchars($q['question']) ?>
                   <div class="admin-table-sub"><?= $q['is_required'] ? 'Required' : 'Optional' ?><?= $q['is_active'] ? '' : ' · Hidden from the form' ?></div>
                 </td>
-                <td class="nowrap"><?= $q['question_type'] === 'rating' ? 'Rating 5–1' : 'Written' ?></td>
+                <td class="nowrap"><?= $q['question_type'] === 'rating' ? 'Rating 1–5' : 'Written' ?></td>
                 <td class="num"><?= $answered ?></td>
                 <td class="admin-row-actions">
                   <a href="evaluation-form.php?edit=<?= urlencode($q['id']) ?>" class="btn-sm">Edit</a>

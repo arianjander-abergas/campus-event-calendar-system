@@ -393,7 +393,7 @@ function assistant_guide(?array $user): array
     $guide = [
         'Every event has a category, an organizer (sometimes several organizations together), an audience (students, faculty, or both), a venue type (on-campus, off-campus or online) and sometimes year levels. Events are marked Completed once they end; cancelled events stay listed as cancelled.',
         "Registering: on the event's page, press Register. It only works while registration is open — before the deadline, before the event ends and while slots are left — and only for the people the event is for (its audience and year levels; irregular students count every year level they have subjects in). Some events need no registration: just show up. A registration can be cancelled on the same page until the event ends, which frees the slot.",
-        'Evaluations: once the organizers mark someone Attended, "Evaluate this event" appears on the event page and the Dashboard. Each event is evaluated once, with the same form for every event (5 Excellent to 1 Poor, plus comments); answers are anonymous.',
+        'Evaluations: once the organizers mark someone Attended, "Evaluate this event" appears on the event page and the Dashboard. Each event is evaluated once, with the same form for every event (Parts I–IV: 1 Needs Improvement to 5 Excellent stars, plus written feedback); answers are anonymous.',
         'Notifications: the bell at the top right (new events, changes, cancellations, evaluation reminders). Opening it marks them read.',
         'Appearance: the round button next to the bell switches between Light, Dim and Dark.',
         'On phones, the menu button at the top left opens the sidebar.',

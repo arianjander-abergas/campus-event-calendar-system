@@ -102,7 +102,7 @@ $breadcrumbs = [['Dashboard', 'dashboard.php'], [$event['title'], '../event-deta
           <p>Please check back later.</p>
         </div>
       <?php else: ?>
-        <p class="eval-scale-legend">Rate each statement: <strong>5</strong> Excellent · <strong>4</strong> Very Satisfactory · <strong>3</strong> Satisfactory · <strong>2</strong> Fair · <strong>1</strong> Poor. Questions marked <span class="req" style="color:var(--red)">*</span> are required.</p>
+        <p class="eval-scale-legend">Rate each statement from 1 to 5 stars (1 – Needs Improvement, 5 – Excellent). Questions marked <span class="req" style="color:var(--red)">*</span> are required.</p>
         <form method="POST" action="evaluate.php?event=<?= urlencode($eventId) ?>" data-autoreset>
           <?php $preview = false; include __DIR__ . '/../../includes/evaluation-fields.php'; ?>
           <div class="eval-submit">

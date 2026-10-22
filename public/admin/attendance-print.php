@@ -62,7 +62,7 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
 
 <main class="sheet">
   <header class="sheet-head">
-    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="sheet-logo">
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="Campus Event Hub logo" class="sheet-logo">
     <div class="sheet-head-text">
       <strong class="sheet-school"><?= htmlspecialchars(SCHOOL_NAME) ?></strong>
       <?php if (!empty($department['name'])): ?><span><?= htmlspecialchars($department['name']) ?> Department</span><?php endif; ?>
