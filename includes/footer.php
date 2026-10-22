@@ -40,7 +40,11 @@ $footerOrgs = array_slice(get_organizations(), 0, 6);
 
   <div class="site-footer-bar">
     <a href="<?= BASE_URL ?>/index.php" class="site-footer-brand">
+<<<<<<< Updated upstream
       <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="" class="site-footer-logo" width="48" height="48">
+=======
+      <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="" class="site-footer-logo" width="28" height="28">
+>>>>>>> Stashed changes
       <span>
         <strong>Campus Event Hub</strong>
         <span><?= htmlspecialchars(SCHOOL_NAME) ?></span>
