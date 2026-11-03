@@ -43,7 +43,7 @@ $manageMenu = fn(): string =>
 <aside class="sidebar neu" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
-      <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="Campus Event Hub logo" class="brand-logo" width="44" height="44">
+      <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="brand-logo" width="44" height="44">
       <span class="brand-text">
         <span class="campus">CAMPUS</span>
         <span class="hub">EVENT HUB</span>
