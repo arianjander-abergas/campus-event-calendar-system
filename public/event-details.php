@@ -75,6 +75,7 @@ if ($event) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title><?= htmlspecialchars($event['title'] ?? 'Event Details') ?> — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -157,6 +158,11 @@ if ($event) {
         </div>
 
         <div class="ed-register">
+          <?php if (is_required_for_me($eventId)): ?>
+            <p class="ed-required-note" role="status"><strong>Your attendance is required.</strong> <?= htmlspecialchars(required_for_label($event)) ?>.<?= $reg['can_register'] ? ' Please register below.' : '' ?></p>
+          <?php elseif (($label = required_for_label($event)) !== ''): ?>
+            <p class="ed-reg-note"><?= htmlspecialchars($label) ?>.</p>
+          <?php endif; ?>
           <?php if ($reg['note'] !== ''): ?>
             <p class="ed-reg-note"><?= htmlspecialchars($reg['note']) ?></p>
           <?php endif; ?>

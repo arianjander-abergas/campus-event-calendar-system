@@ -200,3 +200,5 @@
 .cal-ongoing-more summary { cursor: pointer; font-size: 0.85rem; font-weight: 700; color: var(--blue-accent); width: fit-content; }
 .cal-ongoing-more summary:hover { text-decoration: underline; }
 .cal-ongoing-more[open] summary { margin-bottom: 10px; }
+/* "Required for you" on the day's events. */
+.cal-tag-required { background: var(--p-accent); color: #fff; }

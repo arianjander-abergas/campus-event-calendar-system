@@ -87,6 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // Year levels that may register (none or all picked = every year level; only for events open to students).
     $yearLevels = in_array('students', $audiences, true) ? parse_year_levels($_POST['year_levels'] ?? []) : [];
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
+    // Required attendance: who must attend (among the people it's open to).
+    $requiredFor = isset(REQUIRED_FOR[post_param('required_for')]) ? post_param('required_for') : '';
 
     // Organizations: one, or two or more for a multi-organization event. The
     // main organizer (events.organization_id) runs the event — a moderator's
@@ -115,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'audience' => $audience,
         'audiences' => $audiences ?: null,
         'year_levels' => $yearLevels ?: null,
+        'required_for' => $requiredFor !== '' ? $requiredFor : null,
         'venue_type' => $venueType,
         'description' => post_param('description'),
         'start_date' => post_param('start_date'),
@@ -145,8 +148,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // Only send year levels when used (or being cleared), so saving still works
     // on a database that doesn't have the column yet.
     if (!$fields['year_levels'] && empty($previous['year_levels'])) unset($fields['year_levels']);
-    // Same for the "Other" event type.
+    // Same for the "Other" event type and required attendance.
     if (!$fields['category_other'] && empty($previous['category_other'])) unset($fields['category_other']);
+    if (!$fields['required_for'] && empty($previous['required_for'])) unset($fields['required_for']);
 
     // Errors are keyed by the field they belong to, so the form can highlight
     // that field and show the reason under it (the first problem per field wins).
@@ -227,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
             // What the database couldn't store yet (a database update not run): the event
             // is saved without it, and the message says what's missing.
-            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience'];
+            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience', 'required_for' => 'the required attendance'];
             // Without the audiences column, Students / Faculty still go in the older audience field; only Outsiders is lost.
             $dropped = array_filter($result['dropped'] ?? [], fn($c) => $c !== 'audiences' || in_array('outsiders', $audiences, true));
             $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $dropped);
@@ -239,17 +243,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
                 flash('error', 'Not saved yet: ' . implode(' and ', $notSaved) . '. The database is missing an update — a Super Admin can run it from Database update (link in the red banner), then edit the event to add these.');
             }
 
-            // "Send Notification to Users": a newly published event goes to
-            // everyone; changes to an already-published one go to registrants.
-            if ($fields['status'] === 'published' && $sendNotification) {
+            // Notifications (in the site and by email):
+            //  - newly published: the people required to attend, always; with
+            //    "Send Notification", everyone else the event is open to;
+            //  - already published: people who just became required; with
+            //    "Send Notification", the registrants and required attendees.
+            if ($fields['status'] === 'published') {
                 $wasPublished = ($previous['status'] ?? '') === 'published';
                 $where = event_when($fields) . ' · ' . event_place($fields);
-                $sent = $wasPublished
-                    ? notify_event($eventId, 'registered', 'Event updated: ' . $fields['title'], 'Details changed — ' . $where . '. Check the event page for the latest info.')
-                    : notify_event($eventId, 'all', 'New event: ' . $fields['title'], $where);
-                if ($sent >= 0) {
-                    $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
+                $savedRequired = in_array('required_for', $dropped, true) ? null : ($requiredFor !== '' ? $requiredFor : null);
+                $ev = ['id' => $eventId, 'required_for' => $savedRequired] + $fields;
+                $sent = null;
+                if (!$wasPublished) {
+                    if ($savedRequired || $sendNotification) $sent = announce_published_event($ev, $sendNotification);
                 } else {
+                    if ($savedRequired && $savedRequired !== ($previous['required_for'] ?? null)) {
+                        $sent = max(0, notify_event($eventId, 'required', 'Now required: ' . $fields['title'], 'Your attendance is required. ' . $where));
+                    }
+                    if ($sendNotification) {
+                        $n = notify_event($eventId, 'registered', 'Event updated: ' . $fields['title'], 'Details changed — ' . $where . '. Check the event page for the latest info.');
+                        $sent = $n >= 0 ? (int) $sent + $n : ($sent ?? -1);
+                    }
+                }
+                if ($sent !== null && $sent >= 0) {
+                    $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified' . (mail_enabled() ? ' (in the site and by email).' : '.');
+                } elseif ($sent !== null) {
                     $message .= ' (Notifications could not be sent.)';
                 }
             }
@@ -359,6 +377,7 @@ $breadcrumbs[] = [$pageTitle, null];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title><?= $pageTitle ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -517,6 +536,15 @@ $breadcrumbs[] = [$pageTitle, null];
             </div>
             <p class="admin-hint">Pick none to open the event to every year level. Students outside the picked year levels can't register; irregular students can if any of their subjects' year levels is picked.</p>
           </div>
+
+          <label class="admin-label" for="required_for">Required Attendance</label>
+          <select id="required_for" name="required_for" class="admin-input">
+            <option value="">Not required — anyone it's open to may join</option>
+            <?php foreach (REQUIRED_FOR as $key => $label): ?>
+              <option value="<?= $key ?>" <?= ($f['required_for'] ?? '') === $key ? 'selected' : '' ?>>Required for <?= htmlspecialchars(lcfirst($label)) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <p class="admin-hint">Required attendees are always notified when the event is published — in the site and by email — and see it marked <strong>Required</strong>. Only people the event is open to (the audience and year levels above) can be required.</p>
         </section>
 
         <section class="form-section" aria-labelledby="sec-when">
@@ -574,7 +602,7 @@ $breadcrumbs[] = [$pageTitle, null];
             <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
             <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
           </div>
-          <p class="admin-hint">With "Send Notification" on: publishing a new event notifies every user; saving changes to a published event notifies the people registered for it.</p>
+          <p class="admin-hint">With "Send Notification" on: publishing a new event notifies everyone it's open to (the audience and year levels above); saving changes to a published event notifies the people registered for it and the required attendees. Notifications show in the site and are emailed too<?= mail_enabled() ? '' : ' (once email is set up — a Super Admin can check Database update › Site setup)' ?>.</p>
         </section>
       </div>
 
@@ -692,6 +720,7 @@ $breadcrumbs[] = [$pageTitle, null];
               <td>
                 <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="admin-table-title"><?= htmlspecialchars($ev['title']) ?></a>
                 <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([event_category_label($ev, ''), label_of(VENUE_TYPES, $ev['venue_type'] ?? null, ''), 'For ' . event_audience_label($ev)]))) ?></div>
+                <?php if (($requiredLabel = required_for_label($ev)) !== ''): ?><div class="admin-table-sub"><span class="required-tag">Required</span> <?= htmlspecialchars(substr($requiredLabel, strlen('Required '))) ?></div><?php endif; ?>
               </td>
               <td>
                 <?php if (!empty($ev['organizations']['name'])): ?>
@@ -727,7 +756,7 @@ $breadcrumbs[] = [$pageTitle, null];
                     <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>" class="btn-sm">Update</a>
 
                     <?php if (in_array($status, ['draft', 'published'], true)): ?>
-                      <form method="POST" action="event-organizer.php" data-confirm="Cancel this event? Everyone registered will be notified." data-confirm-title="Cancel event" data-confirm-ok="Cancel event" data-confirm-cancel="Keep it" data-confirm-tone="danger">
+                      <form method="POST" action="event-organizer.php" data-confirm="Cancel this event? Everyone registered, and anyone required to attend, will be notified." data-confirm-title="Cancel event" data-confirm-ok="Cancel event" data-confirm-cancel="Keep it" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="set_status">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($ev['id']) ?>">
                         <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
@@ -1046,7 +1075,7 @@ $breadcrumbs[] = [$pageTitle, null];
       ? 'It\'s saved as a draft — only admins can see it until it\'s published.'
       : needsApproval
         ? 'It goes to a Super Admin for approval and is published once approved.'
-        : 'It will be published on the Event Calendar' + (data.get('send_notification') ? ' and everyone will be notified.' : '.');
+        : 'It will be published on the Event Calendar' + (data.get('send_notification') ? ' and everyone it\'s open to will be notified (in the site and by email).' : '.') + (data.get('required_for') ? ' Required attendees are notified either way.' : '');
     var message = '“' + title + '”' + (when ? ' — ' + when : '') + (place ? ' · ' + place : '') + '\n\n' + what
       + (isNew ? '\n\nThe form is cleared once it\'s sent.' : '');
     var options = {

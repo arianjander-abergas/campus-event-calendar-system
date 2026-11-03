@@ -270,3 +270,12 @@ a.ed-btn { display: inline-block; text-decoration: none; }
 .ed-btn-evaluate:hover { background: var(--p-accent-text) !important; }
 .ed-eval-note { margin: 8px 0 0; font-size: 0.75rem; color: #444; text-align: right; }
 .ed-admin-links { flex-wrap: wrap; }
+
+/* "Your attendance is required." above the Register button. */
+.ed-required-note {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 10px;
+  background: var(--p-soft-2); border-left: 4px solid var(--p-accent);
+  color: var(--p-dark); font-size: 0.82rem; line-height: 1.45; text-align: left;
+}
+.ed-required-note strong { color: var(--p-accent-text); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .ed-required-note { background: var(--p-dk-surface); color: var(--text-main); }

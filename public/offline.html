@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#213e60">
+<title>Offline — Campus Event Hub</title>
+<style>
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: #f4f2ef; color: #162b44; font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif; text-align: center;
+  }
+  .card { max-width: 360px; background: #fff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 8px 24px rgba(22, 43, 68, 0.12); }
+  img { width: 72px; height: 72px; border-radius: 16px; }
+  h1 { margin: 16px 0 8px; font-size: 1.25rem; }
+  p { margin: 0 0 20px; line-height: 1.5; color: #4d5866; font-size: 0.92rem; }
+  button { border: 0; border-radius: 10px; padding: 12px 22px; background: #213e60; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="assets/images/app/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>Campus Event Hub needs an internet connection. Check your Wi-Fi or mobile data, then try again.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

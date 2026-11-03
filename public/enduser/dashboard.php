@@ -18,6 +18,7 @@ $topbarSearch = true;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Dashboard — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 </head>
@@ -35,6 +36,28 @@ $topbarSearch = true;
       <h1>Welcome, <?= htmlspecialchars(explode(' ', trim($user['full_name']))[0]) ?>!</h1>
       <p>Stay updated with campus events and opportunities.</p>
     </div>
+
+    <?php
+      // Events this person is required to attend (the database decides: required_for + who it's open to).
+      $requiredEvents = get_events_by_ids(my_required_event_ids());
+      $requiredStatus = my_registration_statuses(array_column($requiredEvents, 'id'));
+    ?>
+    <?php if ($requiredEvents): ?>
+      <section class="eval-callout required-callout" aria-labelledby="requiredCalloutTitle">
+        <h2 id="requiredCalloutTitle"><?= icon('megaphone', 20) ?> <?= count($requiredEvents) === 1 ? 'An event you\'re required to attend' : count($requiredEvents) . ' events you\'re required to attend' ?></h2>
+        <div class="eval-callout-list">
+          <?php foreach (array_slice($requiredEvents, 0, 4) as $ev):
+            $mine = $requiredStatus[$ev['id']] ?? null;
+            $action = in_array($mine, ['registered', 'attended'], true) ? 'Registered ✓' : (!empty($ev['enable_registration']) ? 'Register ›' : 'View ›');
+          ?>
+            <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
+              <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(event_date_range($ev)) ?> · <?= htmlspecialchars(event_place($ev)) ?></small></span>
+              <strong><?= $action ?></strong>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      </section>
+    <?php endif; ?>
 
     <?php if ($toEvaluate): ?>
       <section class="eval-callout" aria-labelledby="evalCalloutTitle">
