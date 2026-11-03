@@ -1,0 +1,21 @@
+{
+  "name": "Campus Event Hub — LCUP",
+  "short_name": "Event Hub",
+  "description": "Campus events of La Consolacion University Philippines: browse the calendar, register, and get notified.",
+  "start_url": "./index.php",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f2ef",
+  "theme_color": "#213e60",
+  "icons": [
+    { "src": "assets/images/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/images/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/images/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Event Calendar", "url": "./events.php", "icons": [{ "src": "assets/images/app/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "My Events", "url": "./events.php?mine=1", "icons": [{ "src": "assets/images/app/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Dashboard", "url": "./enduser/dashboard.php", "icons": [{ "src": "assets/images/app/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}

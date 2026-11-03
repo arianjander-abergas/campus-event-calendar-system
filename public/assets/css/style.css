@@ -2524,3 +2524,58 @@ body .dash-topbar .topbar-brand .brand-text .campus, .site-footer-brand strong {
 :root:is([data-theme="dark"], [data-theme="dim"]) .topbar-signup,
 :root:is([data-theme="dark"], [data-theme="dim"]) .neu .topbar-signup { color: #fff; }
 :root:is([data-theme="dark"], [data-theme="dim"]) .neu .btn-login { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45); }
+
+/* ============================================================
+   Required attendance + notification emails
+   ============================================================ */
+/* Event cards: "Required" pill (burnt orange, white text). */
+.status-required { background: var(--p-accent); color: #fff; }
+/* Dashboard: "Events you're required to attend". */
+.required-callout { background: var(--p-soft-2); border-color: var(--p-soft-5); }
+.required-callout h2 { color: var(--p-dark); }
+.required-callout .eval-callout-item strong { color: var(--p-accent-text); }
+/* Update Events list: the "Required" tag. */
+.required-tag {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  background: var(--p-accent); color: #fff; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.3px; vertical-align: middle;
+}
+/* "Emailing the notifications…" note, bottom-left (assets/js/email-outbox.js). */
+.email-outbox {
+  position: fixed; left: 16px; bottom: 16px; z-index: 60; max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 14px; border-radius: 10px; background: var(--p-dark); color: #fff;
+  font-size: 0.82rem; font-weight: 600; box-shadow: 0 8px 24px rgba(var(--p-darker-rgb), 0.3);
+}
+.email-outbox.is-done { background: var(--p-main); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .required-callout { background: var(--p-dk-surface); border-color: var(--p-dk-border); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .required-callout h2 { color: var(--text-main); }
+
+/* ============================================================
+   Install the site on a phone (assets/js/app.js)
+   ============================================================ */
+.side-install {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px;
+  padding: 10px 12px; border-radius: 10px; border: 1px dashed rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06); color: #fff; font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; text-align: left;
+}
+.side-install:hover { background: rgba(255, 255, 255, 0.12); }
+.side-install img { border-radius: 6px; flex-shrink: 0; }
+.install-banner {
+  position: fixed; left: 12px; right: 84px; bottom: 14px; z-index: 55;
+  display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px;
+  border-radius: 14px; background: var(--p-dark); color: #fff; font-size: 0.82rem; line-height: 1.35;
+  box-shadow: 0 10px 30px rgba(var(--p-darker-rgb), 0.35);
+}
+.install-banner img { border-radius: 8px; flex-shrink: 0; }
+.install-banner span { flex: 1; min-width: 0; }
+.install-banner-add { border: 0; border-radius: 8px; padding: 8px 14px; background: var(--p-hi); color: var(--p-dark); font: inherit; font-weight: 800; cursor: pointer; }
+.install-banner-close { border: 0; background: transparent; color: rgba(255, 255, 255, 0.8); font-size: 1.3rem; line-height: 1; padding: 4px 6px; cursor: pointer; }
+.install-help {
+  width: min(420px, calc(100vw - 32px)); border: 0; border-radius: 16px; padding: 22px 24px;
+  background: var(--card-bg); color: var(--text-main); box-shadow: 0 20px 60px rgba(var(--p-darker-rgb), 0.35);
+}
+.install-help::backdrop { background: rgba(var(--p-darker-rgb), 0.55); }
+.install-help h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--navy); }
+.install-help ol { margin: 0 0 12px; padding-left: 20px; line-height: 1.6; font-size: 0.9rem; }
+.install-help p { margin: 0 0 14px; font-size: 0.82rem; color: var(--text-muted); }
+.install-help-actions { display: flex; justify-content: flex-end; }
+:root:is([data-theme="dark"], [data-theme="dim"]) .install-help h2 { color: var(--text-main); }

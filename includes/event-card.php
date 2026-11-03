@@ -1,10 +1,12 @@
 <?php
 /**
  * One event card (home page, dashboard, events list). Expects $ev — an
- * event row selected with EVENT_CARD_SELECT. Shows a "Today" / "Ended" /
- * "Completed" pill when it applies (or $ev['my_label'] on My Events, e.g.
- * "Registered", "Completed"), where and for whom the event is (with its year
- * levels), the live "N going" count and the organizing organization.
+ * event row selected with EVENT_CARD_SELECT. Shows one pill: $ev['my_label']
+ * on My Events (e.g. "Registered", "Completed"), else "Required" when the
+ * logged-in person must attend (the database's my_required_events()), else
+ * "Completed" / "Today" / "Ended" when it applies. Also where and for whom the
+ * event is (with its year levels), the live "N going" count and the
+ * organizing organization.
  */
 /** @var array $ev set by the page that includes this card */
 $cardToday = date('Y-m-d');
@@ -19,6 +21,8 @@ $cardOrg = $ev['organizations'] ?? null;
     <span class="event-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
     <?php if (!empty($ev['my_label'])): ?>
       <span class="status-pill status-<?= htmlspecialchars(strtolower($ev['my_label'])) ?>"><?= htmlspecialchars($ev['my_label']) ?></span>
+    <?php elseif (is_required_for_me($ev['id'] ?? null)): ?>
+      <span class="status-pill status-required" title="Your attendance is required">Required</span>
     <?php elseif (($ev['status'] ?? '') === 'completed'): ?>
       <span class="status-pill status-completed">Completed</span>
     <?php elseif ($cardLive): ?>

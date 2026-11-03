@@ -118,6 +118,7 @@ function calendar_time_line(array $ev): string
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title><?= htmlspecialchars($heading) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 <link rel="stylesheet" href="assets/css/calendar.css?v=<?= filemtime(__DIR__ . '/assets/css/calendar.css') ?>">
@@ -307,6 +308,7 @@ function calendar_time_line(array $ev): string
               <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
               <span class="cal-event-tags">
                 <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
+                <?php if (is_required_for_me($ev['id'])): ?><span class="cal-tag cal-tag-required">Required for you</span><?php endif; ?>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>
                 <?php elseif ($ended): ?><span class="cal-tag cal-tag-muted">Ended</span>
                 <?php elseif ($ev['start_date'] <= $today): ?><span class="cal-tag cal-tag-today">Happening now</span><?php endif; ?>

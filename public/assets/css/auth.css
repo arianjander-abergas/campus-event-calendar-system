@@ -529,10 +529,10 @@ button.login-field-icon { cursor: pointer; }
 }
 /* IMAGE SLOT 10 — LCUP campus photo in the login panel strip | file:
    assets/images/login/lcup.jpg. The strip is the panel's right 38% (in every
-   position: resting left, admin right, sliding), so the photo sits there and
-   moves with it. An even espresso tint keeps the text on it readable. */
-.signin-card .login-slide-panel::before,
-.signin-card .login-slide-panel::after {
+   position: resting left, Admin Login right, sliding), so the photo sits there
+   and moves with it — the same photo in both views. An even espresso tint
+   keeps the text on it readable. */
+.signin-card .login-slide-panel::before {
   content: "";
   position: absolute;
   top: 0;
@@ -540,29 +540,10 @@ button.login-field-icon { cursor: pointer; }
   right: 0;
   width: 38%;
   box-shadow: inset -1px 0 0 rgba(var(--p-line-rgb), 0.35);
-  transition: opacity 0.6s ease-in-out; /* in step with the panel slide */
-}
-.signin-card .login-slide-panel::before {
   background:
     linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
     linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
     url("../images/login/lcup.jpg") 16% center / cover no-repeat; /* framed on the cross */
-}
-/* IMAGE SLOT 11 — admin view photo | file: assets/images/login/sister-president.jpg.
-   Cross-fades in while the panel slides right for Admin Login (and back out
-   for Google). Here the strip is on the right, so the fade faces left. */
-.signin-card .login-slide-panel::after {
-  background:
-    linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
-    linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
-    url("../images/login/sister-president.jpg") 53% center / cover no-repeat; /* framed on her */
-  opacity: 0;
-}
-.signin-card.is-admin .login-slide-panel::before { opacity: 0; }
-.signin-card.is-admin .login-slide-panel::after  { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .signin-card .login-slide-panel::before,
-  .signin-card .login-slide-panel::after { transition: none; }
 }
 .login-card.is-admin .login-slide-panel { transform: translateX(var(--panel-admin)); }
 .login-card.is-admin .login-pane        { transform: translateX(var(--pane-admin)); }
@@ -803,7 +784,8 @@ button.login-field-icon { cursor: pointer; }
    Phones / foldables (≤ 760px): the side photo strip doesn't fit, so each
    page's photo becomes a banner across the top of the card, fading into
    the dark form, with the school logo overlapping its bottom edge.
-   Same photos as on computers (IMAGE SLOTS 9–12).
+   Same photos as on computers (IMAGE SLOTS 9, 10 and 12; Admin Login keeps
+   the campus photo of slot 10).
    ============================================================ */
 @media (max-width: 760px) {
   .login-glass .login-card::before {
@@ -825,13 +807,6 @@ button.login-field-icon { cursor: pointer; }
       linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
       url("../images/login/lcup.jpg");
     background-position: center, center 40%;
-  }
-  /* Admin Login: the photo of the school president, as on computers. */
-  .login-glass .signin-card.is-admin::before {
-    background-image:
-      linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
-      url("../images/login/sister-president.jpg");
-    background-position: center, center 25%;
   }
   .login-glass .register-card::before {
     background-image:
@@ -928,3 +903,15 @@ body .login-glass .login-logo-mark,
 }
 .login-glass .login-submit:hover { background: var(--p-main-hover); }
 .login-glass .login-submit { border: 1px solid rgba(var(--p-hi-rgb), 0.55); }
+
+/* ---- School emails + confirming the email (register.php, login.php) ---- */
+.login-field-hint { margin: -10px 0 16px; font-size: 0.76rem; line-height: 1.45; color: var(--glass-muted, #555); }
+.login-school-hint { margin: 14px 0 0; text-align: center; }
+.signup-sent { text-align: center; padding: 8px 4px 4px; }
+.signup-sent h2 { margin: 0 0 10px; font-size: 1.25rem; color: var(--glass-text, #162b44); }
+.signup-sent p { margin: 0 0 10px; line-height: 1.55; font-size: 0.9rem; color: var(--glass-text, #162b44); overflow-wrap: anywhere; }
+.signup-sent-small { font-size: 0.8rem !important; color: var(--glass-muted, #555) !important; }
+.signup-resend { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 14px 0 6px; }
+.signup-resend .login-btn { margin: 0 auto; }
+.signup-sent-link { font-size: 0.85rem; font-weight: 600; color: var(--glass-link, var(--login-link)); }
+.signup-sent-link:hover { text-decoration: underline; }

@@ -115,14 +115,22 @@ function detect_base_url(): string
 // event_report (view): one row per non-draft event with category, organization,
 //        department, school_year, semester and registration / attendance / evaluation totals.
 // notifications(id, event_id, user_id, title, message, status['pending'|'sent'|'failed'|'read'],
-//        created_at, sent_at)
+//        created_at, sent_at, email_pending, email_attempts, email_retry_at, emailed_at, email_error)
+//        -- new ones are also emailed by the site (see EMAIL below)
+// allowed_email_exceptions(email, note) -- non-school addresses that may still have accounts
+//        (SQL Editor only). enforce_school_email() trigger on auth.users: new accounts and
+//        changed addresses must be @email.lcup.edu.ph or on this list.
+// events.required_for['everyone'|'members'|'department'|null] -- required attendance
 // profile_change_requests(id, user_id, changes jsonb {column: new value, school_id}, status['pending'|
 //        'approved'|'rejected'|'withdrawn'], review_note, reviewed_by, reviewed_at) -- one pending per
 //        account; decided only by review_profile_change(), which applies approved changes.
 // user_presence(user_id, last_seen_at) -- Active Users heartbeat (only via functions)
 // Storage buckets (public read, admin upload): event-posters, org-logos, officer-photos.
 // Functions: site_stats(), event_registration_counts(), touch_presence(), clear_presence(),
-//        notify_event(event_id, audience 'all'|'registered', title, message), is_admin(),
+//        notify_event(event_id, audience 'open'|'open_others'|'required'|'registered', title, message),
+//        email_allowed(email), event_open_to(event, profile), event_required_for(event, profile),
+//        my_required_events(), pending_notification_emails(limit), mark_notification_emails(ids, error),
+//        is_admin(),
 //        is_moderator(), can_manage_event(org id), can_manage_event_id(event id),
 //        school_period(date) -> (school_year, semester),
 //        submit_event_evaluation(event_id, answers jsonb), school_id_taken(text),
@@ -510,6 +518,7 @@ const DB_UPDATES = [
     '20261018120000_approval_notes.sql' => ['Super Admins\' notes on waiting profile edits', 'rpc', 'note_profile_change', ['p_request' => '00000000-0000-0000-0000-000000000000', 'p_note' => '']],
     '20261018150000_audiences_and_evaluation_form.sql' => ['Students / Faculty / Outsiders audiences, and Admins editing the evaluation form', 'events', 'select=audiences&limit=1'],
     '20261022120000_evaluation_form_parts.sql' => ['The school\'s evaluation form (Parts I–IV)', 'evaluation_questions', 'select=id&is_active=eq.true&section=eq.Part%20I%3A%20Activity%20Experience&limit=1', 'rows'],
+    '20261103120000_school_email_and_notifications.sql' => ['School-email-only accounts, required attendance, and notifications by email to the people an event is open to', 'events', 'select=required_for&limit=1'],
 ];
 
 /**
@@ -890,7 +899,92 @@ function auth_error_message(array $result, string $fallback): string
 {
     $data = is_array($result['data']) ? $result['data'] : [];
     $msg = $data['error_description'] ?? $data['msg'] ?? $data['message'] ?? $data['error'] ?? $fallback;
-    return is_string($msg) ? $msg : $fallback;
+    if (!is_string($msg)) return $fallback;
+    // The database refused the new account (enforce_school_email()).
+    if (str_contains($msg, 'Database error saving new user') || str_contains($msg, 'SCHOOL_EMAIL_ONLY')) {
+        return school_email_rule_message();
+    }
+    if (stripos($msg, 'already registered') !== false) {
+        return 'An account with that email already exists. Log in, or use "Forgot Password?" if you don\'t remember the password.';
+    }
+    if (($data['error_code'] ?? '') === 'over_email_send_rate_limit' || stripos($msg, 'rate limit') !== false) {
+        return 'Too many emails were sent just now. Please wait a few minutes and try again.';
+    }
+    // Supabase couldn't send the email: its built-in sender only emails the
+    // project's own team until custom SMTP is set, or the SMTP settings are wrong.
+    if (($data['error_code'] ?? '') === 'email_address_not_authorized' || str_contains($msg, 'cannot be used as it is not authorized')
+        || stripos($msg, 'error sending') !== false) {
+        error_log('[auth] ' . $msg . ' — check Supabase → Authentication → Emails → SMTP Settings');
+        return 'The email couldn\'t be sent right now. Please try again later, and if it keeps happening, tell the site\'s admin (the site\'s email sender isn\'t set up yet).';
+    }
+    return $msg;
+}
+
+// ---- School email accounts -------------------------------------------------
+// New accounts (sign-up and Google) must use an LCUP school email; the
+// database refuses any other address (enforce_school_email(), migration
+// 20261103120000). Existing accounts with another address can't log in any
+// more, except Super Admins and the addresses in allowed_email_exceptions
+// (added in the Supabase SQL Editor).
+const SCHOOL_EMAIL_DOMAIN = 'email.lcup.edu.ph';
+
+/** 'juan.delacruz@email.lcup.edu.ph' -> true; gmail.com, subdomains and look-alikes -> false. */
+function is_school_email(?string $email): bool
+{
+    $email = strtolower(trim((string) $email));
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+        && (bool) preg_match('/^[a-z0-9._%+\'-]+@' . preg_quote(SCHOOL_EMAIL_DOMAIN, '/') . '$/', $email);
+}
+
+function school_email_rule_message(): string
+{
+    return 'Only LCUP school emails (ending in @' . SCHOOL_EMAIL_DOMAIN . ') can be used. Other addresses, like a personal @gmail.com, aren\'t allowed.';
+}
+
+/** A school email, or an exception added by a Super Admin in the SQL Editor (the database's email_allowed()). */
+function email_allowed(?string $email): bool
+{
+    if (is_school_email($email)) return true;
+    if (trim((string) $email) === '') return false;
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $result = supabase_rpc('email_allowed', ['p_email' => strtolower(trim((string) $email))]);
+    $GLOBALS['supabase_last_error'] = $lastError;
+    return $result['ok'] && $result['data'] === true;
+}
+
+/** Who may sign in: school emails and exceptions — and Super Admins with any address. */
+function account_may_sign_in(?string $email, ?string $role): bool
+{
+    return $role === 'admin' || email_allowed($email);
+}
+
+/** Message for an existing account that isn't allowed to sign in any more. */
+function blocked_account_message(): string
+{
+    return 'This account can\'t log in: only LCUP school emails (@' . SCHOOL_EMAIL_DOMAIN . ') are allowed now. Create a new account with your school email, or ask a Super Admin for help.';
+}
+
+/** Where the emailed links (confirming a new account, resetting a password) come back to. */
+function auth_callback_url(string $type = ''): string
+{
+    return app_url('auth/callback.php' . ($type !== '' ? '?type=' . rawurlencode($type) : ''));
+}
+
+/**
+ * Send the "confirm your email" message again (Supabase sends it; the link
+ * comes back to auth/callback.php). Same answer whether or not the address
+ * has an account.
+ */
+function supabase_auth_resend_confirmation(string $email): array
+{
+    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/resend?redirect_to=' . rawurlencode(auth_callback_url('signup')), [
+        'apikey: ' . SUPABASE_ANON_KEY,
+        'Content-Type: application/json',
+    ], ['type' => 'signup', 'email' => strtolower(trim($email))]);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => auth_error_message($result, 'Could not send the email. Please try again in a few minutes.')];
+    }
+    return ['ok' => true, 'message' => 'If that address has an account waiting to be confirmed, a new confirmation link is on its way. Check your inbox and spam folder.'];
 }
 
 /**
@@ -904,7 +998,12 @@ function auth_error_message(array $result, string $fallback): string
  */
 function supabase_auth_signup(string $email, string $password, string $fullName, array $profile = []): array
 {
-    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/signup', [
+    $email = strtolower(trim($email));
+    if (!email_allowed($email)) {
+        return ['ok' => false, 'message' => school_email_rule_message()];
+    }
+    // With "Confirm email" on, Supabase emails a link that comes back to auth/callback.php.
+    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/signup?redirect_to=' . rawurlencode(auth_callback_url('signup')), [
         'apikey: ' . SUPABASE_ANON_KEY,
         'Content-Type: application/json',
     ], [
@@ -933,21 +1032,30 @@ function supabase_auth_signup(string $email, string $password, string $fullName,
     }
     // With "Confirm email" on, there's no session until the emailed link is clicked.
     if (empty($data['access_token'])) {
-        return ['ok' => true, 'message' => 'Account created. Please check your email to confirm it before logging in.', 'needsEmailConfirmation' => true];
+        return ['ok' => true, 'message' => 'We sent a confirmation link to ' . $email . '. Open it to activate your account (check your spam folder too).', 'needsEmailConfirmation' => true];
     }
     start_user_session($user, $data['access_token'], $data['refresh_token'] ?? null);
     return ['ok' => true, 'message' => 'Account created.'];
 }
 
-/** Log in with email + password and store the session. */
+/**
+ * Log in with email + password and store the session. Accounts whose email
+ * isn't confirmed yet are told so ('unconfirmed' => true, to offer a new
+ * link); accounts that may not sign in any more are logged straight out.
+ */
 function supabase_auth_signin(string $email, string $password): array
 {
     $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/token?grant_type=password', [
         'apikey: ' . SUPABASE_ANON_KEY,
         'Content-Type: application/json',
-    ], ['email' => $email, 'password' => $password]);
+    ], ['email' => strtolower(trim($email)), 'password' => $password]);
 
     if (!$result['ok']) {
+        $data = is_array($result['data']) ? $result['data'] : [];
+        $raw = (string) ($data['error_description'] ?? $data['msg'] ?? $data['message'] ?? '');
+        if (($data['error_code'] ?? '') === 'email_not_confirmed' || stripos($raw, 'not confirmed') !== false) {
+            return ['ok' => false, 'unconfirmed' => true, 'message' => 'Please confirm your email first: open the link we sent to ' . strtolower(trim($email)) . ' (check your spam folder too).'];
+        }
         return ['ok' => false, 'message' => auth_error_message($result, 'Invalid email or password.')];
     }
     $data = $result['data'];
@@ -955,13 +1063,18 @@ function supabase_auth_signin(string $email, string $password): array
         return ['ok' => false, 'message' => 'Unexpected response from the sign-in server.'];
     }
     start_user_session($data['user'], $data['access_token'], $data['refresh_token'] ?? null);
+    if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+        supabase_auth_signout();
+        return ['ok' => false, 'message' => blocked_account_message()];
+    }
     return ['ok' => true, 'message' => 'Logged in.'];
 }
 
 /**
- * Start a session from tokens Supabase put in the URL after Google sign-in
- * or a password-reset link (see auth/callback.php). The token is checked
- * with Supabase before it's trusted.
+ * Start a session from tokens Supabase put in the URL after Google sign-in,
+ * a confirmation link or a password-reset link (see auth/callback.php). The
+ * token is checked with Supabase before it's trusted, and the account must
+ * be allowed to sign in (school email, exception, or Super Admin).
  */
 function supabase_session_from_tokens(string $accessToken, ?string $refreshToken): array
 {
@@ -973,6 +1086,11 @@ function supabase_session_from_tokens(string $accessToken, ?string $refreshToken
         return ['ok' => false, 'message' => 'This sign-in link is invalid or has expired. Please try again.'];
     }
     start_user_session($result['data'], $accessToken, $refreshToken);
+    if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+        $viaGoogle = ($result['data']['app_metadata']['provider'] ?? '') === 'google';
+        supabase_auth_signout();
+        return ['ok' => false, 'message' => $viaGoogle ? 'Use your LCUP Google account (@' . SCHOOL_EMAIL_DOMAIN . '). ' . school_email_rule_message() : blocked_account_message()];
+    }
     return ['ok' => true, 'message' => 'Logged in.'];
 }
 
@@ -1001,21 +1119,42 @@ function supabase_auth_update_password(string $newPassword): array
     return ['ok' => true, 'message' => 'Password updated.'];
 }
 
-/** Whether a sign-in provider (e.g. 'google') is switched on in Supabase Auth. */
-function auth_provider_enabled(string $provider): bool
+/** Supabase Auth's public settings (sign-in providers, whether emails must be confirmed). [] if unreachable. */
+function auth_settings(): array
 {
     static $settings = null;
     if ($settings === null) {
         $result = supabase_http('GET', rtrim(SUPABASE_URL, '/') . '/auth/v1/settings', ['apikey: ' . SUPABASE_ANON_KEY]);
         $settings = $result['ok'] && is_array($result['data']) ? $result['data'] : [];
     }
-    return !empty($settings['external'][$provider]);
+    return $settings;
 }
 
-/** Where the "Google" button sends people (Supabase handles the Google part). */
+/** Whether a sign-in provider (e.g. 'google') is switched on in Supabase Auth. */
+function auth_provider_enabled(string $provider): bool
+{
+    return !empty(auth_settings()['external'][$provider]);
+}
+
+/** Whether new accounts must confirm their email (Supabase: Authentication → Sign In / Providers → Email → Confirm email). null = unknown. */
+function auth_requires_email_confirmation(): ?bool
+{
+    $settings = auth_settings();
+    return array_key_exists('mailer_autoconfirm', $settings) ? !$settings['mailer_autoconfirm'] : null;
+}
+
+/**
+ * Where the "Google" button sends people (Supabase handles the Google part).
+ * hd=* asks Google to offer school / work accounts only, not personal Gmail.
+ * (Not hd=email.lcup.edu.ph: Google matches it against the school's main
+ * Google domain, which may be a different one, and would then hide the
+ * students' accounts.) auth/callback.php and the database refuse any address
+ * that isn't @email.lcup.edu.ph.
+ */
 function google_signin_url(): string
 {
-    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&redirect_to=' . rawurlencode(app_url('auth/callback.php'));
+    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&hd=*'
+        . '&redirect_to=' . rawurlencode(auth_callback_url());
 }
 
 /** Log out: Active Users -1, revoke the Supabase refresh token, clear the session. */
@@ -1079,6 +1218,10 @@ function reload_session_profile(): void
         $row['is_super_admin'] = !empty($flag[0]['is_super_admin']);
         $GLOBALS['supabase_last_error'] = '';
         $_SESSION['user'] = array_merge($_SESSION['user'], $row);
+        // School emails only (Super Admins and exceptions excepted) — only
+        // decided when the profile could be read, so a failed read never
+        // locks anyone out.
+        $_SESSION['user']['sign_in_allowed'] = account_may_sign_in($_SESSION['user']['email'] ?? '', $_SESSION['user']['role'] ?? 'user');
     }
     $_SESSION['user_checked_at'] = time();
 }
@@ -1090,6 +1233,24 @@ function current_theme(): string
 {
     $theme = is_string($_COOKIE['theme'] ?? null) ? $_COOKIE['theme'] : 'light';
     return isset(THEMES[$theme]) ? $theme : 'light';
+}
+
+/**
+ * <head> tags that make the site installable on phones ("Add to Home
+ * screen" / "Install app"): the app manifest, icons, the browser-bar colour
+ * and assets/js/app.js (the service worker and the Install app button).
+ */
+function app_head_tags(): string
+{
+    $b = htmlspecialchars(BASE_URL);
+    return '<link rel="manifest" href="' . $b . '/manifest.json">' . "\n"
+        . '<meta name="theme-color" content="#213e60">' . "\n"
+        . '<link rel="icon" type="image/png" sizes="192x192" href="' . $b . '/assets/images/app/icon-192.png">' . "\n"
+        . '<link rel="apple-touch-icon" href="' . $b . '/assets/images/app/apple-touch-icon.png">' . "\n"
+        . '<meta name="mobile-web-app-capable" content="yes">' . "\n"
+        . '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n"
+        . '<meta name="apple-mobile-web-app-title" content="Event Hub">' . "\n"
+        . '<script src="' . $b . '/assets/js/app.js?v=' . (int) @filemtime(__DIR__ . '/../public/assets/js/app.js') . '" defer></script>';
 }
 
 /** ' data-theme="dark"' for <html>, so the page is drawn in the chosen look straight away ('' for light). */
@@ -1118,6 +1279,13 @@ function current_user(): ?array
             reload_session_profile();
         } else {
             check_session_role();
+        }
+        // An account that may no longer sign in (not a school email) is logged out.
+        if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+            supabase_auth_signout();
+            session_start_once();
+            flash('error', blocked_account_message());
+            return null;
         }
     }
     return $_SESSION['user'];
@@ -1807,6 +1975,24 @@ function get_event(string $eventId): ?array
     return $rows[0] ?? null;
 }
 
+/** Several events by id (card columns), soonest first. */
+function get_events_by_ids(array $eventIds): array
+{
+    $ids = array_values(array_unique(array_filter($eventIds, 'is_uuid')));
+    if (!$ids) return [];
+    return supabase_request('events', EVENT_CARD_SELECT . '&id=in.(' . implode(',', $ids) . ')&order=start_date.asc,start_time.asc.nullslast', 'GET', null, session_access_token());
+}
+
+/** The logged-in person's registration status for each of these events: [event id => 'registered' | 'attended' | ...]. */
+function my_registration_statuses(array $eventIds): array
+{
+    $user = current_user();
+    $ids = array_values(array_unique(array_filter($eventIds, 'is_uuid')));
+    if (!$user || !$ids) return [];
+    $rows = supabase_user_request('event_registrations', 'select=event_id,status&user_id=eq.' . urlencode($user['id']) . '&event_id=in.(' . implode(',', $ids) . ')');
+    return array_column($rows, 'status', 'event_id');
+}
+
 /** Published events happening today (start_date <= today <= end_date), earliest start time first. */
 function get_events_today(int $limit = 5): array
 {
@@ -2135,7 +2321,8 @@ function presence_script_tag(): string
 {
     if (!current_user()) return '';
     return '<script>window.PRESENCE_URL = ' . json_encode(BASE_URL . '/api/presence.php') . ';</script>' . "\n"
-        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/presence.js') . '"></script>';
+        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/presence.js') . '"></script>'
+        . email_outbox_script_tag(); // notifications waiting to be emailed (staff)
 }
 
 // =============================================================================
@@ -2165,19 +2352,322 @@ function mark_my_notifications_read(): bool
 }
 
 /**
- * Send a notification about an event (admins only — the database checks).
- * $audience: 'all' (every account) or 'registered' (people registered for it).
+ * Send a notification about an event (the event's admins only — the
+ * database checks), in the site and by email. $audience:
+ *   'open'         everyone the event is open to (audiences, year levels)
+ *   'open_others'  everyone it's open to who isn't required to attend
+ *   'required'     the people required to attend
+ *   'registered'   the people registered for it, and those required to attend
  * @return int how many people it was sent to (-1 on failure)
  */
 function notify_event(string $eventId, string $audience, string $title, string $message): int
 {
     $result = supabase_rpc('notify_event', [
         'p_event_id' => $eventId,
-        'p_audience' => $audience === 'registered' ? 'registered' : 'all',
+        'p_audience' => in_array($audience, ['open', 'open_others', 'required', 'registered'], true) ? $audience : 'open',
         'p_title' => $title,
         'p_message' => $message,
     ], true);
+    if ($result['ok'] && (int) $result['data'] > 0) {
+        queue_notification_emails();
+    }
     return $result['ok'] ? (int) $result['data'] : -1;
+}
+
+// ---- Required attendance ----------------------------------------------------
+/** events.required_for: who must attend (they must also be people the event is open to). */
+const REQUIRED_FOR = [
+    'everyone' => 'Everyone it\'s open to',
+    'members' => 'Members of the organizing organization(s)',
+    'department' => 'Everyone in the organizing organization(s)\' department',
+];
+
+/** "Required for members of the organizing organization(s)" ('' when not required). */
+function required_for_label(array $ev): string
+{
+    $key = $ev['required_for'] ?? null;
+    return isset(REQUIRED_FOR[$key]) ? 'Required for ' . lcfirst(REQUIRED_FOR[$key]) : '';
+}
+
+/**
+ * Upcoming published events the logged-in person is required to attend
+ * (the database's my_required_events()). [] when logged out or before the
+ * database update.
+ */
+function my_required_event_ids(): array
+{
+    static $ids = null;
+    if ($ids !== null) return $ids;
+    $ids = [];
+    if (!current_user()) return $ids;
+    // Before the database update the function isn't there: asked again every 5 minutes, not on every page.
+    if (($_SESSION['required_events_missing'] ?? 0) > time() - 300) return $ids;
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $result = supabase_rpc('my_required_events', [], true);
+    if ($result['ok'] && is_array($result['data'])) {
+        $ids = array_values(array_filter(array_column($result['data'], 'event_id'), 'is_string'));
+        unset($_SESSION['required_events_missing']);
+    } elseif (str_contains(supabase_last_error(), 'Could not find the function')) {
+        $_SESSION['required_events_missing'] = time();
+    }
+    $GLOBALS['supabase_last_error'] = $lastError;
+    return $ids;
+}
+
+function is_required_for_me(?string $eventId): bool
+{
+    return $eventId !== null && in_array($eventId, my_required_event_ids(), true);
+}
+
+/**
+ * Tell people about an event that has just been published: the people
+ * required to attend always (bell + email), and — when the organizer picked
+ * "Send Notification" — everyone else it's open to.
+ * @return int how many people were notified
+ */
+function announce_published_event(array $ev, bool $toEveryoneOpen): int
+{
+    $where = event_when($ev) . ' · ' . event_place($ev);
+    $required = !empty($ev['required_for']);
+    $sent = 0;
+    if ($required) {
+        $sent += max(0, notify_event($ev['id'], 'required', 'Required: ' . $ev['title'], 'Your attendance is required. ' . $where));
+    }
+    if ($toEveryoneOpen) {
+        $sent += max(0, notify_event($ev['id'], $required ? 'open_others' : 'open', 'New event: ' . $ev['title'], $where));
+    }
+    return $sent;
+}
+
+// =============================================================================
+// EMAIL (notifications by email — config/mail.local.php)
+// =============================================================================
+// Every new notification is also emailed. The site sends them itself over
+// SMTP (e.g. a Gmail account with an App Password), in the background: the
+// page that created them starts assets/js/email-outbox.js, which asks
+// api/notification-emails.php to send the next batch until none are left.
+// Addresses come from the database's pending_notification_emails() (staff
+// only) and are put in Bcc, so recipients never see each other. An email
+// that fails is tried again 10 minutes, 2 hours and a day later, from the
+// pages Admins open (the outbox also runs every 10 minutes for them).
+
+/** SMTP settings from config/mail.local.php (a copy of mail.local.example.php), or environment variables. */
+function mail_config(): array
+{
+    static $config = null;
+    if ($config === null) {
+        $file = __DIR__ . '/mail.local.php';
+        $local = is_file($file) ? (array) (include $file) : [];
+        $get = fn(string $key, string $env, $default = '') => getenv($env) !== false && getenv($env) !== '' ? getenv($env) : ($local[$key] ?? $default);
+        $config = [
+            'host' => trim((string) $get('host', 'SMTP_HOST', 'smtp.gmail.com')),
+            'port' => (int) $get('port', 'SMTP_PORT', 465),
+            'username' => trim((string) $get('username', 'SMTP_USERNAME')),
+            'password' => str_replace(' ', '', (string) $get('password', 'SMTP_PASSWORD')), // Gmail shows App Passwords in groups of four
+            'from_email' => trim((string) $get('from_email', 'SMTP_FROM_EMAIL')),
+            'from_name' => trim((string) $get('from_name', 'SMTP_FROM_NAME', 'Campus Event Hub')),
+        ];
+        if ($config['from_email'] === '') $config['from_email'] = $config['username'];
+    }
+    return $config;
+}
+
+/** True once real SMTP settings are filled in (the example file's placeholders don't count). */
+function mail_enabled(): bool
+{
+    $c = mail_config();
+    return $c['host'] !== '' && $c['username'] !== '' && $c['password'] !== ''
+        && stripos($c['password'], 'paste') === false && filter_var($c['from_email'], FILTER_VALIDATE_EMAIL) !== false;
+}
+
+/** A header value with non-ASCII text encoded (subjects, names). */
+function mail_header_text(string $text): string
+{
+    return preg_match('/[^\x20-\x7E]/', $text) ? mb_encode_mimeheader($text, 'UTF-8', 'B', "\r\n") : $text;
+}
+
+/**
+ * Send one email (plain text + HTML) to $recipients over SMTP. One
+ * recipient goes in To:; several go in Bcc (To: shows the site's address).
+ * @param string[] $recipients
+ * @return array{ok:bool, error?:string}
+ */
+function smtp_send(array $recipients, string $subject, string $text, string $html): array
+{
+    if (!mail_enabled()) return ['ok' => false, 'error' => 'Email isn\'t set up (config/mail.local.php).'];
+    $c = mail_config();
+    $recipients = array_values(array_unique(array_filter(array_map('trim', $recipients), fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL) !== false)));
+    if (!$recipients) return ['ok' => false, 'error' => 'No valid recipients.'];
+
+    $from = mail_header_text($c['from_name']) . ' <' . $c['from_email'] . '>';
+    $boundary = 'ceh_' . bin2hex(random_bytes(8));
+    $host = parse_url(app_url(), PHP_URL_HOST) ?: 'localhost';
+    $headers = [
+        'Date: ' . date(DATE_RFC2822),
+        'From: ' . $from,
+        'To: ' . (count($recipients) === 1 ? '<' . $recipients[0] . '>' : $from),
+        'Subject: ' . mail_header_text($subject),
+        'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . $host . '>',
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+        'Auto-Submitted: auto-generated',
+        'X-Auto-Response-Suppress: All',
+    ];
+    $part = fn(string $type, string $body) => '--' . $boundary . "\r\n"
+        . 'Content-Type: ' . $type . '; charset=UTF-8' . "\r\n"
+        . 'Content-Transfer-Encoding: base64' . "\r\n\r\n"
+        . chunk_split(base64_encode($body), 76, "\r\n");
+    $message = implode("\r\n", $headers) . "\r\n\r\n"
+        . $part('text/plain', $text) . $part('text/html', $html) . '--' . $boundary . "--\r\n";
+
+    $ssl = $c['port'] === 465;
+    $offset = 0;
+    $ch = curl_init(($ssl ? 'smtps://' : 'smtp://') . $c['host'] . ':' . $c['port']);
+    curl_setopt_array($ch, [
+        CURLOPT_USERNAME => $c['username'],
+        CURLOPT_PASSWORD => $c['password'],
+        CURLOPT_MAIL_FROM => '<' . $c['from_email'] . '>',
+        CURLOPT_MAIL_RCPT => array_map(fn($e) => '<' . $e . '>', $recipients),
+        CURLOPT_UPLOAD => true,
+        CURLOPT_INFILESIZE => strlen($message),
+        CURLOPT_READFUNCTION => function ($ch, $fd, int $length) use ($message, &$offset): string {
+            $chunk = (string) substr($message, $offset, $length);
+            $offset += strlen($chunk);
+            return $chunk;
+        },
+        CURLOPT_USE_SSL => CURLUSESSL_ALL, // port 587: STARTTLS (465 is SSL from the start)
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    // One refused address doesn't stop the rest (PHP 8.2 spells it ALLLOWFAILS, like old libcurl).
+    $allowFails = defined('CURLOPT_MAIL_RCPT_ALLOWFAILS') ? constant('CURLOPT_MAIL_RCPT_ALLOWFAILS')
+        : (defined('CURLOPT_MAIL_RCPT_ALLLOWFAILS') ? constant('CURLOPT_MAIL_RCPT_ALLLOWFAILS') : null);
+    if ($allowFails !== null) curl_setopt($ch, $allowFails, true);
+    $ok = curl_exec($ch) !== false;
+    $errno = curl_errno($ch);
+    $error = curl_error($ch) ?: ($errno ? curl_strerror($errno) : ''); // some errors leave curl_error() empty
+    curl_close($ch);
+    if (!$ok) {
+        if ($errno === 67) $error = 'Login denied: check the email address and App Password in config/mail.local.php'; // CURLE_LOGIN_DENIED
+        error_log('[smtp_send] ' . $error);
+        return ['ok' => false, 'error' => $error !== '' ? $error : 'The mail server refused the message.'];
+    }
+    return ['ok' => true];
+}
+
+/**
+ * The email for a notification: its title and message, the event's date,
+ * place and organizer, and a button to the event page.
+ * @return array{subject:string, text:string, html:string}
+ */
+function notification_email_content(array $n, ?array $event): array
+{
+    $title = (string) ($n['title'] ?? 'Campus Event Hub');
+    $message = (string) ($n['message'] ?? '');
+    $required = str_starts_with($title, 'Required') || str_starts_with($title, 'Now required');
+    $url = !empty($n['event_id']) ? app_url('event-details.php?id=' . rawurlencode($n['event_id'])) : app_url('index.php');
+    $details = [];
+    if ($event) {
+        $details['When'] = event_when($event);
+        $details['Where'] = event_place($event) . (!empty($event['address']) ? ' — ' . $event['address'] : '');
+        if (!empty($event['organizations']['name'])) $details['Organized by'] = $event['organizations']['name'];
+        if (($label = required_for_label($event)) !== '') $details['Attendance'] = $label;
+    }
+
+    $text = "Hello,\n\n" . $title . "\n" . ($message !== '' ? $message . "\n" : '') . "\n";
+    foreach ($details as $label => $value) $text .= $label . ': ' . $value . "\n";
+    $text .= "\nOpen the event: " . $url . "\n\n— Campus Event Hub · " . SCHOOL_NAME
+        . "\nYou're getting this email because you have a Campus Event Hub account.\n";
+
+    $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    $rows = '';
+    foreach ($details as $label => $value) {
+        $rows .= '<tr><td style="padding:4px 12px 4px 0;color:#4d5866;font-size:13px;white-space:nowrap;vertical-align:top">' . $e($label)
+            . '</td><td style="padding:4px 0;color:#162b44;font-size:14px">' . $e($value) . '</td></tr>';
+    }
+    $html = '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f2ef;font-family:Segoe UI,Arial,sans-serif">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ef;padding:24px 12px"><tr><td align="center">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">'
+        . '<tr><td style="background:#213e60;padding:18px 24px;color:#ffffff;font-size:18px;font-weight:800;letter-spacing:.3px">'
+        . '<span style="color:#e68c3a">CAMPUS</span> EVENT HUB</td></tr>'
+        . '<tr><td style="padding:24px">'
+        . ($required ? '<div style="display:inline-block;background:#a85a14;color:#ffffff;font-size:11px;font-weight:800;letter-spacing:.6px;padding:4px 10px;border-radius:999px;margin-bottom:12px">REQUIRED ATTENDANCE</div>' : '')
+        . '<h1 style="margin:0 0 8px;font-size:20px;color:#162b44">' . $e($title) . '</h1>'
+        . ($message !== '' ? '<p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#162b44">' . $e($message) . '</p>' : '')
+        . ($rows !== '' ? '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">' . $rows . '</table>' : '')
+        . '<a href="' . $e($url) . '" style="display:inline-block;background:#213e60;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:8px">Open the event</a>'
+        . '</td></tr>'
+        . '<tr><td style="padding:16px 24px;border-top:1px solid #ebe7dd;color:#6f6a5d;font-size:12px;line-height:1.5">'
+        . $e(SCHOOL_NAME) . ' · Campus Event Hub<br>You\'re getting this email because you have a Campus Event Hub account.</td></tr>'
+        . '</table></td></tr></table></body></html>';
+
+    return ['subject' => $title, 'text' => $text, 'html' => $html];
+}
+
+/** Notifications were just created: email them from the next page (assets/js/email-outbox.js). */
+function queue_notification_emails(): void
+{
+    if (!mail_enabled()) return;
+    session_start_once();
+    $_SESSION['email_outbox'] = time();
+}
+
+/**
+ * Email the next batch of notifications that are waiting (staff only; the
+ * database decides which ones this person may send). Notifications with
+ * the same text go out as one email with the recipients in Bcc.
+ * @return array{enabled:bool, sent:int, failed:int, more:bool, error:string}
+ */
+function deliver_notification_emails(int $maxRecipients = 40): array
+{
+    $out = ['enabled' => mail_enabled(), 'sent' => 0, 'failed' => 0, 'more' => false, 'error' => ''];
+    if (!$out['enabled'] || !is_staff_user()) return $out;
+
+    $result = supabase_rpc('pending_notification_emails', ['p_limit' => $maxRecipients + 1], true);
+    if (!$result['ok'] || !is_array($result['data'])) {
+        $out['error'] = supabase_last_error() ?: 'Could not read the notifications waiting to be emailed.';
+        return $out;
+    }
+    $rows = $result['data'];
+    $out['more'] = count($rows) > $maxRecipients;
+    $groups = [];
+    foreach (array_slice($rows, 0, $maxRecipients) as $r) {
+        $groups[($r['event_id'] ?? '') . "\n" . $r['title'] . "\n" . $r['message']][] = $r;
+    }
+    $events = [];
+    foreach ($groups as $group) {
+        $eventId = $group[0]['event_id'] ?? null;
+        if ($eventId && !array_key_exists($eventId, $events)) $events[$eventId] = get_event_admin($eventId);
+        $mail = notification_email_content($group[0], $eventId ? $events[$eventId] : null);
+        $idsByEmail = [];
+        foreach ($group as $r) $idsByEmail[strtolower((string) $r['email'])][] = $r['id'];
+        $sent = smtp_send(array_keys($idsByEmail), $mail['subject'], $mail['text'], $mail['html']);
+        supabase_rpc('mark_notification_emails', ['p_ids' => array_merge(...array_values($idsByEmail)), 'p_error' => $sent['ok'] ? null : $sent['error']], true);
+        if ($sent['ok']) {
+            $out['sent'] += count($idsByEmail);
+        } else {
+            // The mail server is refusing (down, wrong password, daily limit):
+            // stop here; the database schedules the next try for these.
+            $out['failed'] += count($idsByEmail);
+            $out['error'] = $sent['error'];
+            $out['more'] = false;
+            break;
+        }
+    }
+    return $out;
+}
+
+/**
+ * The background sender (staff): on the page opened right after
+ * notifications were created, and every 10 minutes while an Admin uses the
+ * site (emails that failed are tried again then).
+ */
+function email_outbox_script_tag(): string
+{
+    if (!is_staff_user() || !mail_enabled()) return '';
+    if (empty($_SESSION['email_outbox']) && ($_SESSION['email_outbox_checked'] ?? 0) > time() - 600) return '';
+    return '<script>window.EMAIL_OUTBOX_URL = ' . json_encode(BASE_URL . '/api/notification-emails.php') . ';</script>' . "\n"
+        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/email-outbox.js') . '" defer></script>';
 }
 
 /** Data + script for the notification bell (see includes/topbar.php, assets/js/notifications.js). */
@@ -2460,10 +2950,9 @@ function review_event_admin(string $eventId, bool $approve, string $note = ''): 
         return ['ok' => true, 'message' => 'Rejected — "' . $ev['title'] . '" stays a draft. Its admin can change it and send it again.'];
     }
     $message = 'Approved — "' . $ev['title'] . '" is published.';
-    if (!empty($ev['send_notification'])) {
-        $sent = notify_event($ev['id'], 'all', 'New event: ' . $ev['title'], event_when($ev) . ' · ' . event_place($ev));
-        if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
-    }
+    // Required attendees are always told; everyone else it's open to when "Send Notification" was picked.
+    $sent = announce_published_event($ev, !empty($ev['send_notification']));
+    if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified (in the site and by email).';
     auto_complete_events(true); // already over: Completed right away
     return ['ok' => true, 'message' => $message];
 }
@@ -2505,7 +2994,7 @@ function set_event_status_admin(string $eventId, string $status): array
     if ($status === 'cancelled') {
         $sent = notify_event($ev['id'], 'registered', 'Event cancelled: ' . $ev['title'],
             'Sorry — "' . $ev['title'] . '" (' . event_when($ev) . ') has been cancelled.');
-        if ($sent > 0) $message .= ' ' . $sent . ' registered ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
+        if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified (registered and required attendees).';
     }
     return ['ok' => true, 'message' => $message];
 }
@@ -2655,6 +3144,7 @@ function request_evaluations(array $event, array $userIds): int
         'status' => 'sent',
         'sent_at' => $now,
     ], $todo));
+    if ($rows) queue_notification_emails(); // also by email
     return count($rows);
 }
 

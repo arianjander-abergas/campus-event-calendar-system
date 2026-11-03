@@ -12,6 +12,13 @@ if (current_user()) {
 }
 
 $error = null;
+$unconfirmedEmail = ''; // set when the email isn't confirmed yet: offer a new link
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'resend_confirmation') {
+    $resent = supabase_auth_resend_confirmation(post_param('email'));
+    flash($resent['ok'] ? 'success' : 'error', $resent['message']);
+    header('Location: login.php');
+    exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = post_param('email');
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
@@ -25,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         $error = $result['message'];
+        if (!empty($result['unconfirmed'])) $unconfirmedEmail = strtolower($email);
     }
 }
 
@@ -57,6 +65,7 @@ $flashes = render_flashes();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Log In — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,6 +113,13 @@ $flashes = render_flashes();
   <?= $flashes ?>
   <?php if ($error): ?>
     <div class="login-alert" role="alert"><?= htmlspecialchars($error) ?></div>
+    <?php if ($unconfirmedEmail !== ''): ?>
+      <form method="POST" action="login.php" class="signup-resend">
+        <input type="hidden" name="action" value="resend_confirmation">
+        <input type="hidden" name="email" value="<?= htmlspecialchars($unconfirmedEmail) ?>">
+        <button type="submit" class="login-btn">Send a new confirmation link</button>
+      </form>
+    <?php endif; ?>
   <?php elseif ($notice): ?>
     <div class="login-notice"><?= htmlspecialchars($notice) ?></div>
   <?php endif; ?>
@@ -160,6 +176,7 @@ $flashes = render_flashes();
     </a>
   </div>
 
+  <p class="login-field-hint login-school-hint">Use your LCUP school account (@<?= SCHOOL_EMAIL_DOMAIN ?>) — for Google too.</p>
   <p class="login-signup">Don't have an account? <a href="register.php">Sign up</a></p>
   </div>
 </main>

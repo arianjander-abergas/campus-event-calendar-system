@@ -112,6 +112,11 @@ $manageMenu = fn(): string =>
       <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
     </nav>
   <?php endif; ?>
+
+  <?php /* Shown by assets/js/app.js on phones / when the browser can install the site (computers: "Install as an app"). */ ?>
+  <button type="button" class="side-install" data-install-app data-desktop-label="Install as an app" hidden>
+    <img src="<?= BASE_URL ?>/assets/images/app/icon-192.png" alt="" width="22" height="22"> <span data-install-label>Install app on this phone</span>
+  </button>
 </aside>
 <div class="nav-backdrop" data-nav-close hidden></div>
 <?php /* The Event Hub Assistant chat box in the bottom-right corner — every page with this sidebar. */ ?>

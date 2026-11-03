@@ -15,16 +15,31 @@ if (current_user()) {
 $departments = get_departments();
 $organizations = get_organizations();
 $errors = [];
-$success = null;
+session_start_once();
+
+// "Didn't get the email?" on the check-your-inbox screen.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'resend') {
+    $pendingEmail = (string) ($_SESSION['signup_email'] ?? '');
+    if ($pendingEmail !== '') {
+        $resent = supabase_auth_resend_confirmation($pendingEmail);
+        flash($resent['ok'] ? 'success' : 'error', $resent['message']);
+    }
+    header('Location: register.php?sent=1');
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fullName = post_param('full_name');
-    $email = post_param('email');
+    $email = strtolower(post_param('email'));
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
     $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
 
     if ($fullName === '') $errors[] = 'Please enter your full name.';
-    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Please enter your LCUP school email (ending in @' . SCHOOL_EMAIL_DOMAIN . ').';
+    } elseif (!email_allowed($email)) {
+        $errors[] = school_email_rule_message();
+    }
     if (strlen($password) < 6) {
         $errors[] = 'Password must be at least 6 characters.';
     } elseif ($password !== $confirm) {
@@ -51,10 +66,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         if ($result['ok']) {
-            $success = $result['message']; // "confirm your email" case
-        } else {
-            $errors[] = $result['message'];
+            // "Confirm your email": a clean page with the address and a Resend button.
+            $_SESSION['signup_email'] = $email;
+            header('Location: register.php?sent=1');
+            exit;
         }
+        $errors[] = $result['message'];
     }
 
     if ($errors) {
@@ -64,6 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+// After signing up: check your inbox (the confirmation link comes back to auth/callback.php).
+$sentTo = get_param('sent') !== '' ? (string) ($_SESSION['signup_email'] ?? '') : '';
+$flashes = render_flashes();
 
 $state = recall_form('register');
 $errors = $state['errors'] ?? [];
@@ -76,6 +97,7 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Sign Up — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -126,11 +148,21 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
       <?php endif; ?>
     </div>
   <?php endif; ?>
-  <?php if ($success): ?>
-    <div class="login-notice"><?= htmlspecialchars($success) ?> <a href="login.php">Log in</a></div>
+  <?= $flashes ?>
+  <?php if ($sentTo !== ''): ?>
+    <div class="signup-sent" role="status">
+      <h2>Check your email</h2>
+      <p>We sent a confirmation link to <strong><?= htmlspecialchars($sentTo) ?></strong>. Open it to activate your account — then you're logged in.</p>
+      <p class="signup-sent-small">Not there? Check your spam or promotions folder. The link works once.</p>
+      <form method="POST" action="register.php" class="signup-resend">
+        <input type="hidden" name="action" value="resend">
+        <button type="submit" class="login-btn">Resend the email</button>
+        <a href="login.php" class="signup-sent-link">Back to login</a>
+      </form>
+    </div>
   <?php endif; ?>
 
-  <?php if (!$success): ?>
+  <?php if ($sentTo === ''): ?>
   <form method="POST" action="register.php" class="login-form register-form" data-autoreset>
     <div class="register-grid">
       <div class="register-full">
@@ -140,9 +172,11 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
       </div>
 
       <div class="register-full">
-        <label for="email">Email Address</label>
+        <label for="email">LCUP School Email</label>
         <input type="email" id="email" name="email" class="login-input" required autocomplete="email"
-               placeholder="name@email.lcup.edu.ph" value="<?= $old('email') ?>">
+               placeholder="juan.delacruz@<?= SCHOOL_EMAIL_DOMAIN ?>" value="<?= $old('email') ?>"
+               pattern="[^@\s]+@email\.lcup\.edu\.ph" title="Use your LCUP school email, ending in @<?= SCHOOL_EMAIL_DOMAIN ?>">
+        <p class="login-field-hint">Only @<?= SCHOOL_EMAIL_DOMAIN ?> addresses can sign up. We'll email you a link to confirm it.</p>
       </div>
 
       <div>
