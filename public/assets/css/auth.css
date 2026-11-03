@@ -902,3 +902,29 @@ button.login-field-icon { cursor: pointer; }
   .login-glass .register-form .acct-option small { font-size: 0.7rem; line-height: 1.25; }
   .login-glass .register-form .login-submit { margin-top: 4px; }
 }
+
+/* Login / sign-up / forgot password: the logo alone (Glow Peach version),
+   no white circle or ring around it. */
+body .login-glass .login-logo-mark,
+.login-glass .login-logo-mark {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: contain;
+}
+/* Phones: without the white circle the logo no longer overlaps the photo
+   banner — it sits on the dark card just below it. */
+@media (max-width: 760px) {
+  .login-glass .login-card .login-logo { margin-top: 12px; }
+}
+
+/* Login / Sign Up / Send reset link use the main colour (Blue,
+   white text) — on the navy card it gets an orange edge to stand out. */
+.login-glass .login-submit {
+  background: var(--p-main);
+  color: var(--p-on-main);
+  box-shadow: 0 10px 30px rgba(var(--p-main-shadow-rgb), 0.45);
+}
+.login-glass .login-submit:hover { background: var(--p-main-hover); }
+.login-glass .login-submit { border: 1px solid rgba(var(--p-hi-rgb), 0.55); }

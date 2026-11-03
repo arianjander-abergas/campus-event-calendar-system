@@ -71,6 +71,14 @@
 .admin-input[type="file"]:focus-visible::file-selector-button { outline: 2px solid var(--focus); outline-offset: 2px; }
 .admin-input-follow { margin-top: 8px; }
 textarea.admin-input { resize: vertical; }
+/* A field that still needs information: red border + the reason under it. */
+body .admin-input.is-invalid,
+body .admin-input.is-invalid:focus {
+  border: 1.5px solid var(--red);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+  scroll-margin: 120px;
+}
+.field-error { margin: 5px 0 0; font-size: 0.78rem; font-weight: 600; color: var(--red); }
 
 .admin-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .admin-four-col { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -644,7 +652,7 @@ td.admin-row-actions > form { gap: 6px; }
 }
 
 /* Create Event › Organization picker: click a department (e.g. CITE) to show
-   its organizations; tick one, or two or more for a multi-organization event. */
+   its organizations; pick one, or two or more for a multi-organization event. */
 .org-field { margin-top: 4px; }
 .org-multi-toggle { margin: 4px 0 10px; }
 .org-picker { display: flex; flex-direction: column; gap: 8px; }
