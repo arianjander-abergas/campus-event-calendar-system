@@ -193,7 +193,10 @@ function assistant_run(array $turns, string $message, ?array $user, array $page)
     $turn = [['role' => 'user', 'content' => [['type' => 'text', 'text' => $message]]]];
     $payload = [
         'model' => assistant_config()['model'],
-        'max_tokens' => 1024,
+        // Thinking is always on with Opus 5.5 and counts toward this limit, so
+        // leave room for it; 'low' effort suits short chat answers (fast, cheap).
+        'max_tokens' => 4096,
+        'output_config' => ['effort' => 'low'],
         'system' => [
             ['type' => 'text', 'text' => ASSISTANT_RULES, 'cache_control' => ['type' => 'ephemeral']],
             ['type' => 'text', 'text' => assistant_context($user, $page)],
