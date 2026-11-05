@@ -54,16 +54,9 @@ $assistantSpark = '<path d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5
         <?= $assistantSvg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>', 18) ?>
       </button>
     </form>
-    <p class="assistant-note">
-      <?php if ($assistantAi): ?>
-        AI answers can be wrong, so check the event's page. The assistant only reads the site; it can't change anything.
-      <?php else: ?>
-        The assistant understands common questions about events and pages, in English. It only reads the site; it can't change anything.
-        <?php if (($assistantUser['role'] ?? '') === 'admin'): ?>
-          Admins: add an Anthropic API key in <code>config/assistant.local.php</code> for the full AI.
-        <?php endif; ?>
-      <?php endif; ?>
-    </p>
+    <?php if ($assistantAi): ?>
+      <p class="assistant-note">AI answers can be wrong, so check the event's page. The assistant only reads the site; it can't change anything.</p>
+    <?php endif; ?>
   </section>
 
   <button type="button" class="assistant-launcher" data-assistant-toggle aria-controls="assistantPanel" aria-expanded="false"
