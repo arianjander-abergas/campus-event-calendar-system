@@ -47,12 +47,9 @@ $reg = $event ? registration_state($event, $myRegistration, $going) : null;
 $attended = ($myRegistration['status'] ?? '') === 'attended';
 $evaluated = $attended && has_evaluated($eventId);
 
-// Schedule: this event's segments from event_programs, in sort_order.
+// Program Flow: this event's parts from event_programs, in running order (sort_order).
 $schedule = $event ? get_event_programs($eventId) : [];
 
-// "Programs" cards: other published events, soonest first, so anything
-// happening today always shows up first.
-$programCards = get_upcoming_events(3, $eventId ?: null);
 
 $breadcrumbs = [['Dashboard', 'enduser/dashboard.php'], ['Events', 'events.php'], ['Event Details', null]];
 
@@ -157,14 +154,23 @@ if ($event) {
           </div>
         </div>
 
-        <div class="ed-register">
-          <?php if (is_required_for_me($eventId)): ?>
-            <p class="ed-required-note" role="status"><strong>Your attendance is required.</strong> <?= htmlspecialchars(required_for_label($event)) ?>.<?= $reg['can_register'] ? ' Please register below.' : '' ?></p>
-          <?php elseif (($label = required_for_label($event)) !== ''): ?>
-            <p class="ed-reg-note"><?= htmlspecialchars($label) ?>.</p>
+        <?php /* id="register": the "Register" button in notification emails opens the page here. */ ?>
+        <?php
+        // One line saying where the person stands, and only the buttons that apply:
+        //   open → Register Now! · registered → Registered ✓ + Cancel registration
+        //   attended → Evaluate / Completed ✓ · ended or closed → just the line.
+        // "Required" only matters while the event hasn't ended.
+        $ended = event_has_ended($event);
+        $requiredForMe = !$ended && is_required_for_me($eventId);
+        $requiredLabel = $ended ? '' : required_for_label($event);
+        $statusLine = $reg['state'] === 'registered' && $requiredForMe ? "You're registered. Your attendance is required." : $reg['note'];
+        ?>
+        <div class="ed-register" id="register">
+          <?php if ($requiredForMe && $reg['state'] !== 'registered'): ?>
+            <p class="ed-required-note" role="status"><strong>Your attendance is required.</strong><?= $reg['can_register'] ? ' Please register below.' : '' ?></p>
           <?php endif; ?>
-          <?php if ($reg['note'] !== ''): ?>
-            <p class="ed-reg-note"><?= htmlspecialchars($reg['note']) ?></p>
+          <?php if ($statusLine !== ''): ?>
+            <p class="ed-reg-note ed-reg-<?= htmlspecialchars($reg['state']) ?>"><?= htmlspecialchars($statusLine) ?></p>
           <?php endif; ?>
           <?php if ($reg['can_register']): ?>
             <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>">
@@ -190,9 +196,10 @@ if ($event) {
             <?php endif; ?>
           <?php endif; ?>
           <?php if ($canManage): ?>
+            <?php if ($requiredLabel !== '' && !$requiredForMe): ?><p class="ed-reg-note ed-reg-staff"><?= htmlspecialchars($requiredLabel) ?>.</p><?php endif; ?>
             <div class="ed-admin-links">
               <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
-              <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Edit schedule</a>
+              <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Edit program flow</a>
               <a href="admin/event-registrations.php?event=<?= urlencode($eventId) ?>">Registrations</a>
               <a href="admin/attendance-print.php?event=<?= urlencode($eventId) ?>">Print attendance</a>
               <a href="admin/event-evaluations.php?event=<?= urlencode($eventId) ?>">Evaluation results</a>
@@ -202,41 +209,26 @@ if ($event) {
       </div>
     </section>
     <?php endif; ?>
-
-    <!-- Programs: other published events, happening-today first -->
-    <h2 class="ed-section-title">Programs</h2>
-    <div class="ed-programs">
-      <?php if (empty($programCards)): ?>
-        <p class="ed-empty">No other upcoming events yet.</p>
-      <?php endif; ?>
-      <?php foreach ($programCards as $i => $p): ?>
-      <a class="ed-program-card" href="event-details.php?id=<?= urlencode($p['id']) ?>">
-        <!-- IMAGE SLOTS 3-5: Program card image (used when the event has no poster_url) | file: assets/images/event-details/program-<?= $i + 1 ?>.svg | 225×200 -->
-        <img src="<?= htmlspecialchars(asset_url($p['poster_url'] ?? null, $img . 'program-' . ($i + 1) . '.svg')) ?>" alt="" class="ed-program-img">
-        <div class="ed-program-body">
-          <span class="ed-program-badge"><?= htmlspecialchars($p['categories']['name'] ?? 'Event') ?></span>
-          <h3 class="ed-program-title"><?= htmlspecialchars($p['title']) ?></h3>
-          <p class="ed-program-sub"><?= htmlspecialchars(excerpt($p['description'] ?? '', 90)) ?></p>
-          <p class="ed-program-time"><?= htmlspecialchars(event_when($p)) ?></p>
-        </div>
-      </a>
-      <?php endforeach; ?>
-    </div>
   </main>
 
-  <!-- Right rail: schedule -->
+  <!-- Right rail: the program flow (section 9 of the event form) -->
   <aside class="right-rail ed-rail">
-    <div class="ed-schedule">
-      <h2 class="ed-schedule-title">Schedule</h2>
+    <div class="ed-schedule" id="program-flow">
+      <h2 class="ed-schedule-title">Program Flow</h2>
 
       <?php if (empty($schedule)): ?>
-        <p class="ed-empty">No schedule posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Add one</a>.<?php endif; ?></p>
+        <p class="ed-empty">No program flow posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Add one</a>.<?php endif; ?></p>
       <?php else: ?>
-      <!-- event_programs rows in sort_order; speaker shown on the right -->
-      <div class="ed-schedule-head">Event Program</div>
-      <ol class="ed-timeline">
-        <?php foreach ($schedule as $item): ?>
-        <li title="<?= htmlspecialchars($item['description'] ?? '') ?>"><span class="ed-tl-label"><?= htmlspecialchars($item['title']) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time"><?= htmlspecialchars($item['speaker'] ?? '') ?></span></li>
+      <ol class="ed-flow">
+        <?php foreach ($schedule as $i => $item): ?>
+        <li class="ed-flow-item">
+          <span class="ed-flow-num" aria-hidden="true"><?= $i + 1 ?></span>
+          <div class="ed-flow-body">
+            <span class="ed-flow-title"><?= htmlspecialchars($item['title']) ?></span>
+            <?php if (!empty($item['speaker'])): ?><span class="ed-flow-speaker"><?= htmlspecialchars($item['speaker']) ?></span><?php endif; ?>
+            <?php if (!empty($item['description'])): ?><span class="ed-flow-notes"><?= htmlspecialchars($item['description']) ?></span><?php endif; ?>
+          </div>
+        </li>
         <?php endforeach; ?>
       </ol>
       <?php endif; ?>

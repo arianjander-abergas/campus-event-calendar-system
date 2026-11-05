@@ -279,3 +279,27 @@ a.ed-btn { display: inline-block; text-decoration: none; }
 }
 .ed-required-note strong { color: var(--p-accent-text); }
 :root:is([data-theme="dark"], [data-theme="dim"]) .ed-required-note { background: var(--p-dk-surface); color: var(--text-main); }
+
+/* ---- Program Flow (right rail): the event's parts in order, numbered on a line ----
+   Filled in section 9 of the event form (event_programs). */
+.ed-flow { list-style: none; margin: 6px 0 0; padding: 0; }
+.ed-flow-item { position: relative; display: flex; gap: 12px; padding: 0 0 16px; }
+.ed-flow-item:last-child { padding-bottom: 0; }
+.ed-flow-item:not(:last-child)::before {
+  content: ""; position: absolute; left: 12px; top: 28px; bottom: 2px; width: 2px;
+  background: rgba(var(--p-accent-rgb), 0.45);
+}
+.ed-flow-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--p-accent); color: #fff; font-size: 0.78rem; font-weight: 800;
+}
+.ed-flow-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 3px; }
+.ed-flow-title { font-size: 0.88rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.ed-flow-speaker { font-size: 0.78rem; font-weight: 600; color: var(--p-accent); overflow-wrap: anywhere; }
+.ed-flow-notes { font-size: 0.76rem; line-height: 1.45; opacity: 0.8; overflow-wrap: anywhere; }
+
+/* Registration box status line: ended / closed stand out a little; the
+   "Required for …" detail for Admins is quieter. */
+.ed-reg-ended, .ed-reg-closed { font-weight: 700; }
+.ed-reg-staff { margin: 10px 0 4px; font-size: 0.74rem; opacity: 0.75; }

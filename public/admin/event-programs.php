@@ -58,7 +58,7 @@ if ($errors) {
 $val = fn(string $key) => htmlspecialchars((string) ($editing[$key] ?? ''));
 
 $activeNav = 'manage-update';
-$breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Schedule', null]];
+$breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Program Flow', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en"<?= theme_attr() ?>>
@@ -66,7 +66,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <?= app_head_tags() ?>
-<title>Schedule: <?= htmlspecialchars($event['title']) ?> — Campus Event Hub</title>
+<title>Program Flow: <?= htmlspecialchars($event['title']) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
@@ -80,7 +80,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
   <main class="dash-main">
     <div class="page-head">
       <div>
-        <h1 class="page-title">Schedule</h1>
+        <h1 class="page-title">Program Flow</h1>
         <p class="page-sub"><?= htmlspecialchars($event['title']) ?> · <?= htmlspecialchars(event_when($event)) ?></p>
       </div>
       <a href="../event-details.php?id=<?= urlencode($eventId) ?>" class="btn btn-outline">View event page</a>
@@ -136,7 +136,7 @@ $breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['t
                     <button type="submit" name="action" value="down" class="btn-sm" <?= $i === count($programs) - 1 ? 'disabled' : '' ?> aria-label="Move down">↓</button>
                   </form>
                   <a href="<?= htmlspecialchars($back) ?>&amp;edit=<?= urlencode($p['id']) ?>" class="btn-sm">Edit</a>
-                  <form method="POST" action="<?= htmlspecialchars($back) ?>" data-confirm="Delete this program from the schedule?" data-confirm-title="Delete program" data-confirm-ok="Delete" data-confirm-tone="danger">
+                  <form method="POST" action="<?= htmlspecialchars($back) ?>" data-confirm="Delete this part from the program flow?" data-confirm-title="Delete program" data-confirm-ok="Delete" data-confirm-tone="danger">
                     <input type="hidden" name="action" value="delete">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                     <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
