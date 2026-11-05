@@ -449,7 +449,7 @@ function assistant_pages(?array $user): array
         $pages += [
             'create_event' => ['Create Event', '/admin/event-organizer.php', 'the form for a new event'],
             'update_events' => ['Update Events', '/admin/event-organizer.php?view=update', 'the list of events to edit, publish or cancel, with search and filters'],
-            'event_schedule' => ['Event schedule', '/admin/event-programs.php', "an event's program / schedule (give event_id)"],
+            'event_schedule' => ['Event program flow', '/admin/event-programs.php', "an event's program flow / schedule (give event_id)"],
             'event_registrations' => ['Registrations', '/admin/event-registrations.php', "an event's registrations and attendance, and its printable attendance sheet (give event_id)"],
             'event_evaluation_results' => ['Evaluation results', '/admin/event-evaluations.php', "an event's evaluation results (give event_id)"],
             'import_verify' => ['Import & Verify', '/admin/import.php', 'upload an Excel / CSV attendance sheet' . ($role === 'admin' ? ", or the registrar's student list to verify School IDs" : '')],

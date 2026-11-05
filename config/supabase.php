@@ -39,6 +39,38 @@ const SCHOOL_LOGO_LIGHT = 'assets/images/school-logo-light.png';
 // build links as BASE_URL . '/auth/login.php' instead of relative paths.
 define('BASE_URL', getenv('APP_BASE_URL') ?: detect_base_url());
 
+/** The site is opened over HTTPS (directly, or behind a host's proxy such as Render). */
+function is_https_request(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+}
+
+/** Opened on this computer (XAMPP): PHP errors are shown on the page there, and only there. */
+function is_local_request(): bool
+{
+    $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    return in_array($host, ['localhost', '127.0.0.1', '[::1]'], true);
+}
+
+// Every page and API answer: safety headers, and no error details (file paths,
+// code) shown to visitors once the site is online — they go to the error log.
+if (PHP_SAPI !== 'cli' && !headers_sent()) {
+    header_remove('X-Powered-By');                                      // don't advertise the PHP version
+    header('X-Content-Type-Options: nosniff');                          // files are only what they say they are
+    header('X-Frame-Options: SAMEORIGIN');                              // other sites can't frame the pages (clickjacking)
+    header("Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'");
+    header('Referrer-Policy: strict-origin-when-cross-origin');         // links out don't leak page addresses
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
+    if (is_https_request()) {
+        header('Strict-Transport-Security: max-age=31536000');          // browsers always use HTTPS from then on
+    }
+    if (!is_local_request()) {
+        ini_set('display_errors', '0');
+        ini_set('log_errors', '1');
+    }
+}
+
 function detect_base_url(): string
 {
     // realpath() on both sides so a junction/symlink (e.g. htdocs linked to
@@ -519,6 +551,8 @@ const DB_UPDATES = [
     '20261018150000_audiences_and_evaluation_form.sql' => ['Students / Faculty / Outsiders audiences, and Admins editing the evaluation form', 'events', 'select=audiences&limit=1'],
     '20261022120000_evaluation_form_parts.sql' => ['The school\'s evaluation form (Parts I–IV)', 'evaluation_questions', 'select=id&is_active=eq.true&section=eq.Part%20I%3A%20Activity%20Experience&limit=1', 'rows'],
     '20261103120000_school_email_and_notifications.sql' => ['School-email-only accounts, required attendance, and notifications by email to the people an event is open to', 'events', 'select=required_for&limit=1'],
+    '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
+    '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
 ];
 
 /**
@@ -840,7 +874,11 @@ function session_start_once(): void
         // HttpOnly: scripts can't read the login cookie. SameSite=Lax: the
         // browser won't send it with form posts from other websites, so
         // another site can't trigger admin actions (CSRF).
-        session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
+        // Secure (on HTTPS): the cookie is never sent over plain http.
+        // Strict mode: a session ID the server didn't create is refused.
+        session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => is_https_request()]);
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
         session_start();
     }
 }
@@ -1801,7 +1839,8 @@ function protected_account_ids(): array
 {
     static $ids = null;
     if ($ids === null) {
-        $ids = array_column(supabase_request('profiles', 'select=id&is_super_admin=is.true'), 'id');
+        // As the logged-in Super Admin: profiles are private (20261105120000_private_profiles.sql).
+        $ids = array_column(supabase_user_request('profiles', 'select=id&is_super_admin=is.true'), 'id');
         $GLOBALS['supabase_last_error'] = '';
     }
     return $ids;
@@ -2202,16 +2241,15 @@ function registration_restriction(array $ev, ?array $user): string
 function registration_state(array $ev, ?array $myReg, int $going, ?array $user = null): array
 {
     $today = date('Y-m-d');
-    $ended = ($ev['end_date'] ?? $ev['start_date'] ?? $today) < $today || ($ev['status'] ?? '') === 'completed';
+    $ended = event_has_ended($ev);
     $mine = $myReg['status'] ?? null;
     $state = fn(string $s, bool $reg, bool $cancel, string $note) => ['state' => $s, 'can_register' => $reg, 'can_cancel' => $cancel, 'note' => $note];
 
     if ($mine === 'attended') return $state('attended', false, false, 'You attended this event.');
     if (($ev['status'] ?? '') === 'cancelled') return $state('closed', false, false, 'This event was cancelled.');
-    if ($mine === 'registered') {
-        return $state('registered', false, !$ended, $ended ? 'This event has ended.' : "You're registered for this event.");
-    }
-    if ($ended) return $state('closed', false, false, 'This event has ended.');
+    // Over: nothing to register for or cancel any more.
+    if ($ended) return $state('ended', false, false, $mine === 'registered' ? 'This event has ended. You were registered.' : 'This event has ended, so registration is closed.');
+    if ($mine === 'registered') return $state('registered', false, true, "You're registered for this event.");
     if (($ev['status'] ?? '') !== 'published') return $state('closed', false, false, "This event isn't open for registration yet.");
     if (empty($ev['enable_registration'])) return $state('closed', false, false, 'No registration needed — just show up!');
     if (!empty($ev['registration_deadline']) && $today > $ev['registration_deadline']) {
@@ -2229,13 +2267,35 @@ function registration_state(array $ev, ?array $myReg, int $going, ?array $user =
 }
 
 /**
+ * Whether an event is over: its last day has passed, or it's that day and
+ * its end time has passed (Philippine time), or it's marked Completed.
+ * An event without an end time lasts until the end of its last day.
+ */
+function event_has_ended(array $ev): bool
+{
+    if (($ev['status'] ?? '') === 'completed') return true;
+    $day = (string) (($ev['end_date'] ?? null) ?: ($ev['start_date'] ?? ''));
+    if ($day === '') return false;
+    $time = substr((string) (($ev['end_time'] ?? null) ?: '23:59:59'), 0, 8);
+    $tz = new DateTimeZone('Asia/Manila');
+    $end = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $day . ' ' . (strlen($time) === 5 ? $time . ':00' : $time), $tz);
+    return $end !== false && $end < new DateTimeImmutable('now', $tz);
+}
+
+/**
  * Register the logged-in user (or re-activate a cancelled registration).
  * The database checks every rule; its reason is passed back on failure.
+ * The database adds a "Registered" notification (notify_registration()),
+ * which is emailed to them right away (email_registration_notice()).
  */
 function register_for_event(string $eventId): array
 {
     $user = current_user();
     if (!$user) return ['ok' => false, 'message' => 'Please log in to register for this event.'];
+    $event = get_event($eventId);
+    if ($event && event_has_ended($event)) {
+        return ['ok' => false, 'message' => 'This event has ended, so registration is closed.'];
+    }
 
     $existing = get_my_registration($eventId);
     if ($existing && in_array($existing['status'], ['registered', 'attended'], true)) {
@@ -2248,7 +2308,28 @@ function register_for_event(string $eventId): array
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Something went wrong registering you. Please try again.')];
     }
-    return ['ok' => true, 'message' => "You're registered! We'll notify you about any updates."];
+    $emailed = email_registration_notice($eventId, $event);
+    return ['ok' => true, 'message' => "You're registered!" . ($emailed ? ' A confirmation was sent to ' . $user['email'] . '.' : '') . " We'll notify you about any updates."];
+}
+
+/**
+ * Email the "Registered" notice the database just added to the logged-in
+ * person themselves, and take it out of the email queue (if sending fails,
+ * the queue tries again later). False when nothing was sent.
+ */
+function email_registration_notice(string $eventId, ?array $event): bool
+{
+    $user = current_user();
+    if (!$user || !mail_enabled() || !account_may_sign_in($user['email'] ?? '', $user['role'] ?? 'user')) return false;
+    $rows = supabase_user_request('notifications', 'select=id,event_id,title,message&event_id=eq.' . urlencode($eventId)
+        . '&user_id=eq.' . urlencode($user['id']) . '&title=like.Registered*&email_pending=is.true&order=created_at.desc&limit=1');
+    $notice = $rows[0] ?? null;
+    if (!$notice) return false; // before the database update (20261106120000_registration_notices.sql)
+    $mail = notification_email_content($notice, $event);
+    $sent = smtp_send([(string) $user['email']], $mail['subject'], $mail['text'], $mail['html']);
+    if (!$sent['ok']) return false;
+    supabase_rpc('my_notification_emailed', ['p_id' => $notice['id']], true);
+    return true;
 }
 
 /** Cancel the logged-in user's registration (frees the seat). */
@@ -2566,6 +2647,15 @@ function notification_email_content(array $n, ?array $event): array
     $message = (string) ($n['message'] ?? '');
     $required = str_starts_with($title, 'Required') || str_starts_with($title, 'Now required');
     $url = !empty($n['event_id']) ? app_url('event-details.php?id=' . rawurlencode($n['event_id'])) : app_url('index.php');
+    // "Register": while the event still takes registrations. It opens the event
+    // page at its Register button (registering itself stays a click on the site).
+    $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    $canRegister = $event && !empty($n['event_id']) && !str_starts_with($title, 'Registered') // already registered: no button
+        && !event_has_ended($event)
+        && ($event['status'] ?? '') === 'published' && !empty($event['enable_registration'])
+        && (string) (($event['end_date'] ?? null) ?: ($event['start_date'] ?? '')) >= $today
+        && (empty($event['registration_deadline']) || (string) $event['registration_deadline'] >= $today);
+    $registerUrl = $canRegister ? $url . '#register' : null;
     $details = [];
     if ($event) {
         $details['When'] = event_when($event);
@@ -2576,7 +2666,8 @@ function notification_email_content(array $n, ?array $event): array
 
     $text = "Hello,\n\n" . $title . "\n" . ($message !== '' ? $message . "\n" : '') . "\n";
     foreach ($details as $label => $value) $text .= $label . ': ' . $value . "\n";
-    $text .= "\nOpen the event: " . $url . "\n\n— Campus Event Hub · " . SCHOOL_NAME
+    $text .= ($registerUrl ? "\nRegister: " . $registerUrl : '')
+        . "\nOpen the event: " . $url . "\n\n— Campus Event Hub · " . SCHOOL_NAME
         . "\nYou're getting this email because you have a Campus Event Hub account.\n";
 
     $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
@@ -2595,7 +2686,10 @@ function notification_email_content(array $n, ?array $event): array
         . '<h1 style="margin:0 0 8px;font-size:20px;color:#162b44">' . $e($title) . '</h1>'
         . ($message !== '' ? '<p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#162b44">' . $e($message) . '</p>' : '')
         . ($rows !== '' ? '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">' . $rows . '</table>' : '')
-        . '<a href="' . $e($url) . '" style="display:inline-block;background:#213e60;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:8px">Open the event</a>'
+        . ($registerUrl
+            ? '<a href="' . $e($registerUrl) . '" style="display:inline-block;background:#e68c3a;color:#162b44;text-decoration:none;font-weight:800;font-size:14px;padding:12px 26px;border-radius:8px;margin:0 8px 8px 0">Register</a>'
+              . '<a href="' . $e($url) . '" style="display:inline-block;background:#ffffff;color:#213e60;text-decoration:none;font-weight:700;font-size:14px;padding:10px 20px;border-radius:8px;border:2px solid #213e60;margin:0 0 8px">Open the event</a>'
+            : '<a href="' . $e($url) . '" style="display:inline-block;background:#213e60;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:8px">Open the event</a>')
         . '</td></tr>'
         . '<tr><td style="padding:16px 24px;border-top:1px solid #ebe7dd;color:#6f6a5d;font-size:12px;line-height:1.5">'
         . $e(SCHOOL_NAME) . ' · Campus Event Hub<br>You\'re getting this email because you have a Campus Event Hub account.</td></tr>'
@@ -3013,7 +3107,7 @@ function get_organizations(): array
     return supabase_request('organizations', 'select=id,name,logo_url,department_id&order=name.asc');
 }
 
-// ---- Event programs (the Schedule) — admin/event-programs.php ---------------
+// ---- Event programs (the Program Flow) — event form section 9, admin/event-programs.php ---------------
 
 function create_program_admin(string $eventId, array $fields): array
 {
@@ -3040,6 +3134,42 @@ function delete_program_admin(string $programId): array
     return empty($rows)
         ? ['ok' => false, 'message' => friendly_error('Could not delete the program.')]
         : ['ok' => true, 'message' => 'Program deleted.'];
+}
+
+/**
+ * Save an event's whole program flow from the event form (section 9), in
+ * the order given: parts that are kept are updated (only if they changed),
+ * new ones added, and the ones no longer in the list deleted.
+ * @param array<array{id:string,title:string,speaker:string,description:string}> $rows
+ * @return bool false if any change couldn't be saved
+ */
+function save_event_programs(string $eventId, array $rows): bool
+{
+    if (!is_uuid($eventId)) return false;
+    $existing = array_column(get_event_programs($eventId), null, 'id');
+    $ok = true;
+    $kept = [];
+    foreach (array_values($rows) as $i => $r) {
+        $fields = [
+            'title' => $r['title'],
+            'speaker' => $r['speaker'] !== '' ? $r['speaker'] : null,
+            'description' => $r['description'] !== '' ? $r['description'] : null,
+            'sort_order' => $i + 1,
+        ];
+        $old = isset($existing[$r['id'] ?? '']) ? $existing[$r['id']] : null;
+        if ($old) {
+            $kept[] = $old['id'];
+            $same = $old['title'] === $fields['title'] && ($old['speaker'] ?? null) === $fields['speaker']
+                && ($old['description'] ?? null) === $fields['description'] && (int) $old['sort_order'] === $fields['sort_order'];
+            if (!$same) $ok = !empty(supabase_user_request('event_programs', 'id=eq.' . urlencode($old['id']), 'PATCH', $fields)) && $ok;
+        } else {
+            $ok = !empty(supabase_user_request('event_programs', '', 'POST', $fields + ['event_id' => $eventId])) && $ok;
+        }
+    }
+    foreach (array_diff(array_keys($existing), $kept) as $id) {
+        $ok = !empty(supabase_user_request('event_programs', 'id=eq.' . urlencode($id) . '&event_id=eq.' . urlencode($eventId), 'DELETE')) && $ok;
+    }
+    return $ok;
 }
 
 /** Move a program one place up (-1) or down (+1) in the running order. */

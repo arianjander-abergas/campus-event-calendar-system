@@ -139,6 +139,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'status' => $intent === 'publish' ? 'published' : 'draft',
     ];
 
+    // 9. Program Flow: the parts typed, in order (completely empty rows are skipped).
+    $pf = (array) ($_POST['programs'] ?? []);
+    $pfText = fn(string $col, $i): string => is_string($pf[$col][$i] ?? null) ? trim($pf[$col][$i]) : '';
+    $programs = [];
+    foreach (array_keys((array) ($pf['title'] ?? [])) as $i) {
+        $row = ['id' => $pfText('id', $i), 'title' => $pfText('title', $i), 'speaker' => $pfText('speaker', $i), 'description' => $pfText('description', $i)];
+        if ($row['title'] !== '' || $row['speaker'] !== '' || $row['description'] !== '') $programs[] = $row;
+    }
+
     // Saving as a draft takes back a request for a Super Admin's approval
     // (publishing sends it again; the database turns that into a request).
     if ($intent === 'draft' && ($previous['approval_status'] ?? null) === 'pending') {
@@ -191,6 +200,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         $fail('registration_deadline', 'The registration deadline must be on or before the end date.');
     }
     if ($fields['contact_email'] && !filter_var($fields['contact_email'], FILTER_VALIDATE_EMAIL)) $fail('contact_email', 'Contact email is not a valid email address.');
+    foreach ($programs as $p) {
+        if ($p['title'] === '') $fail('programs', 'Each part of the program flow needs a name (what happens) — fill it in or remove that part.');
+        if (mb_strlen($p['title']) > 200 || mb_strlen($p['speaker']) > 120 || mb_strlen($p['description']) > 500) $fail('programs', 'A part of the program flow is too long (name: 200 characters, speaker: 120, notes: 500).');
+    }
+    if (count($programs) > 60) $fail('programs', 'The program flow can have up to 60 parts.');
 
     // No duplicates: the same title on the same date, or a venue booked twice at once.
     // (The database refuses these too, even for events this user can't see.)
@@ -238,6 +252,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
             // Co-organizers (also cleared when an event stops being multi-organization).
             if (($partnerOrgs || $previous) && !set_event_partner_orgs($eventId, $partnerOrgs) && $partnerOrgs) {
                 $notSaved[] = 'the other organizations';
+            }
+            // The program flow (section 9): kept, added, reordered and removed parts.
+            if (($programs || $previous) && !save_event_programs($eventId, $programs)) {
+                $notSaved[] = 'the program flow';
             }
             if ($notSaved) {
                 flash('error', 'Not saved yet: ' . implode(' and ', $notSaved) . '. The database is missing an update — a Super Admin can run it from Database update (link in the red banner), then edit the event to add these.');
@@ -289,7 +307,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (!empty($_FILES['poster_file']['name'])) {
         $fail('poster_file', 'Choose the poster image again (files can\'t be kept after an error).');
     }
-    remember_form('event', $fields + ['id' => $previous['id'] ?? null, 'multi_org' => $multiOrg, 'partner_ids' => $partnerOrgs], $errors);
+    remember_form('event', $fields + ['id' => $previous['id'] ?? null, 'multi_org' => $multiOrg, 'partner_ids' => $partnerOrgs, 'programs' => $programs], $errors);
     header('Location: event-organizer.php' . ($previous ? '?edit=' . urlencode($previous['id']) : '') . '#event-form');
     exit;
 }
@@ -298,6 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 if ($editEvent) {
     $editEvent['partner_ids'] = array_column(get_event_partner_orgs([$editEvent['id']])[$editEvent['id']] ?? [], 'id');
     $editEvent['multi_org'] = (bool) $editEvent['partner_ids'];
+    $editEvent['programs'] = get_event_programs($editEvent['id']); // section 9
 }
 
 // Will publishing wait for a Super Admin? (Admins' — moderator role — new events do.)
@@ -354,10 +373,13 @@ $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 // Fields the last save rejected: red border + the reason under the field.
 // Errors without a field of their own (e.g. the database said no) show as banners.
 $fieldKeys = ['title', 'category_id', 'category_other', 'description', 'start_date', 'end_date', 'end_time', 'venue', 'online_event_link',
-    'poster_file', 'registration_limit', 'registration_deadline', 'contact_email', 'audiences', 'organizations'];
+    'poster_file', 'registration_limit', 'registration_deadline', 'contact_email', 'audiences', 'organizations', 'programs'];
 $bad = fn(string $key) => isset($errors[$key]) ? ' is-invalid" aria-invalid="true" aria-describedby="' . $key . '-error' : '';
 $why = fn(string $key) => isset($errors[$key]) ? '<p class="field-error" id="' . $key . '-error">' . htmlspecialchars($errors[$key]) . '</p>' : '';
 $fieldErrorCount = count(array_intersect(array_keys($errors), $fieldKeys));
+// Sections 1–9 fold open and shut; they start closed, except one with a field the last save rejected.
+$openIf = fn(string ...$keys): string => array_intersect($keys, array_keys($errors)) ? ' open' : '';
+$fold = '<span class="form-fold-chevron" aria-hidden="true">' . icon('chevron-down', 18) . '</span>';
 // Earliest date the pickers allow: today — or an existing event's own earlier date, so it can be kept.
 $minDate = function (string $key) use ($savedEvent): string {
     $saved = (string) ($savedEvent[$key] ?? '');
@@ -416,8 +438,8 @@ $breadcrumbs[] = [$pageTitle, null];
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
       <div class="admin-card">
-        <section class="form-section" aria-labelledby="sec-basic">
-          <h2 class="form-section-head" id="sec-basic"><span class="form-section-num">1</span><span>Basic Information<small>Title, type of event and description</small></span></h2>
+        <details class="form-section form-fold"<?= $openIf('title', 'category_id', 'category_other', 'description') ?>>
+          <summary><h2 class="form-section-head" id="sec-basic"><span class="form-section-num">1</span><span>Basic Information<small>Title, type of event and description</small></span><?= $fold ?></h2></summary>
           <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
           <input type="text" id="title" name="title" class="admin-input<?= $bad('title') ?>" placeholder="Enter event title" value="<?= $val('title') ?>" required><?= $why('title') ?>
 
@@ -442,10 +464,10 @@ $breadcrumbs[] = [$pageTitle, null];
 
           <label class="admin-label" for="description">Description <span class="req">*</span></label>
           <textarea id="description" name="description" class="admin-input<?= $bad('description') ?>" rows="5" maxlength="2000" placeholder="Write event description here…"><?= $val('description') ?></textarea><?= $why('description') ?>
-        </section>
+        </details>
 
-        <section class="form-section" aria-labelledby="sec-org">
-          <h2 class="form-section-head" id="sec-org"><span class="form-section-num">2</span><span>Organizers<small>The organization holding the event, and any co-organizers</small></span></h2>
+        <details class="form-section form-fold"<?= $openIf('organizations') ?>>
+          <summary><h2 class="form-section-head" id="sec-org"><span class="form-section-num">2</span><span>Organizers<small>The organization holding the event, and any co-organizers</small></span><?= $fold ?></h2></summary>
           <?php /* Organization picker: departments from Categories & Orgs (e.g. CITE) are
                    clickable and open to show their organizations (JPSSITE, SIES, ACpES…).
                    One organization, or two or more with "Multi-organization event". */
@@ -513,10 +535,10 @@ $breadcrumbs[] = [$pageTitle, null];
                 : 'Your organization runs the event. Pick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
             </p><?= $why('organizations') ?>
           </div>
-        </section>
+        </details>
 
-        <section class="form-section" aria-labelledby="sec-audience">
-          <h2 class="form-section-head" id="sec-audience"><span class="form-section-num">3</span><span>Audience<small>Who the event is for</small></span></h2>
+        <details class="form-section form-fold"<?= $openIf('audiences') ?>>
+          <summary><h2 class="form-section-head" id="sec-audience"><span class="form-section-num">3</span><span>Audience<small>Who the event is for</small></span><?= $fold ?></h2></summary>
           <span class="admin-label" id="audience-label">Open to <span class="req">*</span> <span class="admin-muted">— pick everyone it's for</span></span>
           <?php $formAudiences = isset($f['audiences']) || isset($f['audience']) ? event_audiences($f) : ['students']; ?>
           <div class="admin-radio-row" role="group" aria-labelledby="audience-label" data-audiences>
@@ -545,10 +567,10 @@ $breadcrumbs[] = [$pageTitle, null];
             <?php endforeach; ?>
           </select>
           <p class="admin-hint">Required attendees are always notified when the event is published — in the site and by email — and see it marked <strong>Required</strong>. Only people the event is open to (the audience and year levels above) can be required.</p>
-        </section>
+        </details>
 
-        <section class="form-section" aria-labelledby="sec-when">
-          <h2 class="form-section-head" id="sec-when"><span class="form-section-num">4</span><span>Date &amp; Time<small>When it starts and ends</small></span></h2>
+        <details class="form-section form-fold"<?= $openIf('start_date', 'end_date', 'end_time') ?>>
+          <summary><h2 class="form-section-head" id="sec-when"><span class="form-section-num">4</span><span>Date &amp; Time<small>When it starts and ends</small></span><?= $fold ?></h2></summary>
           <div class="admin-four-col">
             <div>
               <label class="admin-label" for="start_date">Start Date <span class="req">*</span></label>
@@ -569,10 +591,10 @@ $breadcrumbs[] = [$pageTitle, null];
           </div>
           <!-- Other events on these dates, and clashes (filled by the script below) -->
           <div class="schedule-hint" data-schedule-hint hidden></div>
-        </section>
+        </details>
 
-        <section class="form-section" aria-labelledby="sec-venue">
-          <h2 class="form-section-head" id="sec-venue"><span class="form-section-num">5</span><span>Venue<small>Where it happens: on campus, off campus or online</small></span></h2>
+        <details class="form-section form-fold"<?= $openIf('venue', 'online_event_link') ?>>
+          <summary><h2 class="form-section-head" id="sec-venue"><span class="form-section-num">5</span><span>Venue<small>Where it happens: on campus, off campus or online</small></span><?= $fold ?></h2></summary>
           <span class="admin-label">Venue Type <span class="req">*</span></span>
           <div class="admin-radio-row">
             <?php foreach (VENUE_TYPES as $key => $label): ?>
@@ -594,21 +616,22 @@ $breadcrumbs[] = [$pageTitle, null];
 
           <label class="admin-label" for="address">Address (if applicable)</label>
           <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
-        </section>
+        </details>
 
-        <section class="form-section" aria-labelledby="sec-options">
-          <h2 class="form-section-head" id="sec-options"><span class="form-section-num">6</span><span>Publishing Options<small>Registration and notifications</small></span></h2>
+        <details class="form-section form-fold">
+          <summary><h2 class="form-section-head" id="sec-options"><span class="form-section-num">6</span><span>Publishing Options<small>Registration and notifications</small></span><?= $fold ?></h2></summary>
           <div class="admin-checkbox-row">
             <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
             <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
           </div>
           <p class="admin-hint">With "Send Notification" on: publishing a new event notifies everyone it's open to (the audience and year levels above); saving changes to a published event notifies the people registered for it and the required attendees. Notifications show in the site and are emailed too<?= mail_enabled() ? '' : ' (once email is set up — a Super Admin can check Database update › Site setup)' ?>.</p>
-        </section>
+        </details>
       </div>
 
       <div class="admin-side-cards">
         <div class="admin-card">
-          <h2 class="form-section-head" id="sec-poster"><span class="form-section-num">7</span><span>Event Poster<small>Shown on the event page and the event cards</small></span></h2>
+          <details class="form-fold"<?= $openIf('poster_file') ?>>
+          <summary><h2 class="form-section-head" id="sec-poster"><span class="form-section-num">7</span><span>Event Poster<small>Shown on the event page and the event cards</small></span><?= $fold ?></h2></summary>
           <?php if (!empty($f['poster_url'])): ?>
             <img src="<?= htmlspecialchars(asset_url($f['poster_url'])) ?>" alt="Current poster" class="admin-image-preview">
           <?php endif; ?>
@@ -617,10 +640,12 @@ $breadcrumbs[] = [$pageTitle, null];
           <p class="admin-hint">JPG, PNG, WEBP or GIF, up to 5 MB. Replaces the current poster.</p>
           <label class="admin-label" for="poster_url">…or paste an image URL</label>
           <input type="text" id="poster_url" name="poster_url" class="admin-input" placeholder="https://…" value="<?= $val('poster_url') ?>">
+          </details>
         </div>
 
         <div class="admin-card">
-          <h2 class="form-section-head" id="sec-contact"><span class="form-section-num">8</span><span>Registration &amp; Contact<small>Limits, deadline and who to ask</small></span></h2>
+          <details class="form-fold"<?= $openIf('registration_limit', 'registration_deadline', 'contact_email') ?>>
+          <summary><h2 class="form-section-head" id="sec-contact"><span class="form-section-num">8</span><span>Registration &amp; Contact<small>Limits, deadline and who to ask</small></span><?= $fold ?></h2></summary>
           <label class="admin-label" for="registration_limit">Registration Limit</label>
           <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input<?= $bad('registration_limit') ?>" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>"><?= $why('registration_limit') ?>
 
@@ -632,18 +657,49 @@ $breadcrumbs[] = [$pageTitle, null];
 
           <label class="admin-label" for="contact_number">Contact Number</label>
           <input type="text" id="contact_number" name="contact_number" class="admin-input" placeholder="Enter no." value="<?= $val('contact_number') ?>">
+          </details>
         </div>
 
         <?php if ($editId): ?>
           <div class="admin-card admin-card-links">
             <h2 class="admin-card-title">More for this event</h2>
-            <a href="event-programs.php?event=<?= urlencode($editId) ?>"><?= icon('schedule', 16) ?> Edit the schedule (programs)</a>
             <a href="event-registrations.php?event=<?= urlencode($editId) ?>"><?= icon('people', 16) ?> See registrations &amp; attendance</a>
             <a href="attendance-print.php?event=<?= urlencode($editId) ?>"><?= icon('print', 16) ?> Print the attendance sheet</a>
             <a href="event-evaluations.php?event=<?= urlencode($editId) ?>"><?= icon('evaluation', 16) ?> See evaluation results</a>
             <a href="../event-details.php?id=<?= urlencode($editId) ?>"><?= icon('view', 16) ?> View the event page</a>
           </div>
         <?php endif; ?>
+      </div>
+
+      <?php /* 9. Program Flow: the event's parts in running order (event_programs),
+               saved with the event. Rows are added / moved / removed by the script below. */
+      $programRows = $f['programs'] ?? [];
+      $programRow = fn(array $p): string =>
+          '<li class="pf-row" data-pf-row>'
+          . '<input type="hidden" name="programs[id][]" value="' . htmlspecialchars((string) ($p['id'] ?? '')) . '">'
+          . '<span class="pf-num" aria-hidden="true"></span>'
+          . '<div class="pf-fields">'
+          . '<input type="text" name="programs[title][]" class="admin-input" maxlength="200" placeholder="What happens, e.g. Opening Prayer" aria-label="Part of the program" value="' . htmlspecialchars((string) ($p['title'] ?? '')) . '">'
+          . '<input type="text" name="programs[speaker][]" class="admin-input" maxlength="120" placeholder="Speaker / in charge (optional)" aria-label="Speaker or person in charge" value="' . htmlspecialchars((string) ($p['speaker'] ?? '')) . '">'
+          . '<input type="text" name="programs[description][]" class="admin-input pf-notes" maxlength="500" placeholder="Notes, e.g. time or room (optional)" aria-label="Notes" value="' . htmlspecialchars((string) ($p['description'] ?? '')) . '">'
+          . '</div>'
+          . '<div class="pf-tools">'
+          . '<button type="button" class="btn-sm" data-pf-up aria-label="Move up" title="Move up">↑</button>'
+          . '<button type="button" class="btn-sm" data-pf-down aria-label="Move down" title="Move down">↓</button>'
+          . '<button type="button" class="btn-sm btn-sm-danger" data-pf-remove aria-label="Remove" title="Remove">✕</button>'
+          . '</div></li>';
+      ?>
+      <div class="admin-card admin-card-wide">
+        <details class="form-fold"<?= $openIf('programs') ?>>
+          <summary><h2 class="form-section-head" id="sec-program"><span class="form-section-num">9</span><span>Program Flow<small>The parts of the event in order — shown on the event page</small></span><?= $fold ?></h2></summary>
+          <ol class="pf-list" data-pf-list>
+            <?php foreach ($programRows as $p) echo $programRow($p); ?>
+          </ol>
+          <p class="admin-hint" data-pf-empty<?= $programRows ? ' hidden' : '' ?>>No program flow yet. Add the parts of the event in the order they happen.</p>
+          <?= $why('programs') ?>
+          <button type="button" class="btn btn-outline pf-add" data-pf-add>+ Add a part</button>
+          <template data-pf-template><?= $programRow([]) ?></template>
+        </details>
       </div>
 
       <div class="admin-actions">
@@ -799,7 +855,7 @@ $breadcrumbs[] = [$pageTitle, null];
                 <details class="row-more">
                   <summary class="btn-sm">Manage <span aria-hidden="true">▾</span></summary>
                   <div class="row-more-menu" role="group" aria-label="Manage <?= htmlspecialchars($ev['title']) ?>">
-                    <a href="event-programs.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Schedule (<?= $programCount ?>)</a>
+                    <a href="event-organizer.php?edit=<?= urlencode($ev['id']) ?>#sec-program" class="btn-sm">Program Flow (<?= $programCount ?>)</a>
                     <a href="event-registrations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Registrations</a>
                     <?php if ($status !== 'draft'): ?>
                       <a href="event-evaluations.php?event=<?= urlencode($ev['id']) ?>" class="btn-sm">Evaluations</a>
@@ -891,6 +947,7 @@ $breadcrumbs[] = [$pageTitle, null];
       hint.textContent = multi.checked ? 'Pick two or more organizations for a multi-organization event (click a department to see its organizations).' : 'Pick the organization holding this event (click a department to see its organizations).';
       hint.classList.add('admin-hint-error');
       var firstDept = form.querySelector('.org-dept');
+      openFold(hint);
       if (firstDept) firstDept.open = true;
       form.querySelector('[data-org-field]').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -922,6 +979,7 @@ $breadcrumbs[] = [$pageTitle, null];
     if (form.querySelector('input[name="audiences[]"]:checked')) return;
     e.preventDefault();
     audienceError.hidden = false;
+    openFold(audienceBoxes[0]);
     audienceBoxes[0].focus();
     audienceBoxes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, true);
@@ -961,6 +1019,50 @@ $breadcrumbs[] = [$pageTitle, null];
   form.addEventListener('change', function () { syncCategory(); syncVenue(); syncAudience(); checkSchedule(); });
   ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
 
+  // ---- Sections 1–9 fold open and shut ----
+  // A field that needs fixing opens the section it's in.
+  function openFold(el) {
+    for (var d = el && el.closest('details.form-fold'); d; d = d.parentElement && d.parentElement.closest('details.form-fold')) d.open = true;
+  }
+  // A link to a section (e.g. "Edit program flow" → #sec-program) opens it.
+  var linked = location.hash && document.getElementById(location.hash.slice(1));
+  if (linked && linked.closest('details.form-fold')) {
+    openFold(linked);
+    linked.scrollIntoView({ block: 'start' });
+  }
+
+  // ---- 9. Program Flow: add, move and remove parts ----
+  var pfList = form.querySelector('[data-pf-list]');
+  var pfTemplate = form.querySelector('[data-pf-template]');
+  var pfEmpty = form.querySelector('[data-pf-empty]');
+  var pfCount = 0;
+  function pfSync() {
+    var rows = pfList.querySelectorAll('[data-pf-row]');
+    rows.forEach(function (row, i) {
+      row.querySelector('.pf-num').textContent = i + 1;
+      var name = row.querySelector('input[name="programs[title][]"]');
+      if (!name.id) name.id = 'pf-title-' + (++pfCount); // so a missing name can be highlighted
+      row.querySelector('[data-pf-up]').disabled = i === 0;
+      row.querySelector('[data-pf-down]').disabled = i === rows.length - 1;
+    });
+    pfEmpty.hidden = rows.length > 0;
+  }
+  form.querySelector('[data-pf-add]').addEventListener('click', function () {
+    pfList.appendChild(pfTemplate.content.firstElementChild.cloneNode(true));
+    pfSync();
+    pfList.lastElementChild.querySelector('input[type="text"]').focus();
+  });
+  pfList.addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    var row = btn.closest('[data-pf-row]');
+    if (btn.hasAttribute('data-pf-remove')) row.remove();
+    else if (btn.hasAttribute('data-pf-up') && row.previousElementSibling) pfList.insertBefore(row, row.previousElementSibling);
+    else if (btn.hasAttribute('data-pf-down') && row.nextElementSibling) pfList.insertBefore(row.nextElementSibling, row);
+    pfSync();
+  });
+  pfSync();
+
   // ---- Fields that still need information ----
   // Checked before the form is sent (the same rules the server applies):
   // every field with a problem gets a red border and the reason under it,
@@ -969,6 +1071,7 @@ $breadcrumbs[] = [$pageTitle, null];
   var summary = document.querySelector('[data-form-summary]');
   function byId(id) { return document.getElementById(id); }
   function markInvalid(el, message) {
+    openFold(el);
     el.classList.add('is-invalid');
     el.setAttribute('aria-invalid', 'true');
     var note = byId(el.id + '-error');
@@ -1020,6 +1123,10 @@ $breadcrumbs[] = [$pageTitle, null];
     if (v('registration_limit') && !(parseInt(v('registration_limit'), 10) >= 1)) add('registration_limit', 'Must be at least 1 (or leave it empty for no limit).');
     if (v('registration_deadline') && v('end_date') && v('registration_deadline') > v('end_date')) add('registration_deadline', 'Must be on or before the end date.');
     if (v('contact_email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v('contact_email'))) add('contact_email', 'Enter a valid email address.');
+    pfList.querySelectorAll('[data-pf-row]').forEach(function (row) {
+      var boxes = row.querySelectorAll('input[type="text"]');
+      if (boxes[0].value.trim() === '' && (boxes[1].value.trim() || boxes[2].value.trim())) add(boxes[0].id, 'Give this part a name (what happens), or remove it.');
+    });
     return problems;
   }
   function focusFirstInvalid() {

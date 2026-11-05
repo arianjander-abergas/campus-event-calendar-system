@@ -703,3 +703,37 @@ td.admin-row-actions > form { gap: 6px; }
 .admin-modal-logo .admin-logo-preview { width: 64px; height: 64px; margin: 0; object-fit: cover; border-radius: 50%; flex-shrink: 0; }
 .admin-modal .acct-modal-actions { margin-top: 18px; }
 @media (prefers-reduced-motion: reduce) { .admin-modal[open] { animation: none; } }
+
+/* ---- Event form: sections 1–9 fold open and shut (<details class="form-fold">) ----
+   Closed, a section is just its numbered band; clicking it opens the fields.
+   A section with a field to fix opens by itself (event-organizer.php). */
+.form-fold > summary { list-style: none; cursor: pointer; border-radius: 10px; }
+.form-fold > summary::-webkit-details-marker { display: none; }
+.form-fold > summary .form-section-head { margin: 0; transition: background 0.15s; }
+.form-fold[open] > summary .form-section-head { margin-bottom: 16px; }
+.form-fold > summary:hover .form-section-head { background: rgba(var(--p-hi-rgb), 0.32); }
+.form-fold > summary:focus-visible { outline: 2px solid var(--p-accent); outline-offset: 2px; }
+.form-fold-chevron { display: inline-flex; flex-shrink: 0; margin-left: auto; color: var(--p-accent); transition: transform 0.2s; }
+.form-fold[open] > summary .form-fold-chevron { transform: rotate(180deg); }
+.form-section.form-fold + .form-section.form-fold { margin-top: 14px; padding-top: 14px; }
+.admin-card-wide { grid-column: 1 / -1; }
+@media (prefers-reduced-motion: reduce) { .form-fold-chevron, .form-fold > summary .form-section-head { transition: none; } }
+
+/* ---- 9. Program Flow: one row per part, in running order ---- */
+.pf-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.pf-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
+.pf-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(var(--p-hi-rgb), 0.3); color: var(--navy); font-size: 0.8rem; font-weight: 800;
+}
+.pf-fields { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr); gap: 8px; }
+.pf-fields .admin-input { margin: 0; }
+.pf-fields .field-error { order: 9; grid-column: 1 / -1; margin: 0; } /* under the row, not between its boxes */
+.pf-tools { display: flex; gap: 4px; flex-shrink: 0; }
+.pf-add { margin-top: 4px; }
+@media (max-width: 760px) {
+  .pf-row { align-items: flex-start; flex-wrap: wrap; }
+  .pf-fields { grid-template-columns: 1fr; flex-basis: calc(100% - 40px); }
+  .pf-tools { margin-left: 36px; }
+}
