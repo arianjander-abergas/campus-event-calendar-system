@@ -71,7 +71,7 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
         <?php foreach ($orgGroups as $deptId => $orgs): ?>
           <optgroup label="<?= htmlspecialchars($deptNames[$deptId] ?? 'Other organizations') ?>" data-department="<?= htmlspecialchars((string) $deptId) ?>">
             <?php foreach ($orgs as $o): ?>
-              <option value="<?= htmlspecialchars($o['id']) ?>" data-department="<?= htmlspecialchars((string) ($o['department_id'] ?? '')) ?>" <?= ($acct['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+              <option value="<?= htmlspecialchars($o['id']) ?>" data-department="<?= htmlspecialchars((string) ($o['department_id'] ?? '')) ?>" <?= ($acct['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
             <?php endforeach; ?>
           </optgroup>
         <?php endforeach; ?>

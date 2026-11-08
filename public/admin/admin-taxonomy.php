@@ -16,6 +16,8 @@ $editDept = $editDeptId !== '' ? get_department_admin($editDeptId) : null;
 $editOrg = $editOrgId !== '' ? get_organization_admin($editOrgId) : null;
 $departments = get_departments();
 $errors = [];
+// Organizations' "Short code" field appears once the organization_codes database update is run.
+$orgCodes = !isset(pending_db_updates()['20261108120000_organization_codes.sql']);
 
 // After a delete: back to the same search and page (only links to this page's own tab are accepted).
 $returnTo = function (string $tab): string {
@@ -96,9 +98,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_orga
         'logo_url' => post_param('logo_url') ?: null,
         'department_id' => post_param('department_id') ?: null,
     ];
+    if ($orgCodes) $fields['code'] = post_param('code') ?: null;
 
     if ($fields['name'] === '') {
         $errors[] = 'Organization name is required.';
+    } elseif (($fields['code'] ?? null) !== null && mb_strlen($fields['code']) > 12) {
+        $errors[] = 'Keep the code short (12 characters or fewer), e.g. UAO.';
     } elseif ($fields['department_id'] !== null && !in_array($fields['department_id'], array_column($departments, 'id'), true)) {
         $errors[] = 'Please choose a department from the list.';
     } else {
@@ -367,7 +372,12 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
           <h2 class="admin-card-title">Add Organization</h2>
 
           <label class="admin-label" for="org_name">Name <span class="req">*</span></label>
-          <input type="text" id="org_name" name="name" class="admin-input" placeholder="e.g. JPSSITE" value="<?= $orgVal('name') ?>" required>
+          <input type="text" id="org_name" name="name" class="admin-input" placeholder="<?= $orgCodes ? 'Full name, e.g. University Ambassadors Organization' : 'e.g. JPSSITE' ?>" value="<?= $orgVal('name') ?>" required>
+
+          <?php if ($orgCodes): ?>
+            <label class="admin-label" for="org_code">Short code</label>
+            <input type="text" id="org_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. UAO" value="<?= $orgVal('code') ?>">
+          <?php endif; ?>
 
           <label class="admin-label" for="org_department">Department</label>
           <select id="org_department" name="department_id" class="admin-input">
@@ -417,7 +427,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                     <?php endif; ?>
                   </td>
                   <td>
-                    <strong><?= htmlspecialchars($o['name']) ?></strong>
+                    <strong><?= htmlspecialchars(organization_label($o)) ?></strong>
                     <?php if (!empty($o['description'])): ?><div class="admin-table-sub"><?= htmlspecialchars(excerpt($o['description'], 70)) ?></div><?php endif; ?>
                   </td>
                   <td><?= !empty($o['departments']) ? htmlspecialchars($o['departments']['code'] ?: $o['departments']['name']) : '<span class="admin-table-sub">None</span>' ?></td>
@@ -426,7 +436,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                   <td class="admin-row-actions">
                     <a href="organization-officers.php?org=<?= urlencode($o['id']) ?>" class="btn-sm btn-sm-accent">Officers</a>
                     <a href="<?= htmlspecialchars($back) ?>&amp;edit_org=<?= urlencode($o['id']) ?>" class="btn-sm" data-edit-open="org-modal"
-                       data-edit="<?= $editData(['id' => $o['id'], 'name' => $o['name'], 'department_id' => $o['department_id'] ?? '', 'description' => $o['description'] ?? '', 'logo_url' => $o['logo_url'] ?? '', 'logo_preview' => !empty($o['logo_url']) ? asset_url($o['logo_url']) : '']) ?>">Edit</a>
+                       data-edit="<?= $editData(['id' => $o['id'], 'name' => $o['name'], 'code' => $o['code'] ?? '', 'department_id' => $o['department_id'] ?? '', 'description' => $o['description'] ?? '', 'logo_url' => $o['logo_url'] ?? '', 'logo_preview' => !empty($o['logo_url']) ? asset_url($o['logo_url']) : '']) ?>">Edit</a>
                     <form method="POST" action="admin-taxonomy.php?tab=organizations" data-confirm="Delete the organization “<?= htmlspecialchars($o['name']) ?>” and its officer list?" data-confirm-title="Delete organization" data-confirm-ok="Delete" data-confirm-tone="danger">
                       <input type="hidden" name="action" value="delete_organization">
                       <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
@@ -458,6 +468,11 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
 
           <label class="admin-label" for="edit_org_name">Name <span class="req">*</span></label>
           <input type="text" id="edit_org_name" name="name" class="admin-input" value="<?= $editVal($orgEdit, 'name') ?>" required>
+
+          <?php if ($orgCodes): ?>
+            <label class="admin-label" for="edit_org_code">Short code</label>
+            <input type="text" id="edit_org_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. UAO" value="<?= $editVal($orgEdit, 'code') ?>">
+          <?php endif; ?>
 
           <label class="admin-label" for="edit_org_department">Department</label>
           <select id="edit_org_department" name="department_id" class="admin-input">
