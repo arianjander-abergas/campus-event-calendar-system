@@ -220,7 +220,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
         <select name="organization">
           <option value="">All organizations</option>
           <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
           <?php endforeach; ?>
         </select>
       </label>

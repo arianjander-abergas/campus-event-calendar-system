@@ -175,7 +175,7 @@ function calendar_time_line(array $ev): string
     <select name="organization" aria-label="Organization">
       <option value="">All organizations</option>
       <?php foreach ($organizations as $o): ?>
-        <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+        <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
       <?php endforeach; ?>
     </select>
     <select name="audience" aria-label="Audience">

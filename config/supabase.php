@@ -553,6 +553,7 @@ const DB_UPDATES = [
     '20261103120000_school_email_and_notifications.sql' => ['School-email-only accounts, required attendance, and notifications by email to the people an event is open to', 'events', 'select=required_for&limit=1'],
     '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
     '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
+    '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
 ];
 
 /**
@@ -3104,7 +3105,8 @@ function get_categories(): array
 
 function get_organizations(): array
 {
-    return supabase_request('organizations', 'select=id,name,logo_url,department_id&order=name.asc');
+    // select=* so it works before and after the organization_codes update adds "code".
+    return supabase_request('organizations', 'select=*&order=name.asc');
 }
 
 // ---- Event programs (the Program Flow) — event form section 9, admin/event-programs.php ---------------
@@ -3581,6 +3583,13 @@ function department_label(?array $department): string
 {
     if (empty($department['name'])) return '—';
     return $department['name'] . (!empty($department['code']) ? ' (' . $department['code'] . ')' : '');
+}
+
+/** "Full Name (CODE)" for an organization, the same way as department_label(). */
+function organization_label(?array $organization): string
+{
+    if (empty($organization['name'])) return '—';
+    return $organization['name'] . (!empty($organization['code']) ? ' (' . $organization['code'] . ')' : '');
 }
 
 /** All departments with how many organizations belong to each. */

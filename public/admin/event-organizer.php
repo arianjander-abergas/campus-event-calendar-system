@@ -508,7 +508,7 @@ $breadcrumbs[] = [$pageTitle, null];
                       <label class="org-option<?= $isOwn ? ' is-locked' : '' ?>">
                         <input type="checkbox" <?= $isOwn ? 'disabled data-own' : 'name="organization_ids[]"' ?> value="<?= htmlspecialchars($o['id']) ?>" data-org-name="<?= htmlspecialchars($o['name']) ?>" <?= $isPicked ? 'checked' : '' ?>>
                         <?php if (!empty($o['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
-                        <span><?= htmlspecialchars($o['name']) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
+                        <span><?= htmlspecialchars(organization_label($o)) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
                       </label>
                     <?php endforeach; ?>
                   </div>
@@ -524,7 +524,7 @@ $breadcrumbs[] = [$pageTitle, null];
                 <label class="admin-label" for="organization_id">Main Organizer <span class="req">*</span></label>
                 <select id="organization_id" name="organization_id" class="admin-input" data-lead-select>
                   <?php foreach ($allOrganizations as $o): ?>
-                    <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+                    <option value="<?= htmlspecialchars($o['id']) ?>" <?= ($f['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
@@ -730,7 +730,7 @@ $breadcrumbs[] = [$pageTitle, null];
         <select name="org" class="admin-input" aria-label="Organization">
           <option value="">Every organization</option>
           <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $orgFilter === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $orgFilter === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
           <?php endforeach; ?>
         </select>
       <?php endif; ?>
