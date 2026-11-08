@@ -35,9 +35,11 @@ if ($eventId !== '') {
 $img = 'assets/images/event-details/';
 $posterUrl = asset_url($event['poster_url'] ?? null, $img . 'event-poster.svg');
 $orgLogo = asset_url($event['organizations']['logo_url'] ?? null, $img . 'org-logo.svg');
-$categoryName = event_category_label($event);
+// No event (a wrong / deleted id, one this person can't see, or no upcoming
+// events for "Next Event"): the page shows "Event not found" below instead.
+$categoryName = $event ? event_category_label($event) : '';
 $orgName = $event['organizations']['name'] ?? 'Organizer';
-$coOrganizers = get_event_partner_orgs([$eventId])[$eventId] ?? []; // multi-organization events
+$coOrganizers = $event ? (get_event_partner_orgs([$eventId])[$eventId] ?? []) : []; // multi-organization events
 
 $going = $event ? get_registration_count($eventId) : 0;
 $myRegistration = $event ? get_my_registration($eventId) : null;

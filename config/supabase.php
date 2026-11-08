@@ -71,8 +71,12 @@ if (($redisUrl = getenv('SESSION_REDIS_URL')) && session_status() === PHP_SESSIO
     }
 }
 
-/** The Redis server shared by every app server (SESSION_REDIS_URL), or null when there isn't one. */
-function shared_redis(): ?Redis
+/**
+ * The Redis server shared by every app server (SESSION_REDIS_URL), or null
+ * when there isn't one. (A Redis object; typed loosely because the redis
+ * extension is only installed on the load-balanced servers, not on XAMPP.)
+ */
+function shared_redis(): ?object
 {
     static $redis = false;
     if ($redis !== false) return $redis;
@@ -642,6 +646,7 @@ const DB_UPDATES = [
     '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
     '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
     '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
+    '20261109120000_event_levels.sql' => ['Event levels (Institutional / Departmental / Organizational) and their colours on the Event Calendar', 'events', 'select=event_level&limit=1'],
 ];
 
 /**
@@ -775,6 +780,28 @@ function audiences_ready(): bool
 
 /** Where an event happens (events.venue_type). Online = webinar. */
 const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', 'online' => 'Online (Webinar)'];
+
+/**
+ * How wide an event is (events.event_level): the whole university, one
+ * department, or one organization. Each has its colour on the Event Calendar.
+ */
+const EVENT_LEVELS = [
+    'institutional' => 'Institutional',
+    'departmental' => 'Departmental',
+    'organizational' => 'Organizational',
+];
+const EVENT_LEVEL_HINTS = [
+    'institutional' => 'University-wide, for the whole LCUP community',
+    'departmental' => 'For one department (e.g. CITE)',
+    'organizational' => 'Held by an organization for its members and guests',
+];
+
+/** An event's level; events saved before levels existed count as organizational. */
+function event_level(array $ev): string
+{
+    $level = (string) ($ev['event_level'] ?? '');
+    return isset(EVENT_LEVELS[$level]) ? $level : 'organizational';
+}
 
 /** Semesters of a school year (academic_terms.semester). */
 const SEMESTERS = ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer'];
@@ -991,7 +1018,9 @@ function session_access_token(): ?string
     $token = $_SESSION['access_token'] ?? null;
     if ($token && ($exp = jwt_expiry($token)) !== null && $exp - time() < 60) {
         supabase_refresh_session();
-        $token = $_SESSION['access_token'] ?? $token;
+        // Renewed: the new token. Network trouble: the old one (still valid a
+        // little longer). Login ended: none.
+        $token = $_SESSION['access_token'] ?? null;
     }
     return $token;
 }
@@ -1014,6 +1043,16 @@ function supabase_refresh_session(): bool
 
     if (!$result['ok'] || empty($result['data']['access_token'])) {
         error_log('[supabase_refresh_session] refresh failed (HTTP ' . $result['status'] . ')');
+        // Supabase no longer knows this login (logged out on another device,
+        // expired, or the account's sessions were ended): end it here too, so
+        // the next page asks to log in instead of loading every page empty.
+        // (Network trouble — no status, or 5xx — keeps the login for a retry.)
+        if (in_array($result['status'], [400, 401, 403], true)) {
+            $_SESSION = [];
+            if (!headers_sent()) session_regenerate_id(true);
+            $GLOBALS['supabase_session_expired'] = true;
+            flash('info', 'Your login has ended (you may have logged out on another device). Please log in again.');
+        }
         return false;
     }
     $_SESSION['access_token'] = $result['data']['access_token'];
@@ -1291,7 +1330,10 @@ function supabase_auth_signout(): void
     presence_clear();
     $accessToken = $_SESSION['access_token'] ?? null;
     if ($accessToken) {
-        supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/logout', [
+        // scope=local: only this browser's login ends. (Supabase's default ends
+        // the account's logins on every device, which broke the pages of anyone
+        // else logged into the same account.)
+        supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/logout?scope=local', [
             'apikey: ' . SUPABASE_ANON_KEY,
             'Authorization: Bearer ' . $accessToken,
         ]);
@@ -1467,6 +1509,11 @@ function current_user(): ?array
             return null;
         }
     }
+    // null if the check above found the login had ended on Supabase's side.
+    if (empty($_SESSION['user']['id']) || empty($_SESSION['access_token'])) {
+        unset($_SESSION['user']);
+        return null;
+    }
     return $_SESSION['user'];
 }
 
@@ -1479,6 +1526,7 @@ function check_session_role(): void
 {
     if (empty($_SESSION['user']['id']) || empty($_SESSION['access_token'])) return;
     $rows = supabase_request('profiles', 'select=role,organization_id&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, session_access_token());
+    if (empty($_SESSION['user']['id'])) return; // the login ended while renewing it (supabase_refresh_session)
     $row = $rows[0] ?? null;
     if (!is_array($row)) {
         // No row and no error: the account is gone (a failed read changes nothing).

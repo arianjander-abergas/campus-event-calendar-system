@@ -89,6 +89,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
     // Required attendance: who must attend (among the people it's open to).
     $requiredFor = isset(REQUIRED_FOR[post_param('required_for')]) ? post_param('required_for') : '';
+    // Event level: institutional / departmental / organizational (its colour on the Event Calendar).
+    $eventLevel = isset(EVENT_LEVELS[post_param('event_level')]) ? post_param('event_level') : 'organizational';
 
     // Organizations: one, or two or more for a multi-organization event. The
     // main organizer (events.organization_id) runs the event — a moderator's
@@ -113,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'category_id' => post_param('category_id'),
         'category_other' => $categoryOther !== '' ? $categoryOther : null,
         'organization_id' => $leadOrg,
+        'event_level' => $eventLevel,
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
         'audience' => $audience,
         'audiences' => $audiences ?: null,
@@ -160,6 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // Same for the "Other" event type and required attendance.
     if (!$fields['category_other'] && empty($previous['category_other'])) unset($fields['category_other']);
     if (!$fields['required_for'] && empty($previous['required_for'])) unset($fields['required_for']);
+    if ($eventLevel === 'organizational' && empty($previous['event_level'])) unset($fields['event_level']);
 
     // Errors are keyed by the field they belong to, so the form can highlight
     // that field and show the reason under it (the first problem per field wins).
@@ -245,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
             // What the database couldn't store yet (a database update not run): the event
             // is saved without it, and the message says what's missing.
-            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience', 'required_for' => 'the required attendance'];
+            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience', 'required_for' => 'the required attendance', 'event_level' => 'the event level'];
             // Without the audiences column, Students / Faculty still go in the older audience field; only Outsiders is lost.
             $dropped = array_filter($result['dropped'] ?? [], fn($c) => $c !== 'audiences' || in_array('outsiders', $audiences, true));
             $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $dropped);
@@ -535,6 +539,19 @@ $breadcrumbs[] = [$pageTitle, null];
                 : 'Your organization runs the event. Pick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
             </p><?= $why('organizations') ?>
           </div>
+
+          <span class="admin-label" id="level-label">Event Level <span class="req">*</span></span>
+          <div class="level-options" role="radiogroup" aria-labelledby="level-label">
+            <?php $formLevel = event_level($f);
+            foreach (EVENT_LEVELS as $key => $label): ?>
+              <label class="level-option level-<?= $key ?>">
+                <input type="radio" name="event_level" value="<?= $key ?>" <?= $formLevel === $key ? 'checked' : '' ?>>
+                <span class="level-swatch" aria-hidden="true"></span>
+                <span><strong><?= $label ?></strong><small><?= htmlspecialchars(EVENT_LEVEL_HINTS[$key]) ?></small></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+          <p class="admin-hint">The event's colour on the Event Calendar: light blue for institutional, lavender for departmental, light yellow for organizational.</p>
         </details>
 
         <details class="form-section form-fold"<?= $openIf('audiences') ?>>
