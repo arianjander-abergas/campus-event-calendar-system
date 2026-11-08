@@ -26,7 +26,7 @@ date_default_timezone_set('Asia/Manila');
 // ---- School identity --------------------------------------------------------
 // Shown in the header, sidebar, footer, login pages and on every printout.
 const SCHOOL_NAME = 'La Consolacion University Philippines';
-// IMAGE SLOT: school logo | file: public/assets/images/school-logo.png | square, 256×256 or larger
+// IMAGE SLOT: site logo (Campus Event Hub hand + magnifier) | file: public/assets/images/school-logo.png | square, 512×512
 // Replace the file with a new logo (keep the file name). Transparent PNG works best.
 const SCHOOL_LOGO = 'assets/images/school-logo.png';
 /** Light (Orange) version for dark backgrounds: sidebar, phone top bar, footer, login cards. */
@@ -38,6 +38,38 @@ const SCHOOL_LOGO_LIGHT = 'assets/images/school-logo-light.png';
 // includes/*.php) are loaded from pages in different subfolders, so they
 // build links as BASE_URL . '/auth/login.php' instead of relative paths.
 define('BASE_URL', getenv('APP_BASE_URL') ?: detect_base_url());
+
+/** The site is opened over HTTPS (directly, or behind a host's proxy such as Render). */
+function is_https_request(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+}
+
+/** Opened on this computer (XAMPP): PHP errors are shown on the page there, and only there. */
+function is_local_request(): bool
+{
+    $host = strtolower(preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
+    return in_array($host, ['localhost', '127.0.0.1', '[::1]'], true);
+}
+
+// Every page and API answer: safety headers, and no error details (file paths,
+// code) shown to visitors once the site is online — they go to the error log.
+if (PHP_SAPI !== 'cli' && !headers_sent()) {
+    header_remove('X-Powered-By');                                      // don't advertise the PHP version
+    header('X-Content-Type-Options: nosniff');                          // files are only what they say they are
+    header('X-Frame-Options: SAMEORIGIN');                              // other sites can't frame the pages (clickjacking)
+    header("Content-Security-Policy: frame-ancestors 'self'; base-uri 'self'; object-src 'none'");
+    header('Referrer-Policy: strict-origin-when-cross-origin');         // links out don't leak page addresses
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()');
+    if (is_https_request()) {
+        header('Strict-Transport-Security: max-age=31536000');          // browsers always use HTTPS from then on
+    }
+    if (!is_local_request()) {
+        ini_set('display_errors', '0');
+        ini_set('log_errors', '1');
+    }
+}
 
 function detect_base_url(): string
 {
@@ -67,7 +99,10 @@ function detect_base_url(): string
 //          Created automatically by the handle_new_user() trigger on sign-up; only admins
 //          can change `role` (protect_profile_role() trigger), moderators can't change their
 //          organization, and the student/faculty choice is fixed once made.
-// school_ids(user_id -> profiles, school_id unique e.g. '2023-00123', verified_at, verified_by)
+//          is_super_admin: the protected Super Admin (Arian Abergas), set only in the SQL Editor. Changing
+//          your own saved details needs a Super Admin's approval (profile_change_requests); filling in
+//          empty ones doesn't (guard_profile_changes() trigger, and the same on school_ids).
+// school_ids(user_id -> profiles, school_id unique e.g. '23-3170-870', verified_at, verified_by)
 //          Kept apart from profiles (which everyone can read): visible to the student, admins,
 //          and moderators whose events the student joined.
 // organizations(id, name unique, description, logo_url, department_id -> departments,
@@ -84,7 +119,13 @@ function detect_base_url(): string
 //        is_published (false only for drafts), send_notification,
 //        status['draft'|'published'|'cancelled'|'completed'], created_by, created_at, updated_at,
 //        audience['students'|'faculty'|'all'], venue_type['on_campus'|'off_campus'|'online'],
-//        year_levels int2[] (student year levels that may register; empty = all))
+//        year_levels int2[] (student year levels that may register; empty = all),
+//        category_other text (the event type typed in when the category is "Other"),
+//        approval_status[null|'needed'|'pending'|'approved'|'rejected'], approval_note,
+//        approval_requested_at, approval_reviewed_by, approval_reviewed_at)
+//        Admins' (moderator role) new events need a Super Admin's approval: publishing
+//        one keeps it a draft with approval_status 'pending' (trg_events_approval).
+//        event_type is no longer picked on the form: it follows the category's name.
 //        Categories/organizations can't be deleted while an event uses them (ON DELETE RESTRICT).
 //        trg_events_venue_type keeps venue_type = 'online' exactly when is_online is true.
 //        trg_events_schedule_rules refuses the same title on the same date (DUPLICATE_EVENT) and
@@ -106,19 +147,31 @@ function detect_base_url(): string
 // event_report (view): one row per non-draft event with category, organization,
 //        department, school_year, semester and registration / attendance / evaluation totals.
 // notifications(id, event_id, user_id, title, message, status['pending'|'sent'|'failed'|'read'],
-//        created_at, sent_at)
+//        created_at, sent_at, email_pending, email_attempts, email_retry_at, emailed_at, email_error)
+//        -- new ones are also emailed by the site (see EMAIL below)
+// allowed_email_exceptions(email, note) -- non-school addresses that may still have accounts
+//        (SQL Editor only). enforce_school_email() trigger on auth.users: new accounts and
+//        changed addresses must be @email.lcup.edu.ph or on this list.
+// events.required_for['everyone'|'members'|'department'|null] -- required attendance
+// profile_change_requests(id, user_id, changes jsonb {column: new value, school_id}, status['pending'|
+//        'approved'|'rejected'|'withdrawn'], review_note, reviewed_by, reviewed_at) -- one pending per
+//        account; decided only by review_profile_change(), which applies approved changes.
 // user_presence(user_id, last_seen_at) -- Active Users heartbeat (only via functions)
 // Storage buckets (public read, admin upload): event-posters, org-logos, officer-photos.
 // Functions: site_stats(), event_registration_counts(), touch_presence(), clear_presence(),
-//        notify_event(event_id, audience 'all'|'registered', title, message), is_admin(),
+//        notify_event(event_id, audience 'open'|'open_others'|'required'|'registered', title, message),
+//        email_allowed(email), event_open_to(event, profile), event_required_for(event, profile),
+//        my_required_events(), pending_notification_emails(limit), mark_notification_emails(ids, error),
+//        is_admin(),
 //        is_moderator(), can_manage_event(org id), can_manage_event_id(event id),
 //        school_period(date) -> (school_year, semester),
 //        submit_event_evaluation(event_id, answers jsonb), school_id_taken(text),
-//        complete_ended_events().
+//        complete_ended_events(), is_super_admin(), review_profile_change(request, approve, note).
 // Roles: admin = everything. moderator = the events of their own organization (create, edit,
 //        publish, cancel — not delete), their schedules, registrations, attendance, printouts,
 //        evaluation results and attendance imports, plus their organization's officers.
-//        user = student or faculty.
+//        user = student or faculty. The super admin is an admin who also approves the other
+//        admins' new events and everyone's profile edits.
 
 // =============================================================================
 // HTTP LAYER
@@ -398,6 +451,13 @@ function format_event_date(?string $date): string
     return $ts ? date('M j, Y', $ts) : $date;
 }
 
+/** A moment (timestamptz) in school time: 'Oct 17, 2026 · 10:30 AM'; empty -> '—'. */
+function format_timestamp(?string $timestamp): string
+{
+    $ts = $timestamp ? strtotime($timestamp) : false;
+    return $ts ? date('M j, Y · g:i A', $ts) : '—';
+}
+
 /** '13:30:00' -> '1:30 PM'; empty -> ''. */
 function format_event_time(?string $time): string
 {
@@ -440,6 +500,25 @@ function is_long_event(array $ev): bool
     return $s && $e && ($e - $s) / 86400 >= 7;
 }
 
+/**
+ * Where an event is right now (Philippine time): 'upcoming' (hasn't
+ * started), 'ongoing' (started, not ended yet) or 'done' (ended, completed
+ * or cancelled). No start time = from the start of the start date; no end
+ * time = until the end of the end date.
+ */
+function event_phase(array $ev): string
+{
+    if (in_array($ev['status'] ?? '', ['completed', 'cancelled'], true)) return 'done';
+    $startDate = (string) ($ev['start_date'] ?? '');
+    $endDate = (string) (($ev['end_date'] ?? '') ?: $startDate);
+    $start = strtotime($startDate . ' ' . (!empty($ev['start_time']) ? $ev['start_time'] : '00:00:00'));
+    $end = !empty($ev['end_time']) ? strtotime($endDate . ' ' . $ev['end_time']) : strtotime($endDate . ' +1 day');
+    $now = time();
+    if ($end && $now >= $end) return 'done';
+    if ($start && $now >= $start) return 'ongoing';
+    return 'upcoming';
+}
+
 /** Venue, or "Online" for online events. */
 function event_place(array $ev): string
 {
@@ -451,7 +530,7 @@ function event_categories_line(array $ev): string
 {
     $parts = [];
     if (!empty($ev['venue_type'])) $parts[] = label_of(VENUE_TYPES, $ev['venue_type'], '');
-    if (!empty($ev['audience'])) $parts[] = 'For ' . label_of(EVENT_AUDIENCES, $ev['audience'], '');
+    if (!empty($ev['audience']) || !empty($ev['audiences'])) $parts[] = 'For ' . event_audience_label($ev);
     return implode(' · ', array_filter($parts));
 }
 
@@ -477,13 +556,60 @@ function take_flashes(): array
 }
 
 /** HTML for all pending flash messages (types: success | error | info). */
+/**
+ * This version's database updates (supabase/migrations), oldest first: file =>
+ * [what it switches on, a quick check — table + query, or 'rpc' + function name + its arguments].
+ * A table check with 'rows' at the end is for data-only updates: needed until the query finds a row.
+ */
+const DB_UPDATES = [
+    '20260930120000_solis_suggestions.sql' => ['Admins, School IDs, year levels and the duplicate checks', 'profiles', 'select=account_type&limit=1'],
+    '20261015120000_manage_events_update.sql' => ['The "Other" type of event and multi-organization events', 'events', 'select=category_other&limit=1'],
+    '20261017120000_super_admin_approvals.sql' => ['Approvals of new events and profile edits', 'profiles', 'select=is_super_admin&limit=1'],
+    '20261018090000_three_role_levels.sql' => ['Admin / Super Admin roles and deleting accounts', 'rpc', 'delete_account', ['p_user' => '00000000-0000-0000-0000-000000000000']],
+    '20261018120000_approval_notes.sql' => ['Super Admins\' notes on waiting profile edits', 'rpc', 'note_profile_change', ['p_request' => '00000000-0000-0000-0000-000000000000', 'p_note' => '']],
+    '20261018150000_audiences_and_evaluation_form.sql' => ['Students / Faculty / Outsiders audiences, and Admins editing the evaluation form', 'events', 'select=audiences&limit=1'],
+    '20261022120000_evaluation_form_parts.sql' => ['The school\'s evaluation form (Parts I–IV)', 'evaluation_questions', 'select=id&is_active=eq.true&section=eq.Part%20I%3A%20Activity%20Experience&limit=1', 'rows'],
+    '20261103120000_school_email_and_notifications.sql' => ['School-email-only accounts, required attendance, and notifications by email to the people an event is open to', 'events', 'select=required_for&limit=1'],
+    '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
+    '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
+    '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
+];
+
+/**
+ * The database updates that haven't been run yet (file => what it switches on).
+ * Checked at most every 5 minutes per session ($fresh: now).
+ */
+function pending_db_updates(bool $fresh = false): array
+{
+    session_start_once();
+    $cache = $_SESSION['db_updates_pending'] ?? null;
+    if (!$fresh && is_array($cache) && $cache['at'] > time() - 300) return $cache['pending'];
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $pending = [];
+    foreach (DB_UPDATES as $file => $update) {
+        [$label, $table, $check, $args] = $update + [3 => []];
+        if ($table === 'rpc') {
+            // Called without a login: "permission denied" = the function is there.
+            supabase_rpc($check, $args);
+            $missing = str_contains(supabase_last_error(), 'Could not find the function');
+        } else {
+            $rows = supabase_request($table, $check);
+            $missing = supabase_last_error() !== '' || ($args === 'rows' && !$rows);
+        }
+        if ($missing) $pending[$file] = $label;
+    }
+    $GLOBALS['supabase_last_error'] = $lastError;
+    $_SESSION['db_updates_pending'] = ['pending' => $pending, 'at' => time()];
+    return $pending;
+}
+
 function render_flashes(): string
 {
     $html = '';
-    // Tell admins when the database is missing this version's columns.
-    if (schema_outdated() && is_admin_user()) {
+    // Tell Super Admins when the database is missing an update this version needs.
+    if (is_admin_user() && ($pending = pending_db_updates())) {
         $html .= '<div class="flash flash-info db-banner" role="status"><span><strong>Database update needed.</strong> '
-            . 'Moderators, School IDs, year levels and the duplicate checks turn on once it\'s run.</span> '
+            . htmlspecialchars(count($pending) === 1 ? reset($pending) . ' turn on once it\'s run.' : count($pending) . ' updates haven\'t been run yet: ' . implode('; ', $pending) . '.') . '</span> '
             . '<a href="' . htmlspecialchars(BASE_URL . '/admin/database-update.php') . '" class="btn btn-primary">Run the update</a></div>';
     }
     foreach (take_flashes() as $f) {
@@ -534,8 +660,49 @@ function is_uuid(?string $value): bool
 
 const EVENT_TYPES = ['academic' => 'Academic', 'seminar' => 'Seminar', 'workshop' => 'Workshop', 'sports' => 'Sports', 'cultural' => 'Cultural', 'other' => 'Other'];
 
-/** Who an event is for (events.audience). */
+/** Who an event is for (events.audience — the older single choice, kept for the reports). */
 const EVENT_AUDIENCES = ['students' => 'Students', 'faculty' => 'Faculty', 'all' => 'Students & Faculty'];
+
+/**
+ * Who an event is for, any of these (events.audiences — migration
+ * 20261018150000_audiences_and_evaluation_form.sql). Outsiders: people from
+ * outside the school.
+ */
+const AUDIENCE_GROUPS = ['students' => 'Students', 'faculty' => 'Faculty', 'outsiders' => 'Outsiders'];
+
+/** An event's audiences: events.audiences, or (older events) what events.audience says. @return string[] */
+function event_audiences(array $ev): array
+{
+    $groups = array_values(array_intersect(array_keys(AUDIENCE_GROUPS), (array) ($ev['audiences'] ?? [])));
+    if ($groups) return $groups;
+    return match ($ev['audience'] ?? 'students') {
+        'all' => ['students', 'faculty'],
+        'faculty' => ['faculty'],
+        default => ['students'],
+    };
+}
+
+/** "Students, Faculty & Outsiders". */
+function event_audience_label(array $ev): string
+{
+    $labels = array_map(fn($g) => AUDIENCE_GROUPS[$g], event_audiences($ev));
+    $last = array_pop($labels);
+    return ($labels ? implode(', ', $labels) . ' & ' : '') . $last;
+}
+
+/** The older single value for these audiences: students | faculty | all (Outsiders only counts as all). */
+function audience_value(array $groups): string
+{
+    $students = in_array('students', $groups, true);
+    $faculty = in_array('faculty', $groups, true);
+    return $students && !$faculty ? 'students' : ($faculty && !$students ? 'faculty' : 'all');
+}
+
+/** True once events.audiences exists (the database update has been run). */
+function audiences_ready(): bool
+{
+    return !isset(pending_db_updates()['20261018150000_audiences_and_evaluation_form.sql']);
+}
 
 /** Where an event happens (events.venue_type). Online = webinar. */
 const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', 'online' => 'Online (Webinar)'];
@@ -549,6 +716,20 @@ function label_of(array $labels, ?string $key, string $default = '—'): string
     return $labels[(string) $key] ?? $default;
 }
 
+/** True for the catch-all "Other" category (its events say what they are in events.category_other). */
+function is_other_category(?string $name): bool
+{
+    return strcasecmp(trim((string) $name), 'Other') === 0;
+}
+
+/** An event's category for display — the typed-in event type when the category is "Other". */
+function event_category_label(array $ev, string $default = 'Event'): string
+{
+    $name = $ev['categories']['name'] ?? label_of(EVENT_TYPES, $ev['event_type'] ?? null, $default);
+    $custom = trim((string) ($ev['category_other'] ?? ''));
+    return $custom !== '' && is_other_category($name) ? $custom : $name;
+}
+
 /** Kinds of account (profiles.account_type) and of student (profiles.student_type). */
 const ACCOUNT_TYPES = ['student' => 'Student', 'faculty' => 'Faculty'];
 const STUDENT_TYPES = ['regular' => 'Regular', 'irregular' => 'Irregular'];
@@ -556,8 +737,12 @@ const STUDENT_TYPES = ['regular' => 'Regular', 'irregular' => 'Irregular'];
 /** Student year levels (profiles.year_level = the HIGHEST one; events.year_levels). */
 const YEAR_LEVELS = [1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', 5 => '5th Year'];
 
-/** Roles (profiles.role). 'user' shows as Student or Faculty (see role_display()). */
-const ROLES = ['user' => 'Student / Faculty', 'moderator' => 'Moderator', 'admin' => 'Admin'];
+/**
+ * Roles (profiles.role) and how they're shown: 'user' as Student or Faculty
+ * (see role_display()), 'moderator' as Admin (their organization's events),
+ * 'admin' as Super Admin (everything, and approvals).
+ */
+const ROLES = ['user' => 'Student / Faculty', 'moderator' => 'Admin', 'admin' => 'Super Admin'];
 
 /** 3 -> '3rd' */
 function ordinal(int $n): string
@@ -617,20 +802,21 @@ function student_year_line(array $profile): string
 }
 
 // ---- School ID ---------------------------------------------------------------
-// Stored uppercase without spaces. Letters, digits and dashes, 4-20 characters,
-// with at least 4 digits (e.g. 2023-00123). Change SCHOOL_ID_EXAMPLE (and the
-// check in valid_school_id()) to the registrar's exact format when known.
-const SCHOOL_ID_EXAMPLE = '2023-00123';
+// The registrar's format: 2 digits, 4 digits, 3 digits — 23-3170-870. Spaces
+// are dropped, and the dashes are added when only the 9 digits are typed
+// (233170870 -> 23-3170-870). IDs saved before this format was required stay
+// valid until they're changed (validate_account_fields()).
+const SCHOOL_ID_EXAMPLE = '23-3170-870'; // also checked in the browser by assets/js/account.js
 
 function normalize_school_id(?string $value): string
 {
-    return strtoupper(preg_replace('/\s+/', '', (string) $value));
+    $id = strtoupper(preg_replace('/\s+/', '', (string) $value));
+    return preg_match('/^\d{9}$/', $id) ? substr($id, 0, 2) . '-' . substr($id, 2, 4) . '-' . substr($id, 6) : $id;
 }
 
 function valid_school_id(string $normalized): bool
 {
-    return (bool) preg_match('/^[A-Z0-9][A-Z0-9-]{3,19}$/', $normalized)
-        && preg_match_all('/\d/', $normalized) >= 4;
+    return (bool) preg_match('/^\d{2}-\d{4}-\d{3}$/', $normalized);
 }
 
 /** Whether another account already uses this school ID (the database answers without saying whose). */
@@ -660,17 +846,59 @@ function recall_form(string $key): ?array
     return is_array($state) ? $state : null;
 }
 
+// ---- Forms: save once -------------------------------------------------------
+// A form that adds something carries a one-time token (form_once_field()).
+// After it's saved, form_once_saved() remembers the token with what was
+// sent; if the very same form arrives again (a double click got through),
+// form_once_repeat() says so and the page skips saving it a second time.
+
+function form_once_field(): string
+{
+    return '<input type="hidden" name="form_once" value="' . bin2hex(random_bytes(12)) . '">';
+}
+
+/** The token and what was sent with it (minus the token). */
+function form_once_key(): ?string
+{
+    $token = $_POST['form_once'] ?? '';
+    if (!is_string($token) || !preg_match('/^[0-9a-f]{24}$/', $token)) return null;
+    $sent = $_POST;
+    unset($sent['form_once']);
+    return $token . ':' . md5(serialize($sent));
+}
+
+function form_once_repeat(): bool
+{
+    session_start_once();
+    $key = form_once_key();
+    return $key !== null && in_array($key, $_SESSION['form_once'] ?? [], true);
+}
+
+function form_once_saved(): void
+{
+    session_start_once();
+    if (($key = form_once_key()) === null) return;
+    $_SESSION['form_once'] = array_slice(array_merge($_SESSION['form_once'] ?? [], [$key]), -30);
+}
+
 // =============================================================================
 // SESSION & AUTH
 // =============================================================================
 
 function session_start_once(): void
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) {
+    // While the assistant waits for Claude's answer it lets go of the session
+    // (assistant_handle() in includes/assistant.php), so the user's other pages
+    // aren't held up; it stays closed until the assistant reopens it to save.
+    if (session_status() !== PHP_SESSION_ACTIVE && empty($GLOBALS['session_detached'])) {
         // HttpOnly: scripts can't read the login cookie. SameSite=Lax: the
         // browser won't send it with form posts from other websites, so
         // another site can't trigger admin actions (CSRF).
-        session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax']);
+        // Secure (on HTTPS): the cookie is never sent over plain http.
+        // Strict mode: a session ID the server didn't create is refused.
+        session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax', 'secure' => is_https_request()]);
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
         session_start();
     }
 }
@@ -729,7 +957,92 @@ function auth_error_message(array $result, string $fallback): string
 {
     $data = is_array($result['data']) ? $result['data'] : [];
     $msg = $data['error_description'] ?? $data['msg'] ?? $data['message'] ?? $data['error'] ?? $fallback;
-    return is_string($msg) ? $msg : $fallback;
+    if (!is_string($msg)) return $fallback;
+    // The database refused the new account (enforce_school_email()).
+    if (str_contains($msg, 'Database error saving new user') || str_contains($msg, 'SCHOOL_EMAIL_ONLY')) {
+        return school_email_rule_message();
+    }
+    if (stripos($msg, 'already registered') !== false) {
+        return 'An account with that email already exists. Log in, or use "Forgot Password?" if you don\'t remember the password.';
+    }
+    if (($data['error_code'] ?? '') === 'over_email_send_rate_limit' || stripos($msg, 'rate limit') !== false) {
+        return 'Too many emails were sent just now. Please wait a few minutes and try again.';
+    }
+    // Supabase couldn't send the email: its built-in sender only emails the
+    // project's own team until custom SMTP is set, or the SMTP settings are wrong.
+    if (($data['error_code'] ?? '') === 'email_address_not_authorized' || str_contains($msg, 'cannot be used as it is not authorized')
+        || stripos($msg, 'error sending') !== false) {
+        error_log('[auth] ' . $msg . ' — check Supabase → Authentication → Emails → SMTP Settings');
+        return 'The email couldn\'t be sent right now. Please try again later, and if it keeps happening, tell the site\'s admin (the site\'s email sender isn\'t set up yet).';
+    }
+    return $msg;
+}
+
+// ---- School email accounts -------------------------------------------------
+// New accounts (sign-up and Google) must use an LCUP school email; the
+// database refuses any other address (enforce_school_email(), migration
+// 20261103120000). Existing accounts with another address can't log in any
+// more, except Super Admins and the addresses in allowed_email_exceptions
+// (added in the Supabase SQL Editor).
+const SCHOOL_EMAIL_DOMAIN = 'email.lcup.edu.ph';
+
+/** 'juan.delacruz@email.lcup.edu.ph' -> true; gmail.com, subdomains and look-alikes -> false. */
+function is_school_email(?string $email): bool
+{
+    $email = strtolower(trim((string) $email));
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false
+        && (bool) preg_match('/^[a-z0-9._%+\'-]+@' . preg_quote(SCHOOL_EMAIL_DOMAIN, '/') . '$/', $email);
+}
+
+function school_email_rule_message(): string
+{
+    return 'Only LCUP school emails (ending in @' . SCHOOL_EMAIL_DOMAIN . ') can be used. Other addresses, like a personal @gmail.com, aren\'t allowed.';
+}
+
+/** A school email, or an exception added by a Super Admin in the SQL Editor (the database's email_allowed()). */
+function email_allowed(?string $email): bool
+{
+    if (is_school_email($email)) return true;
+    if (trim((string) $email) === '') return false;
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $result = supabase_rpc('email_allowed', ['p_email' => strtolower(trim((string) $email))]);
+    $GLOBALS['supabase_last_error'] = $lastError;
+    return $result['ok'] && $result['data'] === true;
+}
+
+/** Who may sign in: school emails and exceptions — and Super Admins with any address. */
+function account_may_sign_in(?string $email, ?string $role): bool
+{
+    return $role === 'admin' || email_allowed($email);
+}
+
+/** Message for an existing account that isn't allowed to sign in any more. */
+function blocked_account_message(): string
+{
+    return 'This account can\'t log in: only LCUP school emails (@' . SCHOOL_EMAIL_DOMAIN . ') are allowed now. Create a new account with your school email, or ask a Super Admin for help.';
+}
+
+/** Where the emailed links (confirming a new account, resetting a password) come back to. */
+function auth_callback_url(string $type = ''): string
+{
+    return app_url('auth/callback.php' . ($type !== '' ? '?type=' . rawurlencode($type) : ''));
+}
+
+/**
+ * Send the "confirm your email" message again (Supabase sends it; the link
+ * comes back to auth/callback.php). Same answer whether or not the address
+ * has an account.
+ */
+function supabase_auth_resend_confirmation(string $email): array
+{
+    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/resend?redirect_to=' . rawurlencode(auth_callback_url('signup')), [
+        'apikey: ' . SUPABASE_ANON_KEY,
+        'Content-Type: application/json',
+    ], ['type' => 'signup', 'email' => strtolower(trim($email))]);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => auth_error_message($result, 'Could not send the email. Please try again in a few minutes.')];
+    }
+    return ['ok' => true, 'message' => 'If that address has an account waiting to be confirmed, a new confirmation link is on its way. Check your inbox and spam folder.'];
 }
 
 /**
@@ -743,7 +1056,12 @@ function auth_error_message(array $result, string $fallback): string
  */
 function supabase_auth_signup(string $email, string $password, string $fullName, array $profile = []): array
 {
-    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/signup', [
+    $email = strtolower(trim($email));
+    if (!email_allowed($email)) {
+        return ['ok' => false, 'message' => school_email_rule_message()];
+    }
+    // With "Confirm email" on, Supabase emails a link that comes back to auth/callback.php.
+    $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/signup?redirect_to=' . rawurlencode(auth_callback_url('signup')), [
         'apikey: ' . SUPABASE_ANON_KEY,
         'Content-Type: application/json',
     ], [
@@ -772,21 +1090,30 @@ function supabase_auth_signup(string $email, string $password, string $fullName,
     }
     // With "Confirm email" on, there's no session until the emailed link is clicked.
     if (empty($data['access_token'])) {
-        return ['ok' => true, 'message' => 'Account created. Please check your email to confirm it before logging in.', 'needsEmailConfirmation' => true];
+        return ['ok' => true, 'message' => 'We sent a confirmation link to ' . $email . '. Open it to activate your account (check your spam folder too).', 'needsEmailConfirmation' => true];
     }
     start_user_session($user, $data['access_token'], $data['refresh_token'] ?? null);
     return ['ok' => true, 'message' => 'Account created.'];
 }
 
-/** Log in with email + password and store the session. */
+/**
+ * Log in with email + password and store the session. Accounts whose email
+ * isn't confirmed yet are told so ('unconfirmed' => true, to offer a new
+ * link); accounts that may not sign in any more are logged straight out.
+ */
 function supabase_auth_signin(string $email, string $password): array
 {
     $result = supabase_http('POST', rtrim(SUPABASE_URL, '/') . '/auth/v1/token?grant_type=password', [
         'apikey: ' . SUPABASE_ANON_KEY,
         'Content-Type: application/json',
-    ], ['email' => $email, 'password' => $password]);
+    ], ['email' => strtolower(trim($email)), 'password' => $password]);
 
     if (!$result['ok']) {
+        $data = is_array($result['data']) ? $result['data'] : [];
+        $raw = (string) ($data['error_description'] ?? $data['msg'] ?? $data['message'] ?? '');
+        if (($data['error_code'] ?? '') === 'email_not_confirmed' || stripos($raw, 'not confirmed') !== false) {
+            return ['ok' => false, 'unconfirmed' => true, 'message' => 'Please confirm your email first: open the link we sent to ' . strtolower(trim($email)) . ' (check your spam folder too).'];
+        }
         return ['ok' => false, 'message' => auth_error_message($result, 'Invalid email or password.')];
     }
     $data = $result['data'];
@@ -794,13 +1121,18 @@ function supabase_auth_signin(string $email, string $password): array
         return ['ok' => false, 'message' => 'Unexpected response from the sign-in server.'];
     }
     start_user_session($data['user'], $data['access_token'], $data['refresh_token'] ?? null);
+    if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+        supabase_auth_signout();
+        return ['ok' => false, 'message' => blocked_account_message()];
+    }
     return ['ok' => true, 'message' => 'Logged in.'];
 }
 
 /**
- * Start a session from tokens Supabase put in the URL after Google sign-in
- * or a password-reset link (see auth/callback.php). The token is checked
- * with Supabase before it's trusted.
+ * Start a session from tokens Supabase put in the URL after Google sign-in,
+ * a confirmation link or a password-reset link (see auth/callback.php). The
+ * token is checked with Supabase before it's trusted, and the account must
+ * be allowed to sign in (school email, exception, or Super Admin).
  */
 function supabase_session_from_tokens(string $accessToken, ?string $refreshToken): array
 {
@@ -812,6 +1144,11 @@ function supabase_session_from_tokens(string $accessToken, ?string $refreshToken
         return ['ok' => false, 'message' => 'This sign-in link is invalid or has expired. Please try again.'];
     }
     start_user_session($result['data'], $accessToken, $refreshToken);
+    if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+        $viaGoogle = ($result['data']['app_metadata']['provider'] ?? '') === 'google';
+        supabase_auth_signout();
+        return ['ok' => false, 'message' => $viaGoogle ? 'Use your LCUP Google account (@' . SCHOOL_EMAIL_DOMAIN . '). ' . school_email_rule_message() : blocked_account_message()];
+    }
     return ['ok' => true, 'message' => 'Logged in.'];
 }
 
@@ -840,21 +1177,42 @@ function supabase_auth_update_password(string $newPassword): array
     return ['ok' => true, 'message' => 'Password updated.'];
 }
 
-/** Whether a sign-in provider (e.g. 'google') is switched on in Supabase Auth. */
-function auth_provider_enabled(string $provider): bool
+/** Supabase Auth's public settings (sign-in providers, whether emails must be confirmed). [] if unreachable. */
+function auth_settings(): array
 {
     static $settings = null;
     if ($settings === null) {
         $result = supabase_http('GET', rtrim(SUPABASE_URL, '/') . '/auth/v1/settings', ['apikey: ' . SUPABASE_ANON_KEY]);
         $settings = $result['ok'] && is_array($result['data']) ? $result['data'] : [];
     }
-    return !empty($settings['external'][$provider]);
+    return $settings;
 }
 
-/** Where the "Google" button sends people (Supabase handles the Google part). */
+/** Whether a sign-in provider (e.g. 'google') is switched on in Supabase Auth. */
+function auth_provider_enabled(string $provider): bool
+{
+    return !empty(auth_settings()['external'][$provider]);
+}
+
+/** Whether new accounts must confirm their email (Supabase: Authentication → Sign In / Providers → Email → Confirm email). null = unknown. */
+function auth_requires_email_confirmation(): ?bool
+{
+    $settings = auth_settings();
+    return array_key_exists('mailer_autoconfirm', $settings) ? !$settings['mailer_autoconfirm'] : null;
+}
+
+/**
+ * Where the "Google" button sends people (Supabase handles the Google part).
+ * hd=* asks Google to offer school / work accounts only, not personal Gmail.
+ * (Not hd=email.lcup.edu.ph: Google matches it against the school's main
+ * Google domain, which may be a different one, and would then hide the
+ * students' accounts.) auth/callback.php and the database refuse any address
+ * that isn't @email.lcup.edu.ph.
+ */
 function google_signin_url(): string
 {
-    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&redirect_to=' . rawurlencode(app_url('auth/callback.php'));
+    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&hd=*'
+        . '&redirect_to=' . rawurlencode(auth_callback_url());
 }
 
 /** Log out: Active Users -1, revoke the Supabase refresh token, clear the session. */
@@ -912,31 +1270,173 @@ function reload_session_profile(): void
         $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
         unset($row['school_ids']);
         $row['schema_ready'] = $schemaReady;
+        // Read on its own: before migration 20261017120000_super_admin_approvals.sql the column
+        // doesn't exist, and that mustn't stop the rest of the profile from loading.
+        $flag = supabase_request('profiles', 'select=is_super_admin' . $id, 'GET', null, $_SESSION['access_token'] ?? null);
+        $row['is_super_admin'] = !empty($flag[0]['is_super_admin']);
+        $GLOBALS['supabase_last_error'] = '';
         $_SESSION['user'] = array_merge($_SESSION['user'], $row);
+        // School emails only (Super Admins and exceptions excepted) — only
+        // decided when the profile could be read, so a failed read never
+        // locks anyone out.
+        $_SESSION['user']['sign_in_allowed'] = account_may_sign_in($_SESSION['user']['email'] ?? '', $_SESSION['user']['role'] ?? 'user');
     }
     $_SESSION['user_checked_at'] = time();
+}
+
+/** Appearance chosen with the top bar's switcher (includes/theme-switch.php), kept in the "theme" cookie. */
+const THEMES = ['light' => 'Light', 'dim' => 'Dim', 'dark' => 'Dark'];
+
+function current_theme(): string
+{
+    $theme = is_string($_COOKIE['theme'] ?? null) ? $_COOKIE['theme'] : 'light';
+    return isset(THEMES[$theme]) ? $theme : 'light';
+}
+
+/**
+ * <head> tags that make the site installable on phones ("Add to Home
+ * screen" / "Install app"): the app manifest, icons, the browser-bar colour
+ * and assets/js/app.js (the service worker and the Install app button).
+ */
+function app_head_tags(): string
+{
+    $b = htmlspecialchars(BASE_URL);
+    return '<link rel="manifest" href="' . $b . '/manifest.json">' . "\n"
+        . '<meta name="theme-color" content="#213e60">' . "\n"
+        . '<link rel="icon" type="image/png" sizes="192x192" href="' . $b . '/assets/images/app/icon-192.png">' . "\n"
+        . '<link rel="apple-touch-icon" href="' . $b . '/assets/images/app/apple-touch-icon.png">' . "\n"
+        . '<meta name="mobile-web-app-capable" content="yes">' . "\n"
+        . '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n"
+        . '<meta name="apple-mobile-web-app-title" content="Event Hub">' . "\n"
+        . '<script src="' . $b . '/assets/js/app.js?v=' . (int) @filemtime(__DIR__ . '/../public/assets/js/app.js') . '" defer></script>';
+}
+
+const SITE_NAME = 'Campus Event Hub';
+const SITE_DESCRIPTION = 'Campus Event Hub is the official event calendar of La Consolacion University Philippines (LCUP): '
+    . 'browse upcoming seminars, workshops, sports and cultural events, register online, and get notified about campus activities.';
+
+/**
+ * Tags that let search engines (Google) and link previews (Messenger,
+ * Facebook) show a public page properly: description, canonical address,
+ * Open Graph / Twitter card and, on the home page, the site's structured
+ * data. Set APP_ORIGIN (e.g. https://eventhub.lcup.edu.ph) on the live
+ * server so every address uses the real domain.
+ * $path: the page, relative to the site root ("index.php", "events.php").
+ */
+function seo_head_tags(string $title, string $description, string $path, bool $home = false): string
+{
+    $e = fn(string $s) => htmlspecialchars($s, ENT_QUOTES);
+    $url = app_url($path);
+    $image = app_url('assets/images/lcup-campus.jpg');
+    $tags = [
+        '<meta name="description" content="' . $e($description) . '">',
+        '<meta name="robots" content="index, follow">',
+        '<link rel="canonical" href="' . $e($url) . '">',
+        '<meta property="og:type" content="website">',
+        '<meta property="og:site_name" content="' . SITE_NAME . '">',
+        '<meta property="og:title" content="' . $e($title) . '">',
+        '<meta property="og:description" content="' . $e($description) . '">',
+        '<meta property="og:url" content="' . $e($url) . '">',
+        '<meta property="og:image" content="' . $e($image) . '">',
+        '<meta property="og:locale" content="en_PH">',
+        '<meta name="twitter:card" content="summary_large_image">',
+        '<meta name="twitter:title" content="' . $e($title) . '">',
+        '<meta name="twitter:description" content="' . $e($description) . '">',
+        '<meta name="twitter:image" content="' . $e($image) . '">',
+    ];
+    if ($home) {
+        $data = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => SITE_NAME,
+            'alternateName' => 'LCUP Campus Event Hub',
+            'url' => app_url(''),
+            'description' => $description,
+            'publisher' => [
+                '@type' => 'CollegeOrUniversity',
+                'name' => 'La Consolacion University Philippines',
+                'logo' => app_url('assets/images/school-logo.png'),
+            ],
+        ];
+        $tags[] = '<script type="application/ld+json">' . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
+    }
+    return implode("\n", $tags);
+}
+
+/** ' data-theme="dark"' for <html>, so the page is drawn in the chosen look straight away ('' for light). */
+function theme_attr(): string
+{
+    $theme = current_theme();
+    return $theme === 'light' ? '' : ' data-theme="' . $theme . '"';
 }
 
 /**
  * The logged-in user (id, email, full_name, role, account_type,
  * department_id, organization_id, year_level, course, student_type,
  * irregular_year_levels, school_id, school_id_verified), or null. The role
- * is re-checked every 5 minutes so an admin change takes effect without
- * logging out.
+ * and organization are checked once per page load (check_session_role()),
+ * so a role change takes effect on the next click — a demoted admin loses
+ * access straight away. The rest of the profile is re-read every 5 minutes.
  */
 function current_user(): ?array
 {
+    static $checked = false;
     session_start_once();
     if (empty($_SESSION['user'])) return null;
-    if (($_SESSION['user_checked_at'] ?? 0) < time() - 300) {
-        reload_session_profile();
+    if (!$checked) {
+        $checked = true;
+        if (($_SESSION['user_checked_at'] ?? 0) < time() - 300) {
+            reload_session_profile();
+        } else {
+            check_session_role();
+        }
+        // An account that may no longer sign in (not a school email) is logged out.
+        if (($_SESSION['user']['sign_in_allowed'] ?? true) === false) {
+            supabase_auth_signout();
+            session_start_once();
+            flash('error', blocked_account_message());
+            return null;
+        }
     }
     return $_SESSION['user'];
+}
+
+/**
+ * One small read per page load: the account's current role and
+ * organization. If a Super Admin changed either, the whole profile is
+ * re-read; if the account was deleted, it loses every staff right.
+ */
+function check_session_role(): void
+{
+    if (empty($_SESSION['user']['id']) || empty($_SESSION['access_token'])) return;
+    $rows = supabase_request('profiles', 'select=role,organization_id&id=eq.' . urlencode($_SESSION['user']['id']), 'GET', null, session_access_token());
+    $row = $rows[0] ?? null;
+    if (!is_array($row)) {
+        // No row and no error: the account is gone (a failed read changes nothing).
+        if (supabase_last_error() === '') $_SESSION['user']['role'] = 'user';
+        return;
+    }
+    if (($row['role'] ?? null) !== ($_SESSION['user']['role'] ?? null)
+        || ($row['organization_id'] ?? null) !== ($_SESSION['user']['organization_id'] ?? null)) {
+        reload_session_profile();
+        unset($_SESSION['approvals_waiting']); // the sidebar count depends on the role
+    }
 }
 
 function is_admin_user(): bool
 {
     return (current_user()['role'] ?? '') === 'admin';
+}
+
+/**
+ * A Super Admin (the 'admin' role): everything, including approving Admins'
+ * new events and everyone's profile edits. (profiles.is_super_admin marks
+ * the protected one — Arian Abergas — who can't be demoted or deleted.)
+ */
+function is_super_admin_user(?array $user = null): bool
+{
+    $user = $user ?? current_user();
+    return ($user['role'] ?? '') === 'admin';
 }
 
 function is_moderator_user(): bool
@@ -951,14 +1451,14 @@ function is_staff_user(): bool
 }
 
 /**
- * 'admin' -> 'Admin', 'moderator' -> 'Moderator', 'user' -> 'Student' or
+ * 'admin' -> 'Super Admin', 'moderator' -> 'Admin', 'user' -> 'Student' or
  * 'Faculty' (the database keeps the enum value).
  */
 function role_display(string $role, ?string $accountType = null): string
 {
     return match ($role) {
-        'admin' => 'Admin',
-        'moderator' => 'Moderator',
+        'admin' => 'Super Admin',
+        'moderator' => 'Admin',
         default => $accountType === 'faculty' ? 'Faculty' : 'Student',
     };
 }
@@ -1003,9 +1503,9 @@ function require_login(): array
         header('Location: ' . BASE_URL . '/auth/login.php?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? BASE_URL . '/enduser/dashboard.php'));
         exit;
     }
-    if (profile_missing_fields($user) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'profile.php') {
-        // My Profile lists what's missing.
-        header('Location: ' . BASE_URL . '/enduser/profile.php?complete=1');
+    if (profile_missing_fields($user) && basename($_SERVER['SCRIPT_NAME'] ?? '') !== 'edit-profile.php') {
+        // The profile form lists what's missing.
+        header('Location: ' . BASE_URL . '/enduser/edit-profile.php?complete=1');
         exit;
     }
     return $user;
@@ -1016,7 +1516,7 @@ function require_admin(): array
 {
     $user = require_login();
     if (($user['role'] ?? 'user') !== 'admin') {
-        flash('error', 'That page is for admins only.');
+        flash('error', 'That page is for Super Admins only.');
         header('Location: ' . BASE_URL . '/enduser/dashboard.php');
         exit;
     }
@@ -1029,7 +1529,7 @@ function require_staff(): array
     $user = require_login();
     $role = $user['role'] ?? 'user';
     if ($role !== 'admin' && ($role !== 'moderator' || empty($user['organization_id']))) {
-        flash('error', $role === 'moderator' ? 'Your moderator account has no organization yet. Ask an admin to set it.' : 'That page is for admins and moderators only.');
+        flash('error', $role === 'moderator' ? 'Your Admin account has no organization yet. Ask a Super Admin to set it.' : 'That page is for Admins and Super Admins only.');
         header('Location: ' . BASE_URL . '/enduser/dashboard.php');
         exit;
     }
@@ -1062,7 +1562,7 @@ function require_event_manager(string $eventId): array
     $user = require_staff();
     $event = is_uuid($eventId) ? get_event_admin($eventId) : null;
     if (!$event || !can_manage_event($event, $user)) {
-        flash('error', $event ? 'Moderators can only manage their own organization\'s events.' : "That event doesn't exist anymore.");
+        flash('error', $event ? 'Admins can only manage their own organization\'s events.' : "That event doesn't exist anymore.");
         header('Location: ' . BASE_URL . '/admin/event-organizer.php');
         exit;
     }
@@ -1119,11 +1619,13 @@ function validate_account_fields(array $in, array $departments, array $organizat
         $studentType = (string) ($in['student_type'] ?? '');
         $course = trim((string) ($in['course'] ?? ''));
 
+        // The account's own saved ID, unchanged (it may be from before the format was required).
+        $unchanged = (string) $ownSchoolId !== '' && $schoolId === normalize_school_id($ownSchoolId);
         if ($schoolId === '') {
             $errors[] = 'Your School ID is required.';
-        } elseif (!valid_school_id($schoolId)) {
-            $errors[] = 'Please enter a valid School ID (letters, numbers and dashes, like ' . SCHOOL_ID_EXAMPLE . ').';
-        } elseif ($schoolId !== normalize_school_id($ownSchoolId) && school_id_taken($schoolId)) {
+        } elseif (!$unchanged && !valid_school_id($schoolId)) {
+            $errors[] = 'Please enter your School ID in the format ' . SCHOOL_ID_EXAMPLE . ' (2 digits, 4 digits, then 3 digits).';
+        } elseif (!$unchanged && school_id_taken($schoolId)) {
             $errors[] = 'That School ID is already registered to another account. If it\'s yours, contact an admin.';
         }
         if ($course === '') $errors[] = 'Your course is required.';
@@ -1181,12 +1683,257 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
     if (($user['role'] ?? '') === 'moderator') {
         unset($allowed['organization_id']);
     }
-    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
-    if (empty($rows)) {
-        return ['ok' => false, 'message' => friendly_error('Could not save your profile. Please try again.')];
+    if ($allowed) {
+        $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
+        if (empty($rows)) {
+            return ['ok' => false, 'message' => friendly_error('Could not save your profile. Please try again.')];
+        }
     }
     reload_session_profile();
     return ['ok' => true, 'message' => 'Profile saved.'];
+}
+
+// ---- Profile edits need the super admin's approval ----------------------------
+// (migration 20261017120000_super_admin_approvals.sql: profile_change_requests,
+// review_profile_change(); the database refuses direct changes too.)
+
+/** The details on the profile form, as shown to the reviewer. */
+const PROFILE_DETAIL_LABELS = [
+    'full_name' => 'Full name',
+    'account_type' => 'Student or faculty',
+    'department_id' => 'Department',
+    'organization_id' => 'Organization',
+    'school_id' => 'School ID',
+    'course' => 'Course',
+    'year_level' => 'Highest year level',
+    'student_type' => 'Student status',
+    'irregular_year_levels' => 'Year levels of subjects',
+];
+
+/** One detail in a comparable form (empty = null). */
+function profile_value_norm(string $key, $value)
+{
+    if ($key === 'irregular_year_levels') return parse_year_levels($value ?? []) ?: null;
+    if ($key === 'year_level') return $value === null || $value === '' ? null : (int) $value;
+    if ($key === 'school_id') return ($id = normalize_school_id(is_string($value) ? $value : null)) === '' ? null : $id;
+    $value = is_string($value) ? trim($value) : $value;
+    return $value === '' ? null : $value;
+}
+
+/**
+ * Compare the profile form with the saved profile.
+ * @param array $current the saved profile (current_user(), with school_id)
+ * @param array $new     full_name + validate_account_fields() fields + school_id
+ * @return array{fills: array, changes: array} fills = details that were empty,
+ *         changes = saved details that would change
+ */
+function profile_detail_diff(array $current, array $new): array
+{
+    $out = ['fills' => [], 'changes' => []];
+    foreach (array_keys(PROFILE_DETAIL_LABELS) as $key) {
+        if (!array_key_exists($key, $new)) continue;
+        $old = profile_value_norm($key, $current[$key] ?? null);
+        $value = profile_value_norm($key, $new[$key]);
+        if ($old === $value || ($key === 'school_id' && $value === null)) continue;
+        $out[$old === null ? 'fills' : 'changes'][$key] = $value;
+    }
+    return $out;
+}
+
+/** A detail as people read it: department / organization names, "3rd Year", … ('—' when empty). */
+function profile_value_label(string $key, $value, array $departments, array $organizations): string
+{
+    $value = profile_value_norm($key, $value);
+    if ($value === null) return '—';
+    return match ($key) {
+        'account_type' => label_of(ACCOUNT_TYPES, $value),
+        'department_id' => department_label(array_column($departments, null, 'id')[$value] ?? null) ?: 'Unknown department',
+        'organization_id' => array_column($organizations, 'name', 'id')[$value] ?? 'Unknown organization',
+        'year_level' => year_label($value),
+        'student_type' => label_of(STUDENT_TYPES, $value),
+        'irregular_year_levels' => year_levels_label($value) ?: 'Every year level',
+        default => (string) $value,
+    };
+}
+
+/**
+ * Save the profile form. Details that were still empty are saved straight
+ * away (completing a profile). Changes to saved details go to the super
+ * admin as a change request — except the super admin's own, which are saved.
+ * $completing (the "complete your profile" form): only the empty details are
+ * saved; changes to the others have to be sent from Edit my profile.
+ * @return array{ok: bool, message: string, requested?: bool, unchanged?: bool}
+ */
+function save_profile_details(array $new, bool $completing = false): array
+{
+    $user = current_user();
+    if (!$user) return ['ok' => false, 'message' => 'Please log in again.'];
+    $diff = profile_detail_diff($user, $new);
+    $pending = $completing ? null : get_my_profile_request('pending');
+
+    if (!$diff['fills'] && !$diff['changes']) {
+        if ($pending && withdraw_profile_request($pending['id'])['ok']) {
+            return ['ok' => true, 'unchanged' => true, 'message' => 'That\'s the same as your current profile, so your waiting request was withdrawn.'];
+        }
+        return ['ok' => true, 'unchanged' => true, 'message' => 'Nothing changed.'];
+    }
+
+    $save = function (array $fields): array {
+        $schoolId = $fields['school_id'] ?? null;
+        unset($fields['school_id']);
+        return update_my_profile($fields, $schoolId);
+    };
+    $later = 'Changes to details you had already filled in need a Super Admin\'s approval — send them from Edit my profile.';
+
+    // Only empty details filled in, or the super admin's own profile (or no
+    // super admin yet — the database update isn't run): saved now.
+    if (!$diff['changes'] || !profile_edits_need_approval($user)) {
+        $result = $save($diff['fills'] + $diff['changes']);
+        if ($result['ok'] && $pending) withdraw_profile_request($pending['id']); // replaced by what was just saved
+        return $result;
+    }
+    // Completing a profile: the empty details are saved, the changes aren't.
+    if ($completing) {
+        if (!$diff['fills']) return ['ok' => false, 'message' => $later];
+        $result = $save($diff['fills']);
+        return $result['ok'] ? ['ok' => true, 'message' => 'Saved. ' . $later] : $result;
+    }
+    // Everything else waits for the super admin (empty details too, as they may depend on the changes).
+    return send_profile_change_request($diff['fills'] + $diff['changes']);
+}
+
+/** Whether this account's profile changes wait for a Super Admin (not a Super Admin's own). */
+function profile_edits_need_approval(array $user): bool
+{
+    return !is_super_admin_user($user) && approvals_ready();
+}
+
+/** True once migration 20261017120000_super_admin_approvals.sql is run (approvals switched on). */
+function approvals_ready(): bool
+{
+    static $ready = null;
+    if ($ready === null) {
+        supabase_request('profiles', 'select=id&is_super_admin=is.true&limit=1');
+        $ready = supabase_last_error() === '';
+        $GLOBALS['supabase_last_error'] = '';
+    }
+    return $ready;
+}
+
+/** The logged-in user's latest change request ($status: only one with that status), or null. */
+function get_my_profile_request(?string $status = null): ?array
+{
+    $user = current_user();
+    if (!$user) return null;
+    $rows = supabase_user_request('profile_change_requests', 'select=*&user_id=eq.' . urlencode($user['id'])
+        . ($status ? '&status=eq.' . urlencode($status) : '') . '&order=created_at.desc&limit=1');
+    return $rows[0] ?? null;
+}
+
+/** Send changes for approval (a request that's still waiting is updated instead). */
+function send_profile_change_request(array $changes): array
+{
+    $user = current_user();
+    $pending = get_my_profile_request('pending');
+    $rows = $pending
+        ? supabase_user_request('profile_change_requests', 'id=eq.' . urlencode($pending['id']) . '&status=eq.pending', 'PATCH', ['changes' => $changes])
+        : supabase_user_request('profile_change_requests', '', 'POST', ['user_id' => $user['id'], 'changes' => $changes]);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => str_contains(supabase_last_error(), 'profile_change_requests')
+            ? 'Profile edits need the latest database update first. Please ask an admin to run it.'
+            : friendly_error('Could not send your changes. Please try again.')];
+    }
+    return ['ok' => true, 'requested' => true, 'message' => ($pending ? 'Your waiting request was updated.' : 'Sent to a Super Admin for approval.')
+        . ' Your profile keeps its current details until the changes are approved.'];
+}
+
+/** Take back the logged-in user's waiting request. */
+function withdraw_profile_request(string $requestId): array
+{
+    $user = current_user();
+    $rows = is_uuid($requestId) ? supabase_user_request('profile_change_requests',
+        'id=eq.' . urlencode($requestId) . '&user_id=eq.' . urlencode((string) ($user['id'] ?? '')) . '&status=eq.pending', 'PATCH', ['status' => 'withdrawn']) : [];
+    return $rows
+        ? ['ok' => true, 'message' => 'Your request was withdrawn. Your profile stays as it is.']
+        : ['ok' => false, 'message' => friendly_error('That request was already handled or withdrawn.')];
+}
+
+/** Change requests with that status, with the account's current details (Users & Roles › Approvals). */
+function get_profile_requests_admin(string $status = 'pending'): array
+{
+    return supabase_user_request('profile_change_requests',
+        'select=*,profiles(id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at))'
+        . '&status=eq.' . urlencode($status) . '&order=' . ($status === 'pending' ? 'created_at.asc' : 'reviewed_at.desc') . '&limit=300');
+}
+
+/** The super admin approves (the changes are saved to the profile) or rejects a request. */
+function review_profile_request(string $requestId, bool $approve, string $note = ''): array
+{
+    if (!is_super_admin_user()) {
+        return ['ok' => false, 'message' => 'Only a Super Admin can approve or reject profile changes.'];
+    }
+    if (!is_uuid($requestId)) return ['ok' => false, 'message' => 'Unknown request.'];
+    $note = mb_substr(trim($note), 0, 500);
+    $result = supabase_rpc('review_profile_change', ['p_request' => $requestId, 'p_approve' => $approve, 'p_note' => $note !== '' ? $note : null], true);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => friendly_error('Could not save your decision. Please try again.')];
+    }
+    return ['ok' => true, 'message' => $approve ? 'Approved — the changes are saved to their profile.' : 'Rejected — their profile stays as it was.'];
+}
+
+/**
+ * A Super Admin's note on something still waiting for approval (without
+ * deciding yet) — 'event' (events.approval_note) or 'profile'
+ * (note_profile_change()). The person who sent it sees the note; '' removes it.
+ */
+function save_approval_note(string $kind, string $id, string $note): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can leave notes.'];
+    if (!is_uuid($id)) return ['ok' => false, 'message' => 'Unknown request.'];
+    $note = mb_substr(trim($note), 0, 500);
+    if ($kind === 'event') {
+        $rows = supabase_user_request('events', 'id=eq.' . urlencode($id) . '&approval_status=eq.pending', 'PATCH', ['approval_note' => $note !== '' ? $note : null]);
+        $ok = !empty($rows);
+        if (!$ok && supabase_last_error() === '') return ['ok' => false, 'message' => 'That event isn\'t waiting for approval anymore.'];
+    } else {
+        $result = supabase_rpc('note_profile_change', ['p_request' => $id, 'p_note' => $note], true);
+        $ok = $result['ok'];
+        if (!$ok && str_contains(supabase_last_error(), 'note_profile_change')) {
+            return ['ok' => false, 'message' => 'Notes on profile edits need the latest database update first (20261018120000_approval_notes.sql).'];
+        }
+    }
+    if (!$ok) return ['ok' => false, 'message' => friendly_error('Could not save the note. Please try again.')];
+    return ['ok' => true, 'message' => $note !== '' ? 'Note saved — they\'ll see it with their request.' : 'Note removed.'];
+}
+
+/** Protected Super Admin accounts (profiles.is_super_admin — Arian Abergas): can't be demoted or deleted from the site. */
+function protected_account_ids(): array
+{
+    static $ids = null;
+    if ($ids === null) {
+        // As the logged-in Super Admin: profiles are private (20261105120000_private_profiles.sql).
+        $ids = array_column(supabase_user_request('profiles', 'select=id&is_super_admin=is.true'), 'id');
+        $GLOBALS['supabase_last_error'] = '';
+    }
+    return $ids;
+}
+
+/**
+ * How many events and profile edits wait for the super admin — the count on
+ * the sidebar's Approvals link (admins). Kept for a minute in the session so
+ * pages don't ask the database every time; 0 before the database update.
+ */
+function approvals_waiting_count(bool $fresh = false): int
+{
+    // Super Admins: everything waiting. Admins: their own organization's events and their own edits (RLS).
+    if (!is_staff_user()) return 0;
+    $cache = $_SESSION['approvals_waiting'] ?? null;
+    if (!$fresh && is_array($cache) && $cache['at'] > time() - 60) return $cache['count'];
+    $count = count(supabase_user_request('events', 'select=id&approval_status=eq.pending&status=eq.draft&limit=1000'))
+        + count(supabase_user_request('profile_change_requests', 'select=id&status=eq.pending&limit=1000'));
+    $GLOBALS['supabase_last_error'] = '';
+    $_SESSION['approvals_waiting'] = ['count' => $count, 'at' => time()];
+    return $count;
 }
 
 /** Every account with its details, for the admin Users page. */
@@ -1213,15 +1960,63 @@ function set_user_role_admin(string $userId, string $role): array
     if ($role === 'moderator') {
         $target = supabase_user_request('profiles', 'select=organization_id&id=eq.' . urlencode($userId));
         if (empty($target[0]['organization_id'])) {
-            return ['ok' => false, 'message' => 'A moderator runs their organization\'s events, so this account needs an organization first.'];
+            return ['ok' => false, 'message' => 'An Admin runs their organization\'s events, so this account needs an organization first.'];
         }
     }
     $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($userId), 'PATCH', ['role' => $role]);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not change the role.')];
     }
-    $as = ['admin' => 'an admin', 'moderator' => 'a moderator', 'user' => 'a regular ' . strtolower(role_display('user', $rows[0]['account_type'] ?? null)) . ' account'][$role];
+    $as = ['admin' => 'a Super Admin', 'moderator' => 'an Admin', 'user' => 'a regular ' . strtolower(role_display('user', $rows[0]['account_type'] ?? null)) . ' account'][$role];
     return ['ok' => true, 'message' => $rows[0]['full_name'] . ' is now ' . $as . '.'];
+}
+
+/** One account with its details and School ID (Super Admin: Users & Roles › Edit), or null. */
+function get_profile_admin(string $userId): ?array
+{
+    if (!is_uuid($userId)) return null;
+    $rows = supabase_user_request('profiles', 'select=id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
+    if (empty($rows[0])) return null;
+    $row = $rows[0];
+    $row['school_id'] = $row['school_ids']['school_id'] ?? null;
+    $row['school_id_verified'] = !empty($row['school_ids']['verified_at']);
+    unset($row['school_ids']);
+    return $row;
+}
+
+/**
+ * Super Admin: save someone's details straight away (no approval needed) —
+ * $fields from validate_account_fields() plus full_name; students' School ID
+ * is saved (and verified or not) when it or its verified mark changed.
+ */
+function update_profile_admin(array $account, array $fields, ?string $schoolId, bool $verified): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can edit other accounts.'];
+    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($account['id']), 'PATCH', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => friendly_error('Could not save the account. Please try again.')];
+    }
+    if ($schoolId !== null && $schoolId !== '' && ($schoolId !== ($account['school_id'] ?? null) || $verified !== !empty($account['school_id_verified']))) {
+        $result = set_school_id_admin($account['id'], $schoolId, $verified);
+        if (!$result['ok']) return ['ok' => false, 'message' => 'The details were saved, but not the School ID: ' . $result['message']];
+    }
+    if ($account['id'] === (current_user()['id'] ?? '')) reload_session_profile();
+    return ['ok' => true, 'message' => $rows[0]['full_name'] . '\'s account was saved.'];
+}
+
+/** Super Admin: delete an account — its login and profile (database: delete_account()). */
+function delete_account_admin(string $userId): array
+{
+    if (!is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can delete accounts.'];
+    if (!is_uuid($userId)) return ['ok' => false, 'message' => 'Unknown account.'];
+    if ($userId === (current_user()['id'] ?? '')) return ['ok' => false, 'message' => "You can't delete your own account."];
+    $result = supabase_rpc('delete_account', ['p_user' => $userId], true);
+    if (!$result['ok']) {
+        return ['ok' => false, 'message' => str_contains(supabase_last_error(), 'delete_account')
+            ? 'Deleting accounts needs the latest database update first (20261018090000_three_role_levels.sql).'
+            : friendly_error('Could not delete the account. Please try again.')];
+    }
+    return ['ok' => true, 'message' => (is_string($result['data']) && $result['data'] !== '' ? $result['data'] . '\'s account' : 'The account') . ' was deleted.'];
 }
 
 /**
@@ -1260,7 +2055,7 @@ function set_school_id_admin(string $userId, string $schoolId, bool $verified): 
 {
     $schoolId = normalize_school_id($schoolId);
     if (!valid_school_id($schoolId)) {
-        return ['ok' => false, 'message' => 'Please enter a valid School ID (like ' . SCHOOL_ID_EXAMPLE . ').'];
+        return ['ok' => false, 'message' => 'Please enter the School ID in the format ' . SCHOOL_ID_EXAMPLE . ' (2 digits, 4 digits, then 3 digits).'];
     }
     $fields = ['school_id' => $schoolId, 'verified_at' => $verified ? gmdate('c') : null, 'verified_by' => $verified ? (current_user()['id'] ?? null) : null];
     $existing = supabase_user_request('school_ids', 'select=user_id&user_id=eq.' . urlencode($userId));
@@ -1277,7 +2072,7 @@ function set_school_id_admin(string $userId, string $schoolId, bool $verified): 
 // =============================================================================
 
 /** Columns used for event cards/lists: category + organization joined in. */
-const EVENT_CARD_SELECT = 'select=*,categories(name),organizations(id,name,logo_url)';
+const EVENT_CARD_SELECT = 'select=*,categories(name),organizations!events_organization_id_fkey(id,name,logo_url)';
 
 /**
  * One event by id. Uses the logged-in user's token when there is one, so
@@ -1289,6 +2084,24 @@ function get_event(string $eventId): ?array
     if (!is_uuid($eventId)) return null;
     $rows = supabase_request('events', EVENT_CARD_SELECT . '&id=eq.' . urlencode($eventId) . '&limit=1', 'GET', null, session_access_token());
     return $rows[0] ?? null;
+}
+
+/** Several events by id (card columns), soonest first. */
+function get_events_by_ids(array $eventIds): array
+{
+    $ids = array_values(array_unique(array_filter($eventIds, 'is_uuid')));
+    if (!$ids) return [];
+    return supabase_request('events', EVENT_CARD_SELECT . '&id=in.(' . implode(',', $ids) . ')&order=start_date.asc,start_time.asc.nullslast', 'GET', null, session_access_token());
+}
+
+/** The logged-in person's registration status for each of these events: [event id => 'registered' | 'attended' | ...]. */
+function my_registration_statuses(array $eventIds): array
+{
+    $user = current_user();
+    $ids = array_values(array_unique(array_filter($eventIds, 'is_uuid')));
+    if (!$user || !$ids) return [];
+    $rows = supabase_user_request('event_registrations', 'select=event_id,status&user_id=eq.' . urlencode($user['id']) . '&event_id=in.(' . implode(',', $ids) . ')');
+    return array_column($rows, 'status', 'event_id');
 }
 
 /** Published events happening today (start_date <= today <= end_date), earliest start time first. */
@@ -1322,16 +2135,25 @@ function get_upcoming_events(int $limit = 3, ?string $excludeId = null): array
  * category whose name matches), category, organization,
  * audience ('students'|'faculty'), venue_type.
  * "For students" also lists events for students & faculty (same for faculty).
+ * $statuses: the calendar's published + completed events; the assistant
+ * also asks for cancelled ones.
  */
-function find_events(array $filters, string $from = '', string $to = '', int $limit = 500): array
+function find_events(array $filters, string $from = '', string $to = '', int $limit = 500, array $statuses = ['published', 'completed']): array
 {
-    $parts = [EVENT_CARD_SELECT, 'status=in.(published,completed)', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=' . $limit];
+    $parts = [EVENT_CARD_SELECT, 'status=in.(' . implode(',', $statuses) . ')', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=' . $limit];
     if ($to !== '') $parts[] = 'start_date=lte.' . $to;
     if ($from !== '') $parts[] = 'end_date=gte.' . $from;
 
     if (is_uuid($filters['category'] ?? null)) $parts[] = 'category_id=eq.' . $filters['category'];
     if (is_uuid($filters['organization'] ?? null)) $parts[] = 'organization_id=eq.' . $filters['organization'];
-    if (in_array($filters['audience'] ?? '', ['students', 'faculty'], true)) $parts[] = 'audience=in.(' . $filters['audience'] . ',all)';
+    $audience = (string) ($filters['audience'] ?? '');
+    if (isset(AUDIENCE_GROUPS[$audience]) && audiences_ready()) {
+        // events.audiences, or the older events.audience on events saved before it.
+        $old = $audience === 'outsiders' ? '' : ',and(audiences.is.null,audience.in.(' . $audience . ',all))';
+        $parts[] = 'and=(or(audiences.cs.%7B' . $audience . '%7D' . $old . '))';
+    } elseif (in_array($audience, ['students', 'faculty'], true)) {
+        $parts[] = 'audience=in.(' . $audience . ',all)';
+    }
     if (isset(VENUE_TYPES[$filters['venue_type'] ?? ''])) $parts[] = 'venue_type=eq.' . $filters['venue_type'];
 
     $term = trim(preg_replace('/[^\p{L}\p{N}\s\-\'&]/u', ' ', (string) ($filters['q'] ?? '')));
@@ -1465,9 +2287,10 @@ function registration_restriction(array $ev, ?array $user): string
 {
     if (!$user || can_manage_event($ev, $user)) return '';
     $type = $user['account_type'] ?? null;
-    $audience = $ev['audience'] ?? 'students';
-    if ($audience === 'faculty' && $type === 'student') return 'This event is for faculty only.';
-    if ($audience === 'students' && $type === 'faculty') return 'This event is for students only.';
+    $groups = event_audiences($ev);
+    if (($type === 'student' && !in_array('students', $groups, true)) || ($type === 'faculty' && !in_array('faculty', $groups, true))) {
+        return 'This event is for ' . event_audience_label($ev) . ' only.';
+    }
 
     $levels = parse_year_levels($ev['year_levels'] ?? []);
     if ($levels && $type !== 'faculty') {
@@ -1490,16 +2313,15 @@ function registration_restriction(array $ev, ?array $user): string
 function registration_state(array $ev, ?array $myReg, int $going, ?array $user = null): array
 {
     $today = date('Y-m-d');
-    $ended = ($ev['end_date'] ?? $ev['start_date'] ?? $today) < $today || ($ev['status'] ?? '') === 'completed';
+    $ended = event_has_ended($ev);
     $mine = $myReg['status'] ?? null;
     $state = fn(string $s, bool $reg, bool $cancel, string $note) => ['state' => $s, 'can_register' => $reg, 'can_cancel' => $cancel, 'note' => $note];
 
     if ($mine === 'attended') return $state('attended', false, false, 'You attended this event.');
     if (($ev['status'] ?? '') === 'cancelled') return $state('closed', false, false, 'This event was cancelled.');
-    if ($mine === 'registered') {
-        return $state('registered', false, !$ended, $ended ? 'This event has ended.' : "You're registered for this event.");
-    }
-    if ($ended) return $state('closed', false, false, 'This event has ended.');
+    // Over: nothing to register for or cancel any more.
+    if ($ended) return $state('ended', false, false, $mine === 'registered' ? 'This event has ended. You were registered.' : 'This event has ended, so registration is closed.');
+    if ($mine === 'registered') return $state('registered', false, true, "You're registered for this event.");
     if (($ev['status'] ?? '') !== 'published') return $state('closed', false, false, "This event isn't open for registration yet.");
     if (empty($ev['enable_registration'])) return $state('closed', false, false, 'No registration needed — just show up!');
     if (!empty($ev['registration_deadline']) && $today > $ev['registration_deadline']) {
@@ -1517,13 +2339,35 @@ function registration_state(array $ev, ?array $myReg, int $going, ?array $user =
 }
 
 /**
+ * Whether an event is over: its last day has passed, or it's that day and
+ * its end time has passed (Philippine time), or it's marked Completed.
+ * An event without an end time lasts until the end of its last day.
+ */
+function event_has_ended(array $ev): bool
+{
+    if (($ev['status'] ?? '') === 'completed') return true;
+    $day = (string) (($ev['end_date'] ?? null) ?: ($ev['start_date'] ?? ''));
+    if ($day === '') return false;
+    $time = substr((string) (($ev['end_time'] ?? null) ?: '23:59:59'), 0, 8);
+    $tz = new DateTimeZone('Asia/Manila');
+    $end = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $day . ' ' . (strlen($time) === 5 ? $time . ':00' : $time), $tz);
+    return $end !== false && $end < new DateTimeImmutable('now', $tz);
+}
+
+/**
  * Register the logged-in user (or re-activate a cancelled registration).
  * The database checks every rule; its reason is passed back on failure.
+ * The database adds a "Registered" notification (notify_registration()),
+ * which is emailed to them right away (email_registration_notice()).
  */
 function register_for_event(string $eventId): array
 {
     $user = current_user();
     if (!$user) return ['ok' => false, 'message' => 'Please log in to register for this event.'];
+    $event = get_event($eventId);
+    if ($event && event_has_ended($event)) {
+        return ['ok' => false, 'message' => 'This event has ended, so registration is closed.'];
+    }
 
     $existing = get_my_registration($eventId);
     if ($existing && in_array($existing['status'], ['registered', 'attended'], true)) {
@@ -1536,7 +2380,28 @@ function register_for_event(string $eventId): array
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Something went wrong registering you. Please try again.')];
     }
-    return ['ok' => true, 'message' => "You're registered! We'll notify you about any updates."];
+    $emailed = email_registration_notice($eventId, $event);
+    return ['ok' => true, 'message' => "You're registered!" . ($emailed ? ' A confirmation was sent to ' . $user['email'] . '.' : '') . " We'll notify you about any updates."];
+}
+
+/**
+ * Email the "Registered" notice the database just added to the logged-in
+ * person themselves, and take it out of the email queue (if sending fails,
+ * the queue tries again later). False when nothing was sent.
+ */
+function email_registration_notice(string $eventId, ?array $event): bool
+{
+    $user = current_user();
+    if (!$user || !mail_enabled() || !account_may_sign_in($user['email'] ?? '', $user['role'] ?? 'user')) return false;
+    $rows = supabase_user_request('notifications', 'select=id,event_id,title,message&event_id=eq.' . urlencode($eventId)
+        . '&user_id=eq.' . urlencode($user['id']) . '&title=like.Registered*&email_pending=is.true&order=created_at.desc&limit=1');
+    $notice = $rows[0] ?? null;
+    if (!$notice) return false; // before the database update (20261106120000_registration_notices.sql)
+    $mail = notification_email_content($notice, $event);
+    $sent = smtp_send([(string) $user['email']], $mail['subject'], $mail['text'], $mail['html']);
+    if (!$sent['ok']) return false;
+    supabase_rpc('my_notification_emailed', ['p_id' => $notice['id']], true);
+    return true;
 }
 
 /** Cancel the logged-in user's registration (frees the seat). */
@@ -1609,7 +2474,8 @@ function presence_script_tag(): string
 {
     if (!current_user()) return '';
     return '<script>window.PRESENCE_URL = ' . json_encode(BASE_URL . '/api/presence.php') . ';</script>' . "\n"
-        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/presence.js') . '"></script>';
+        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/presence.js') . '"></script>'
+        . email_outbox_script_tag(); // notifications waiting to be emailed (staff)
 }
 
 // =============================================================================
@@ -1639,19 +2505,335 @@ function mark_my_notifications_read(): bool
 }
 
 /**
- * Send a notification about an event (admins only — the database checks).
- * $audience: 'all' (every account) or 'registered' (people registered for it).
+ * Send a notification about an event (the event's admins only — the
+ * database checks), in the site and by email. $audience:
+ *   'open'         everyone the event is open to (audiences, year levels)
+ *   'open_others'  everyone it's open to who isn't required to attend
+ *   'required'     the people required to attend
+ *   'registered'   the people registered for it, and those required to attend
  * @return int how many people it was sent to (-1 on failure)
  */
 function notify_event(string $eventId, string $audience, string $title, string $message): int
 {
     $result = supabase_rpc('notify_event', [
         'p_event_id' => $eventId,
-        'p_audience' => $audience === 'registered' ? 'registered' : 'all',
+        'p_audience' => in_array($audience, ['open', 'open_others', 'required', 'registered'], true) ? $audience : 'open',
         'p_title' => $title,
         'p_message' => $message,
     ], true);
+    if ($result['ok'] && (int) $result['data'] > 0) {
+        queue_notification_emails();
+    }
     return $result['ok'] ? (int) $result['data'] : -1;
+}
+
+// ---- Required attendance ----------------------------------------------------
+/** events.required_for: who must attend (they must also be people the event is open to). */
+const REQUIRED_FOR = [
+    'everyone' => 'Everyone it\'s open to',
+    'members' => 'Members of the organizing organization(s)',
+    'department' => 'Everyone in the organizing organization(s)\' department',
+];
+
+/** "Required for members of the organizing organization(s)" ('' when not required). */
+function required_for_label(array $ev): string
+{
+    $key = $ev['required_for'] ?? null;
+    return isset(REQUIRED_FOR[$key]) ? 'Required for ' . lcfirst(REQUIRED_FOR[$key]) : '';
+}
+
+/**
+ * Upcoming published events the logged-in person is required to attend
+ * (the database's my_required_events()). [] when logged out or before the
+ * database update.
+ */
+function my_required_event_ids(): array
+{
+    static $ids = null;
+    if ($ids !== null) return $ids;
+    $ids = [];
+    if (!current_user()) return $ids;
+    // Before the database update the function isn't there: asked again every 5 minutes, not on every page.
+    if (($_SESSION['required_events_missing'] ?? 0) > time() - 300) return $ids;
+    $lastError = $GLOBALS['supabase_last_error'] ?? '';
+    $result = supabase_rpc('my_required_events', [], true);
+    if ($result['ok'] && is_array($result['data'])) {
+        $ids = array_values(array_filter(array_column($result['data'], 'event_id'), 'is_string'));
+        unset($_SESSION['required_events_missing']);
+    } elseif (str_contains(supabase_last_error(), 'Could not find the function')) {
+        $_SESSION['required_events_missing'] = time();
+    }
+    $GLOBALS['supabase_last_error'] = $lastError;
+    return $ids;
+}
+
+function is_required_for_me(?string $eventId): bool
+{
+    return $eventId !== null && in_array($eventId, my_required_event_ids(), true);
+}
+
+/**
+ * Tell people about an event that has just been published: the people
+ * required to attend always (bell + email), and — when the organizer picked
+ * "Send Notification" — everyone else it's open to.
+ * @return int how many people were notified
+ */
+function announce_published_event(array $ev, bool $toEveryoneOpen): int
+{
+    $where = event_when($ev) . ' · ' . event_place($ev);
+    $required = !empty($ev['required_for']);
+    $sent = 0;
+    if ($required) {
+        $sent += max(0, notify_event($ev['id'], 'required', 'Required: ' . $ev['title'], 'Your attendance is required. ' . $where));
+    }
+    if ($toEveryoneOpen) {
+        $sent += max(0, notify_event($ev['id'], $required ? 'open_others' : 'open', 'New event: ' . $ev['title'], $where));
+    }
+    return $sent;
+}
+
+// =============================================================================
+// EMAIL (notifications by email — config/mail.local.php)
+// =============================================================================
+// Every new notification is also emailed. The site sends them itself over
+// SMTP (e.g. a Gmail account with an App Password), in the background: the
+// page that created them starts assets/js/email-outbox.js, which asks
+// api/notification-emails.php to send the next batch until none are left.
+// Addresses come from the database's pending_notification_emails() (staff
+// only) and are put in Bcc, so recipients never see each other. An email
+// that fails is tried again 10 minutes, 2 hours and a day later, from the
+// pages Admins open (the outbox also runs every 10 minutes for them).
+
+/** SMTP settings from config/mail.local.php (a copy of mail.local.example.php), or environment variables. */
+function mail_config(): array
+{
+    static $config = null;
+    if ($config === null) {
+        $file = __DIR__ . '/mail.local.php';
+        $local = is_file($file) ? (array) (include $file) : [];
+        $get = fn(string $key, string $env, $default = '') => getenv($env) !== false && getenv($env) !== '' ? getenv($env) : ($local[$key] ?? $default);
+        $config = [
+            'host' => trim((string) $get('host', 'SMTP_HOST', 'smtp.gmail.com')),
+            'port' => (int) $get('port', 'SMTP_PORT', 465),
+            'username' => trim((string) $get('username', 'SMTP_USERNAME')),
+            'password' => str_replace(' ', '', (string) $get('password', 'SMTP_PASSWORD')), // Gmail shows App Passwords in groups of four
+            'from_email' => trim((string) $get('from_email', 'SMTP_FROM_EMAIL')),
+            'from_name' => trim((string) $get('from_name', 'SMTP_FROM_NAME', 'Campus Event Hub')),
+        ];
+        if ($config['from_email'] === '') $config['from_email'] = $config['username'];
+    }
+    return $config;
+}
+
+/** True once real SMTP settings are filled in (the example file's placeholders don't count). */
+function mail_enabled(): bool
+{
+    $c = mail_config();
+    return $c['host'] !== '' && $c['username'] !== '' && $c['password'] !== ''
+        && stripos($c['password'], 'paste') === false && filter_var($c['from_email'], FILTER_VALIDATE_EMAIL) !== false;
+}
+
+/** A header value with non-ASCII text encoded (subjects, names). */
+function mail_header_text(string $text): string
+{
+    return preg_match('/[^\x20-\x7E]/', $text) ? mb_encode_mimeheader($text, 'UTF-8', 'B', "\r\n") : $text;
+}
+
+/**
+ * Send one email (plain text + HTML) to $recipients over SMTP. One
+ * recipient goes in To:; several go in Bcc (To: shows the site's address).
+ * @param string[] $recipients
+ * @return array{ok:bool, error?:string}
+ */
+function smtp_send(array $recipients, string $subject, string $text, string $html): array
+{
+    if (!mail_enabled()) return ['ok' => false, 'error' => 'Email isn\'t set up (config/mail.local.php).'];
+    $c = mail_config();
+    $recipients = array_values(array_unique(array_filter(array_map('trim', $recipients), fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL) !== false)));
+    if (!$recipients) return ['ok' => false, 'error' => 'No valid recipients.'];
+
+    $from = mail_header_text($c['from_name']) . ' <' . $c['from_email'] . '>';
+    $boundary = 'ceh_' . bin2hex(random_bytes(8));
+    $host = parse_url(app_url(), PHP_URL_HOST) ?: 'localhost';
+    $headers = [
+        'Date: ' . date(DATE_RFC2822),
+        'From: ' . $from,
+        'To: ' . (count($recipients) === 1 ? '<' . $recipients[0] . '>' : $from),
+        'Subject: ' . mail_header_text($subject),
+        'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . $host . '>',
+        'MIME-Version: 1.0',
+        'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+        'Auto-Submitted: auto-generated',
+        'X-Auto-Response-Suppress: All',
+    ];
+    $part = fn(string $type, string $body) => '--' . $boundary . "\r\n"
+        . 'Content-Type: ' . $type . '; charset=UTF-8' . "\r\n"
+        . 'Content-Transfer-Encoding: base64' . "\r\n\r\n"
+        . chunk_split(base64_encode($body), 76, "\r\n");
+    $message = implode("\r\n", $headers) . "\r\n\r\n"
+        . $part('text/plain', $text) . $part('text/html', $html) . '--' . $boundary . "--\r\n";
+
+    $ssl = $c['port'] === 465;
+    $offset = 0;
+    $ch = curl_init(($ssl ? 'smtps://' : 'smtp://') . $c['host'] . ':' . $c['port']);
+    curl_setopt_array($ch, [
+        CURLOPT_USERNAME => $c['username'],
+        CURLOPT_PASSWORD => $c['password'],
+        CURLOPT_MAIL_FROM => '<' . $c['from_email'] . '>',
+        CURLOPT_MAIL_RCPT => array_map(fn($e) => '<' . $e . '>', $recipients),
+        CURLOPT_UPLOAD => true,
+        CURLOPT_INFILESIZE => strlen($message),
+        CURLOPT_READFUNCTION => function ($ch, $fd, int $length) use ($message, &$offset): string {
+            $chunk = (string) substr($message, $offset, $length);
+            $offset += strlen($chunk);
+            return $chunk;
+        },
+        CURLOPT_USE_SSL => CURLUSESSL_ALL, // port 587: STARTTLS (465 is SSL from the start)
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 30,
+    ]);
+    // One refused address doesn't stop the rest (PHP 8.2 spells it ALLLOWFAILS, like old libcurl).
+    $allowFails = defined('CURLOPT_MAIL_RCPT_ALLOWFAILS') ? constant('CURLOPT_MAIL_RCPT_ALLOWFAILS')
+        : (defined('CURLOPT_MAIL_RCPT_ALLLOWFAILS') ? constant('CURLOPT_MAIL_RCPT_ALLLOWFAILS') : null);
+    if ($allowFails !== null) curl_setopt($ch, $allowFails, true);
+    $ok = curl_exec($ch) !== false;
+    $errno = curl_errno($ch);
+    $error = curl_error($ch) ?: ($errno ? curl_strerror($errno) : ''); // some errors leave curl_error() empty
+    curl_close($ch);
+    if (!$ok) {
+        if ($errno === 67) $error = 'Login denied: check the email address and App Password in config/mail.local.php'; // CURLE_LOGIN_DENIED
+        error_log('[smtp_send] ' . $error);
+        return ['ok' => false, 'error' => $error !== '' ? $error : 'The mail server refused the message.'];
+    }
+    return ['ok' => true];
+}
+
+/**
+ * The email for a notification: its title and message, the event's date,
+ * place and organizer, and a button to the event page.
+ * @return array{subject:string, text:string, html:string}
+ */
+function notification_email_content(array $n, ?array $event): array
+{
+    $title = (string) ($n['title'] ?? 'Campus Event Hub');
+    $message = (string) ($n['message'] ?? '');
+    $required = str_starts_with($title, 'Required') || str_starts_with($title, 'Now required');
+    $url = !empty($n['event_id']) ? app_url('event-details.php?id=' . rawurlencode($n['event_id'])) : app_url('index.php');
+    // "Register": while the event still takes registrations. It opens the event
+    // page at its Register button (registering itself stays a click on the site).
+    $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    $canRegister = $event && !empty($n['event_id']) && !str_starts_with($title, 'Registered') // already registered: no button
+        && !event_has_ended($event)
+        && ($event['status'] ?? '') === 'published' && !empty($event['enable_registration'])
+        && (string) (($event['end_date'] ?? null) ?: ($event['start_date'] ?? '')) >= $today
+        && (empty($event['registration_deadline']) || (string) $event['registration_deadline'] >= $today);
+    $registerUrl = $canRegister ? $url . '#register' : null;
+    $details = [];
+    if ($event) {
+        $details['When'] = event_when($event);
+        $details['Where'] = event_place($event) . (!empty($event['address']) ? ' — ' . $event['address'] : '');
+        if (!empty($event['organizations']['name'])) $details['Organized by'] = $event['organizations']['name'];
+        if (($label = required_for_label($event)) !== '') $details['Attendance'] = $label;
+    }
+
+    $text = "Hello,\n\n" . $title . "\n" . ($message !== '' ? $message . "\n" : '') . "\n";
+    foreach ($details as $label => $value) $text .= $label . ': ' . $value . "\n";
+    $text .= ($registerUrl ? "\nRegister: " . $registerUrl : '')
+        . "\nOpen the event: " . $url . "\n\n— Campus Event Hub · " . SCHOOL_NAME
+        . "\nYou're getting this email because you have a Campus Event Hub account.\n";
+
+    $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+    $rows = '';
+    foreach ($details as $label => $value) {
+        $rows .= '<tr><td style="padding:4px 12px 4px 0;color:#4d5866;font-size:13px;white-space:nowrap;vertical-align:top">' . $e($label)
+            . '</td><td style="padding:4px 0;color:#162b44;font-size:14px">' . $e($value) . '</td></tr>';
+    }
+    $html = '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f2ef;font-family:Segoe UI,Arial,sans-serif">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f2ef;padding:24px 12px"><tr><td align="center">'
+        . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">'
+        . '<tr><td style="background:#213e60;padding:18px 24px;color:#ffffff;font-size:18px;font-weight:800;letter-spacing:.3px">'
+        . '<span style="color:#e68c3a">CAMPUS</span> EVENT HUB</td></tr>'
+        . '<tr><td style="padding:24px">'
+        . ($required ? '<div style="display:inline-block;background:#a85a14;color:#ffffff;font-size:11px;font-weight:800;letter-spacing:.6px;padding:4px 10px;border-radius:999px;margin-bottom:12px">REQUIRED ATTENDANCE</div>' : '')
+        . '<h1 style="margin:0 0 8px;font-size:20px;color:#162b44">' . $e($title) . '</h1>'
+        . ($message !== '' ? '<p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#162b44">' . $e($message) . '</p>' : '')
+        . ($rows !== '' ? '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px">' . $rows . '</table>' : '')
+        . ($registerUrl
+            ? '<a href="' . $e($registerUrl) . '" style="display:inline-block;background:#e68c3a;color:#162b44;text-decoration:none;font-weight:800;font-size:14px;padding:12px 26px;border-radius:8px;margin:0 8px 8px 0">Register</a>'
+              . '<a href="' . $e($url) . '" style="display:inline-block;background:#ffffff;color:#213e60;text-decoration:none;font-weight:700;font-size:14px;padding:10px 20px;border-radius:8px;border:2px solid #213e60;margin:0 0 8px">Open the event</a>'
+            : '<a href="' . $e($url) . '" style="display:inline-block;background:#213e60;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:8px">Open the event</a>')
+        . '</td></tr>'
+        . '<tr><td style="padding:16px 24px;border-top:1px solid #ebe7dd;color:#6f6a5d;font-size:12px;line-height:1.5">'
+        . $e(SCHOOL_NAME) . ' · Campus Event Hub<br>You\'re getting this email because you have a Campus Event Hub account.</td></tr>'
+        . '</table></td></tr></table></body></html>';
+
+    return ['subject' => $title, 'text' => $text, 'html' => $html];
+}
+
+/** Notifications were just created: email them from the next page (assets/js/email-outbox.js). */
+function queue_notification_emails(): void
+{
+    if (!mail_enabled()) return;
+    session_start_once();
+    $_SESSION['email_outbox'] = time();
+}
+
+/**
+ * Email the next batch of notifications that are waiting (staff only; the
+ * database decides which ones this person may send). Notifications with
+ * the same text go out as one email with the recipients in Bcc.
+ * @return array{enabled:bool, sent:int, failed:int, more:bool, error:string}
+ */
+function deliver_notification_emails(int $maxRecipients = 40): array
+{
+    $out = ['enabled' => mail_enabled(), 'sent' => 0, 'failed' => 0, 'more' => false, 'error' => ''];
+    if (!$out['enabled'] || !is_staff_user()) return $out;
+
+    $result = supabase_rpc('pending_notification_emails', ['p_limit' => $maxRecipients + 1], true);
+    if (!$result['ok'] || !is_array($result['data'])) {
+        $out['error'] = supabase_last_error() ?: 'Could not read the notifications waiting to be emailed.';
+        return $out;
+    }
+    $rows = $result['data'];
+    $out['more'] = count($rows) > $maxRecipients;
+    $groups = [];
+    foreach (array_slice($rows, 0, $maxRecipients) as $r) {
+        $groups[($r['event_id'] ?? '') . "\n" . $r['title'] . "\n" . $r['message']][] = $r;
+    }
+    $events = [];
+    foreach ($groups as $group) {
+        $eventId = $group[0]['event_id'] ?? null;
+        if ($eventId && !array_key_exists($eventId, $events)) $events[$eventId] = get_event_admin($eventId);
+        $mail = notification_email_content($group[0], $eventId ? $events[$eventId] : null);
+        $idsByEmail = [];
+        foreach ($group as $r) $idsByEmail[strtolower((string) $r['email'])][] = $r['id'];
+        $sent = smtp_send(array_keys($idsByEmail), $mail['subject'], $mail['text'], $mail['html']);
+        supabase_rpc('mark_notification_emails', ['p_ids' => array_merge(...array_values($idsByEmail)), 'p_error' => $sent['ok'] ? null : $sent['error']], true);
+        if ($sent['ok']) {
+            $out['sent'] += count($idsByEmail);
+        } else {
+            // The mail server is refusing (down, wrong password, daily limit):
+            // stop here; the database schedules the next try for these.
+            $out['failed'] += count($idsByEmail);
+            $out['error'] = $sent['error'];
+            $out['more'] = false;
+            break;
+        }
+    }
+    return $out;
+}
+
+/**
+ * The background sender (staff): on the page opened right after
+ * notifications were created, and every 10 minutes while an Admin uses the
+ * site (emails that failed are tried again then).
+ */
+function email_outbox_script_tag(): string
+{
+    if (!is_staff_user() || !mail_enabled()) return '';
+    if (empty($_SESSION['email_outbox']) && ($_SESSION['email_outbox_checked'] ?? 0) > time() - 600) return '';
+    return '<script>window.EMAIL_OUTBOX_URL = ' . json_encode(BASE_URL . '/api/notification-emails.php') . ';</script>' . "\n"
+        . '<script src="' . htmlspecialchars(BASE_URL . '/assets/js/email-outbox.js') . '" defer></script>';
 }
 
 /** Data + script for the notification bell (see includes/topbar.php, assets/js/notifications.js). */
@@ -1715,7 +2897,7 @@ function get_all_events_admin(): array
 {
     $user = current_user();
     $scope = ($user['role'] ?? '') === 'admin' ? '' : '&organization_id=eq.' . urlencode((string) ($user['organization_id'] ?? '00000000-0000-0000-0000-000000000000'));
-    return supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url),event_programs(count)&order=created_at.desc' . $scope);
+    return supabase_user_request('events', 'select=*,categories(name),organizations!events_organization_id_fkey(name,logo_url),event_programs(count)&order=created_at.desc' . $scope);
 }
 
 /** Organizations the logged-in user may create events for: all (admin) or their own (moderator). */
@@ -1741,7 +2923,7 @@ function find_schedule_conflicts(array $ev, ?string $excludeId = null): array
     $end = (string) ($ev['end_date'] ?? '') ?: $start;
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) return $out;
 
-    $rows = supabase_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,organizations(name)'
+    $rows = supabase_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,organizations!events_organization_id_fkey(name)'
         . '&status=neq.cancelled&start_date=lte.' . max($start, $end) . '&end_date=gte.' . min($start, $end) . '&order=start_date.asc,start_time.asc.nullslast&limit=100',
         'GET', null, session_access_token());
 
@@ -1793,45 +2975,152 @@ function auto_complete_events(bool $now = false): void
 function get_event_admin(string $eventId): ?array
 {
     if (!is_uuid($eventId)) return null;
-    $rows = supabase_user_request('events', 'select=*,categories(name),organizations(name,logo_url,departments(name,code))&id=eq.' . urlencode($eventId) . '&limit=1');
+    $rows = supabase_user_request('events', 'select=*,categories(name),organizations!events_organization_id_fkey(name,logo_url,departments(name,code))&id=eq.' . urlencode($eventId) . '&limit=1');
     return $rows[0] ?? null;
 }
 
 /**
- * Write an event row. If the database doesn't have events.year_levels yet
- * (migration 20260930120000_solis_suggestions.sql not run), the write is
- * retried without it so events can still be saved and published.
+ * Co-organizers of multi-organization events (event_organizations), as
+ * event id => [organization rows]. The main organizer is events.organization_id
+ * and isn't repeated here. Pass ids for a few events, or null for every event.
+ * Empty until migration 20261015120000_manage_events_update.sql is run.
  */
-function write_event_row(string $query, string $method, array $fields): array
+function get_event_partner_orgs(?array $eventIds = null): array
 {
-    $rows = supabase_user_request('events', $query, $method, $fields);
-    if (!$rows && array_key_exists('year_levels', $fields) && str_contains(supabase_last_error(), 'year_levels')) {
-        $GLOBALS['schema_outdated'] = true;
-        unset($fields['year_levels']);
-        $rows = supabase_user_request('events', $query, $method, $fields);
+    $ids = array_values(array_filter($eventIds ?? [], 'is_uuid'));
+    if ($eventIds !== null && !$ids) return [];
+    $rows = supabase_request('event_organizations',
+        'select=event_id,organizations(id,name,logo_url)' . ($ids ? '&event_id=in.(' . implode(',', $ids) . ')' : ''),
+        'GET', null, session_access_token());
+    $map = [];
+    foreach ($rows as $row) {
+        if (!empty($row['organizations'])) $map[$row['event_id']][] = $row['organizations'];
     }
-    return $rows;
+    foreach ($map as &$orgs) usort($orgs, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+    return $map;
 }
 
-/** @return array{ok:bool, message:string, event?:array} */
+/** Replace an event's co-organizers. @return bool false if they couldn't be saved */
+function set_event_partner_orgs(string $eventId, array $organizationIds): bool
+{
+    supabase_user_request('event_organizations', 'event_id=eq.' . urlencode($eventId), 'DELETE');
+    if (supabase_last_error() !== '') return false;
+    if (!$organizationIds) return true;
+    $rows = array_map(fn($id) => ['event_id' => $eventId, 'organization_id' => $id], array_values($organizationIds));
+    supabase_user_request('event_organizations', '', 'POST', $rows);
+    return supabase_last_error() === '';
+}
+
+/** "JPSSITE" or "JPSSITE, SIES & ACpES" — an event's main organizer, then its co-organizers. */
+function event_organizers_label(array $ev, array $partners = [], string $default = 'Organizer'): string
+{
+    $names = array_values(array_filter(array_merge([$ev['organizations']['name'] ?? ''], array_column($partners, 'name'))));
+    if (!$names) return $default;
+    $last = array_pop($names);
+    return $names ? implode(', ', $names) . ' & ' . $last : $last;
+}
+
+/**
+ * A save (POST / PATCH) as the logged-in user that still works when the
+ * database is missing a newer column (a database update that hasn't been
+ * run): those columns are left out and listed in $dropped.
+ */
+function supabase_user_write_lenient(string $table, string $query, string $method, array $fields, ?array &$dropped = null): array
+{
+    $dropped = [];
+    for ($try = 0; $try < 5; $try++) {
+        $rows = supabase_user_request($table, $query, $method, $fields);
+        if ($rows) return $rows;
+        // PostgREST: "Could not find the 'x' column of 'events' in the schema cache" / Postgres: "column events.x does not exist"
+        if (!preg_match("/Could not find the '(\w+)' column|column \w+\.(\w+) does not exist/", supabase_last_error(), $m)) return $rows;
+        $column = ($m[1] ?? '') !== '' ? $m[1] : ($m[2] ?? '');
+        if (!array_key_exists($column, $fields)) return $rows;
+        unset($fields[$column]);
+        $dropped[] = $column;
+    }
+    return [];
+}
+
+/** @return array{ok:bool, message:string, event?:array, dropped?:string[]} dropped: columns the database doesn't have yet */
 function create_event_admin(array $fields): array
 {
     $fields['created_by'] = current_user()['id'] ?? null;
-    $rows = write_event_row('', 'POST', $fields);
+    $rows = supabase_user_write_lenient('events', '', 'POST', $fields, $dropped);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not create the event. Please check the fields and try again.')];
     }
-    return ['ok' => true, 'message' => 'Event created.', 'event' => $rows[0]];
+    return ['ok' => true, 'message' => 'Event created.', 'event' => $rows[0], 'dropped' => $dropped];
 }
 
-/** @return array{ok:bool, message:string} */
+/** @return array{ok:bool, message:string, event?:array, dropped?:string[]} */
 function update_event_admin(string $eventId, array $fields): array
 {
-    $rows = write_event_row('id=eq.' . urlencode($eventId), 'PATCH', $fields);
+    $rows = supabase_user_write_lenient('events', 'id=eq.' . urlencode($eventId), 'PATCH', $fields, $dropped);
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not save changes. Please try again.')];
     }
-    return ['ok' => true, 'message' => 'Event updated.'];
+    return ['ok' => true, 'message' => 'Event updated.', 'event' => $rows[0], 'dropped' => $dropped];
+}
+
+// ---- Admins' new events need a Super Admin's approval ------------------------
+// (migrations 20261017120000_super_admin_approvals.sql, 20261018090000_three_role_levels.sql).
+// events.approval_status: null = no approval needed (Super Admins' events, older
+// events), 'needed' = an Admin's (moderator role) event not sent yet, 'pending' =
+// waiting (still a draft), 'approved', 'rejected' (approval_note says why).
+// Publishing one of these events sends it for approval instead — the database
+// does that (trg_events_approval).
+
+/** True if this event, published by this user now, would wait for a Super Admin. */
+function event_needs_approval(?array $event, array $user): bool
+{
+    if (($user['role'] ?? '') !== 'moderator' || !approvals_ready()) return false;
+    return $event === null || in_array($event['approval_status'] ?? null, ['needed', 'pending', 'rejected'], true);
+}
+
+/** Admins' events with that approval status (Users & Roles › Approvals). */
+function get_event_approvals_admin(string $status = 'pending'): array
+{
+    return supabase_user_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,'
+        . 'send_notification,created_by,approval_status,approval_note,approval_requested_at,approval_reviewed_by,approval_reviewed_at,categories(name),organizations!events_organization_id_fkey(name)'
+        . '&approval_status=eq.' . urlencode($status)
+        . ($status === 'pending' ? '&status=eq.draft&order=approval_requested_at.asc' : '&order=approval_reviewed_at.desc') . '&limit=300');
+}
+
+/**
+ * The super admin approves an event (it's published, and announced if its
+ * organizer picked "Send Notification") or rejects it (it stays a draft;
+ * its admin can change it and send it again).
+ */
+function review_event_admin(string $eventId, bool $approve, string $note = ''): array
+{
+    if (!is_super_admin_user()) {
+        return ['ok' => false, 'message' => 'Only a Super Admin can approve or reject events.'];
+    }
+    $ev = get_event_admin($eventId);
+    if (!$ev || ($ev['approval_status'] ?? '') !== 'pending') {
+        return ['ok' => false, 'message' => 'That event isn\'t waiting for approval anymore.'];
+    }
+    $note = mb_substr(trim($note), 0, 500);
+    $fields = [
+        'approval_status' => $approve ? 'approved' : 'rejected',
+        'approval_reviewed_by' => current_user()['id'] ?? null,
+        'approval_reviewed_at' => gmdate('c'),
+    ];
+    if ($note !== '') $fields['approval_note'] = $note; // otherwise an earlier note stays
+    if ($approve) $fields += ['status' => 'published', 'is_published' => true];
+    $rows = supabase_user_request('events', 'id=eq.' . urlencode($eventId) . '&approval_status=eq.pending', 'PATCH', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => friendly_error('Could not save your decision. Please try again.')];
+    }
+    if (!$approve) {
+        return ['ok' => true, 'message' => 'Rejected — "' . $ev['title'] . '" stays a draft. Its admin can change it and send it again.'];
+    }
+    $message = 'Approved — "' . $ev['title'] . '" is published.';
+    // Required attendees are always told; everyone else it's open to when "Send Notification" was picked.
+    $sent = announce_published_event($ev, !empty($ev['send_notification']));
+    if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified (in the site and by email).';
+    auto_complete_events(true); // already over: Completed right away
+    return ['ok' => true, 'message' => $message];
 }
 
 /** Delete an event (its registrations, programs and notifications go with it). Admins only. */
@@ -1871,23 +3160,27 @@ function set_event_status_admin(string $eventId, string $status): array
     if ($status === 'cancelled') {
         $sent = notify_event($ev['id'], 'registered', 'Event cancelled: ' . $ev['title'],
             'Sorry — "' . $ev['title'] . '" (' . event_when($ev) . ') has been cancelled.');
-        if ($sent > 0) $message .= ' ' . $sent . ' registered ' . ($sent === 1 ? 'person was' : 'people were') . ' notified.';
+        if ($sent > 0) $message .= ' ' . $sent . ' ' . ($sent === 1 ? 'person was' : 'people were') . ' notified (registered and required attendees).';
     }
     return ['ok' => true, 'message' => $message];
 }
 
 /** Categories / organizations for the event form's dropdowns (alphabetical). */
+/** Categories A–Z, with "Other" always last. */
 function get_categories(): array
 {
-    return supabase_request('categories', 'select=id,name&order=name.asc');
+    $categories = supabase_request('categories', 'select=id,name&order=name.asc');
+    usort($categories, fn($a, $b) => is_other_category($a['name']) <=> is_other_category($b['name']));
+    return $categories;
 }
 
 function get_organizations(): array
 {
-    return supabase_request('organizations', 'select=id,name,logo_url,department_id&order=name.asc');
+    // select=* so it works before and after the organization_codes update adds "code".
+    return supabase_request('organizations', 'select=*&order=name.asc');
 }
 
-// ---- Event programs (the Schedule) — admin/event-programs.php ---------------
+// ---- Event programs (the Program Flow) — event form section 9, admin/event-programs.php ---------------
 
 function create_program_admin(string $eventId, array $fields): array
 {
@@ -1914,6 +3207,42 @@ function delete_program_admin(string $programId): array
     return empty($rows)
         ? ['ok' => false, 'message' => friendly_error('Could not delete the program.')]
         : ['ok' => true, 'message' => 'Program deleted.'];
+}
+
+/**
+ * Save an event's whole program flow from the event form (section 9), in
+ * the order given: parts that are kept are updated (only if they changed),
+ * new ones added, and the ones no longer in the list deleted.
+ * @param array<array{id:string,title:string,speaker:string,description:string}> $rows
+ * @return bool false if any change couldn't be saved
+ */
+function save_event_programs(string $eventId, array $rows): bool
+{
+    if (!is_uuid($eventId)) return false;
+    $existing = array_column(get_event_programs($eventId), null, 'id');
+    $ok = true;
+    $kept = [];
+    foreach (array_values($rows) as $i => $r) {
+        $fields = [
+            'title' => $r['title'],
+            'speaker' => $r['speaker'] !== '' ? $r['speaker'] : null,
+            'description' => $r['description'] !== '' ? $r['description'] : null,
+            'sort_order' => $i + 1,
+        ];
+        $old = isset($existing[$r['id'] ?? '']) ? $existing[$r['id']] : null;
+        if ($old) {
+            $kept[] = $old['id'];
+            $same = $old['title'] === $fields['title'] && ($old['speaker'] ?? null) === $fields['speaker']
+                && ($old['description'] ?? null) === $fields['description'] && (int) $old['sort_order'] === $fields['sort_order'];
+            if (!$same) $ok = !empty(supabase_user_request('event_programs', 'id=eq.' . urlencode($old['id']), 'PATCH', $fields)) && $ok;
+        } else {
+            $ok = !empty(supabase_user_request('event_programs', '', 'POST', $fields + ['event_id' => $eventId])) && $ok;
+        }
+    }
+    foreach (array_diff(array_keys($existing), $kept) as $id) {
+        $ok = !empty(supabase_user_request('event_programs', 'id=eq.' . urlencode($id) . '&event_id=eq.' . urlencode($eventId), 'DELETE')) && $ok;
+    }
+    return $ok;
 }
 
 /** Move a program one place up (-1) or down (+1) in the running order. */
@@ -2018,6 +3347,7 @@ function request_evaluations(array $event, array $userIds): int
         'status' => 'sent',
         'sent_at' => $now,
     ], $todo));
+    if ($rows) queue_notification_emails(); // also by email
     return count($rows);
 }
 
@@ -2078,7 +3408,7 @@ function delete_category_admin(string $categoryId): array
 /** All organizations with their department and event / officer counts. */
 function get_all_organizations_admin(): array
 {
-    return supabase_user_request('organizations', 'select=*,departments(name,code),events(count),organization_officers(count)&order=name.asc');
+    return supabase_user_request('organizations', 'select=*,departments(name,code),events!events_organization_id_fkey(count),organization_officers(count)&order=name.asc');
 }
 
 function get_organization_admin(string $organizationId): ?array
@@ -2232,6 +3562,65 @@ function send_csv(string $filename, array $header, array $rows): void
     exit;
 }
 
+/**
+ * One page of a list, $perPage rows at a time. Pages start at 1; a page
+ * past the end shows the last one.
+ * @return array{rows: array, page: int, pages: int, total: int, from: int, to: int}
+ */
+function paginate(array $rows, int $perPage, int $page): array
+{
+    $total = count($rows);
+    $pages = max(1, (int) ceil($total / $perPage));
+    $page = min(max(1, $page), $pages);
+    $offset = ($page - 1) * $perPage;
+    return [
+        'rows' => array_slice(array_values($rows), $offset, $perPage),
+        'page' => $page, 'pages' => $pages, 'total' => $total,
+        'from' => $total ? $offset + 1 : 0, 'to' => min($offset + $perPage, $total),
+    ];
+}
+
+/**
+ * ‹ Prev · 1 2 3 … 9 · Next › under a list, and "Showing 1–10 of 24 events".
+ * $p from paginate(); $url(n) is the link to page n.
+ */
+function render_pagination(array $p, callable $url, string $one = 'item', string $many = 'items'): string
+{
+    $html = '';
+    if ($p['pages'] > 1) {
+        $link = fn(int $n, string $text, string $attrs = '') => '<a href="' . htmlspecialchars($url($n)) . '"' . $attrs . '>' . $text . '</a>';
+        $html .= '<nav class="pagination admin-pagination" aria-label="Pages">';
+        if ($p['page'] > 1) $html .= $link($p['page'] - 1, '‹ Prev', ' class="btn btn-outline" rel="prev"');
+        $html .= '<span class="admin-pages">';
+        for ($n = 1; $n <= $p['pages']; $n++) {
+            if ($n === $p['page']) {
+                $html .= '<span class="admin-page is-current" aria-current="page">' . $n . '</span>';
+            } elseif ($n === 1 || $n === $p['pages'] || abs($n - $p['page']) <= 1) {
+                $html .= $link($n, (string) $n, ' class="admin-page"');
+            } elseif (abs($n - $p['page']) === 2) {
+                $html .= '<span class="admin-page-gap" aria-hidden="true">…</span>';
+            }
+        }
+        $html .= '</span>';
+        if ($p['page'] < $p['pages']) $html .= $link($p['page'] + 1, 'Next ›', ' class="btn btn-outline" rel="next"');
+        $html .= '</nav>';
+    }
+    if ($p['total']) {
+        $html .= '<p class="admin-hint admin-pagination-info">Showing ' . $p['from'] . '–' . $p['to'] . ' of ' . $p['total'] . ' ' . ($p['total'] === 1 ? $one : $many) . '</p>';
+    }
+    return $html;
+}
+
+/** True if $q (already trimmed) is found in any of the texts, ignoring case. */
+function matches_search(string $q, array $texts): bool
+{
+    if ($q === '') return true;
+    foreach ($texts as $text) {
+        if (stripos((string) $text, $q) !== false) return true;
+    }
+    return false;
+}
+
 /** 'Kalinangan Hall' -> 'kalinangan-hall' (file names). */
 function slugify(string $text, string $fallback = 'report'): string
 {
@@ -2265,6 +3654,13 @@ function department_label(?array $department): string
 {
     if (empty($department['name'])) return '—';
     return $department['name'] . (!empty($department['code']) ? ' (' . $department['code'] . ')' : '');
+}
+
+/** "Full Name (CODE)" for an organization, the same way as department_label(). */
+function organization_label(?array $organization): string
+{
+    if (empty($organization['name'])) return '—';
+    return $organization['name'] . (!empty($organization['code']) ? ' (' . $organization['code'] . ')' : '');
 }
 
 /** All departments with how many organizations belong to each. */
@@ -2553,12 +3949,12 @@ function week_label(string $monday): string
 // =============================================================================
 
 /** The 1-5 rating scale, best first (labels on the form and in the results). */
-const RATING_SCALE = [5 => 'Excellent', 4 => 'Very Satisfactory', 3 => 'Satisfactory', 2 => 'Fair', 1 => 'Poor'];
+const RATING_SCALE = [5 => 'Excellent', 4 => 'Very Satisfactory', 3 => 'Satisfactory', 2 => 'Fair', 1 => 'Needs Improvement'];
 
 /**
  * Verbal interpretation of a mean rating, in equal intervals of 0.80:
  * 4.21–5.00 Excellent · 3.41–4.20 Very Satisfactory · 2.61–3.40 Satisfactory
- * · 1.81–2.60 Fair · 1.00–1.80 Poor.
+ * · 1.81–2.60 Fair · 1.00–1.80 Needs Improvement.
  */
 function rating_interpretation(?float $mean): string
 {
@@ -2569,7 +3965,7 @@ function rating_interpretation(?float $mean): string
         $mean >= 3.41 => 'Very Satisfactory',
         $mean >= 2.61 => 'Satisfactory',
         $mean >= 1.81 => 'Fair',
-        default => 'Poor',
+        default => 'Needs Improvement',
     };
 }
 

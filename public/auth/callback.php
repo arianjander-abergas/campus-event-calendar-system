@@ -1,12 +1,13 @@
 <?php
 /**
- * Where Supabase sends people back after Google sign-in or a password-reset
- * email link. Supabase puts the session tokens in the URL *fragment*
- * (#access_token=...), which never reaches PHP, so a tiny script posts them
- * here. The tokens are verified with Supabase before a session is started.
+ * Where Supabase sends people back after Google sign-in, the "confirm your
+ * email" link or a password-reset link. Supabase puts the session tokens in
+ * the URL *fragment* (#access_token=...), which never reaches PHP, so a tiny
+ * script posts them here. The tokens are verified with Supabase before a
+ * session is started.
  *
  * The site's URL must be allowed in Supabase: Authentication -> URL
- * Configuration -> Redirect URLs (e.g. http://localhost/campus-event-calendar-system/public/auth/callback.php).
+ * Configuration -> Redirect URLs (e.g. http://localhost/campus-event-calendar-system/public/**).
  */
 require_once __DIR__ . '/../../config/supabase.php';
 session_start_once();
@@ -28,6 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'tokens') 
         } elseif (post_param('type') === 'recovery') {
             $_SESSION['password_recovery'] = true;
             header('Location: callback.php?step=new-password');
+            exit;
+        } elseif (post_param('type') === 'signup') {
+            // The link from the "confirm your email" message.
+            unset($_SESSION['signup_email']);
+            flash('success', 'Your email is confirmed — welcome to Campus Event Hub, ' . explode(' ', trim((string) (current_user()['full_name'] ?? '')))[0] . '!');
+            header('Location: ' . BASE_URL . '/enduser/dashboard.php');
             exit;
         } else {
             $target = safe_redirect_target($_SESSION['after_login'] ?? '', BASE_URL . '/enduser/dashboard.php');
@@ -70,21 +77,18 @@ $_SESSION['callback_nonce'] = $_SESSION['callback_nonce'] ?? bin2hex(random_byte
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title><?= $step === 'new-password' ? 'Choose a New Password' : 'Signing you in…' ?> — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;700;800&display=swap">
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
-<link rel="stylesheet" href="../assets/css/auth.css">
+<link rel="stylesheet" href="../assets/css/auth.css?v=<?= filemtime(__DIR__ . '/../assets/css/auth.css') ?>">
 </head>
 <body class="login-page">
 
 <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-<<<<<<< Updated upstream
-  <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="72" height="68">
-=======
   <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="login-logo-mark" width="72" height="68">
->>>>>>> Stashed changes
   <span class="login-logo-text">
     <span class="campus">CAMPUS</span>
     <span class="hub">EVENT HUB</span>
@@ -134,7 +138,14 @@ $_SESSION['callback_nonce'] = $_SESSION['callback_nonce'] ?? bin2hex(random_byte
     }
     document.getElementById("callbackTitle").textContent = "Sign-in failed";
     const err = document.getElementById("callbackError");
-    err.textContent = params.get("error_description") || "This sign-in link is invalid or has expired. Please try again.";
+    const why = params.get("error_description") || "";
+    const code = params.get("error_code") || "";
+    // The database refuses accounts that aren't LCUP school emails (enforce_school_email()).
+    err.textContent = /Database error saving new user|SCHOOL_EMAIL_ONLY/i.test(why)
+      ? <?= json_encode('Use your LCUP Google account (@' . SCHOOL_EMAIL_DOMAIN . '). ' . school_email_rule_message()) ?>
+      : (code === "otp_expired" || /expired/i.test(why))
+        ? "This link has expired or was already used. Log in to get a new confirmation link, or use \"Forgot Password?\" for a new reset link."
+        : (why || "This sign-in link is invalid or has expired. Please try again.");
     err.hidden = false;
     document.getElementById("callbackHelp").hidden = false;
   })();

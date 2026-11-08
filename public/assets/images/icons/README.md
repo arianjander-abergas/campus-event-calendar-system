@@ -1,6 +1,6 @@
 # UI icons
 
-Every small icon on the site is an image from this folder: simple line icons drawn in blue (`#3d74c9`, 24×24, stroke 1.9). On dark backgrounds (the navy sidebar, blue buttons and circles) `style.css` shows them white, so one file works everywhere. The "Label" column below is the short name the old placeholder boxes showed.
+Every small icon on the site is an image from this folder: simple line icons drawn in deep royal navy (`#1d2a66`, 24×24, stroke 1.9), the palette's dark colour. On dark backgrounds (the sidebar, filled buttons and circles) `style.css` shows them white, so one file works everywhere. The "Label" column below is the short name the old placeholder boxes showed.
 
 ## How to replace an icon
 

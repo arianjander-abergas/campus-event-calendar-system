@@ -4,11 +4,14 @@
  * and moderator pages). Set $activeNav before including to highlight the
  * current page:
  *   'home' | 'dashboard' | 'events' | 'my-events' | 'event' | 'organizations' | 'profile'
- *   'manage-events' | 'import' | 'my-officers'           (moderators and admins)
+ *   'manage-create' | 'manage-update' | 'import' | 'my-officers'  (moderators and admins)
  *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-taxonomy'
- *   'admin-calendar' | 'admin-users'                      (admins)
+ *   'admin-calendar' | 'admin-users' | 'admin-approvals'  (admins)
  * Logged-out visitors see the public links (Log in / Sign up are in the top
  * bar; on phones they're also at the bottom of this menu).
+ *
+ * It also brings the Event Hub Assistant chat box (includes/assistant-widget.php),
+ * so the assistant is on every page that has this sidebar.
  *
  * Screen sizes (style.css, assets/js/sidebar.js):
  *   computer  full sidebar with labels
@@ -19,19 +22,28 @@ $activeNav = $activeNav ?? '';
 $navUser = current_user();
 $navRole = $navUser['role'] ?? '';
 $navActive = fn(string $key): string => $activeNav === $key ? ' class="active" aria-current="page"' : '';
-/** One sidebar link: icon + label (the label is hidden on the slim tablet sidebar, so it's also the tooltip). */
-$navLink = fn(string $href, string $key, string $icon, string $label, int $size = 18): string =>
-    '<a href="' . BASE_URL . $href . '"' . $navActive($key) . ' title="' . $label . '"><span class="icon">' . icon($icon, $size) . '</span><span class="nav-label">' . $label . '</span></a>';
+/** One sidebar link: icon + label (the label is hidden on the slim tablet sidebar, so it's also the tooltip). $count: a red number badge (0 = none). */
+$navLink = fn(string $href, string $key, string $icon, string $label, int $size = 18, int $count = 0): string =>
+    '<a href="' . BASE_URL . $href . '"' . $navActive($key) . ' title="' . $label . ($count ? ' (' . $count . ' waiting)' : '') . '"><span class="icon">' . icon($icon, $size) . '</span><span class="nav-label">' . $label . '</span>'
+    . ($count ? '<span class="nav-count" aria-label="' . $count . ' waiting">' . ($count > 99 ? '99+' : $count) . '</span>' : '') . '</a>';
 $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
+$manageOpen = in_array($activeNav, ['manage-create', 'manage-update'], true);
+/** "Manage Events" dropdown (moderators and admins): Create Event, Update Events. */
+$manageMenu = fn(): string =>
+    '<div class="side-nav-item has-submenu">'
+    . '<button type="button" class="submenu-toggle' . ($manageOpen ? ' is-current' : '') . '" aria-expanded="' . ($manageOpen ? 'true' : 'false') . '" aria-controls="manageSubmenu" title="Manage Events">'
+    . '<span class="icon">' . icon('tools') . '</span><span class="nav-label">Manage Events</span>'
+    . '<span class="chevron" aria-hidden="true">' . icon('chevron-down', 14) . '</span></button>'
+    . '<div class="event-submenu" id="manageSubmenu"' . ($manageOpen ? '' : ' hidden') . '>'
+    . $navLink('/admin/event-organizer.php', 'manage-create', 'register', 'Create Event', 16)
+    . $navLink('/admin/event-organizer.php?view=update', 'manage-update', 'list', 'Update Events', 16)
+    . '</div></div>';
 ?>
-<aside class="sidebar" id="sidebar" aria-label="Site menu">
+<?php /* .neu: the home page's dark-blue neumorphic sidebar on every page (style.css). */ ?>
+<aside class="sidebar neu" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">
     <a href="<?= BASE_URL ?>/index.php" class="brand">
-<<<<<<< Updated upstream
-      <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="brand-logo" width="44" height="44">
-=======
       <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="brand-logo" width="44" height="44">
->>>>>>> Stashed changes
       <span class="brand-text">
         <span class="campus">CAMPUS</span>
         <span class="hub">EVENT HUB</span>
@@ -76,26 +88,38 @@ $eventsOpen = in_array($activeNav, ['events', 'my-events', 'event'], true);
   <?php endif; ?>
 
   <?php if ($navRole === 'moderator'): ?>
-    <nav class="side-nav side-admin" aria-label="Moderator">
-      <div class="side-group-label">Moderator</div>
-      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+    <nav class="side-nav side-admin" aria-label="Admin">
+      <div class="side-group-label">Admin</div>
+      <?= $manageMenu() ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?php if (!empty($navUser['organization_id'])): ?>
         <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>
+        <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
+        <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
       <?php endif; ?>
     </nav>
   <?php elseif ($navRole === 'admin'): ?>
-    <nav class="side-nav side-admin" aria-label="Admin">
-      <div class="side-group-label">Admin</div>
+    <nav class="side-nav side-admin" aria-label="Super Admin">
+      <div class="side-group-label">Super Admin</div>
       <?= $navLink('/admin/dashboard.php', 'admin-dashboard', 'chart', 'Admin Dashboard') ?>
-      <?= $navLink('/admin/event-organizer.php', 'manage-events', 'tools', 'Manage Events') ?>
+      <?= $manageMenu() ?>
       <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
       <?= $navLink('/admin/admin-taxonomy.php', 'admin-taxonomy', 'tag', 'Categories &amp; Orgs') ?>
       <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
       <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users &amp; Roles') ?>
+      <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
     </nav>
   <?php endif; ?>
+
+  <?php /* Shown by assets/js/app.js on phones / when the browser can install the site (computers: "Install as an app"). */ ?>
+  <button type="button" class="side-install" data-install-app data-desktop-label="Install as an app" hidden>
+    <img src="<?= BASE_URL ?>/assets/images/app/icon-192.png" alt="" width="22" height="22"> <span data-install-label>Install app on this phone</span>
+  </button>
 </aside>
 <div class="nav-backdrop" data-nav-close hidden></div>
+<?php /* The Event Hub Assistant chat box in the bottom-right corner — every page with this sidebar. */ ?>
+<?php /* The site's confirmation pop-up (data-confirm on forms, cehConfirm() / cehAlert()) — every page with this sidebar. */ ?>
+<script src="<?= BASE_URL ?>/assets/js/confirm.js?v=<?= filemtime(__DIR__ . '/../public/assets/js/confirm.js') ?>" defer></script>
+<?php include __DIR__ . '/assistant-widget.php'; ?>

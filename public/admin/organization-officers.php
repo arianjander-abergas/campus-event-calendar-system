@@ -10,7 +10,7 @@ $isAdmin = ($user['role'] ?? '') === 'admin';
 
 $orgId = get_param('org');
 if (!$isAdmin && $orgId !== ($user['organization_id'] ?? '')) {
-    flash('error', "Moderators can only manage their own organization's officers.");
+    flash('error', "Admins can only manage their own organization's officers.");
     header('Location: organization-officers.php?org=' . urlencode((string) $user['organization_id']));
     exit;
 }
@@ -97,10 +97,11 @@ $activeNav = $isAdmin ? 'admin-taxonomy' : 'my-officers';
 $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'] : ['Dashboard', '../enduser/dashboard.php'], [$org['name'], null], ['Officers', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Officers: <?= htmlspecialchars($org['name']) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -213,7 +214,7 @@ $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organiz
                     <td><span class="admin-status admin-status-<?= !empty($o['is_active']) ? 'published' : 'draft' ?>"><?= !empty($o['is_active']) ? 'Active' : 'Inactive' ?></span></td>
                     <td class="admin-row-actions">
                       <a href="<?= htmlspecialchars($back) ?>&amp;edit=<?= urlencode($o['id']) ?>" class="btn-sm">Edit</a>
-                      <form method="POST" action="<?= htmlspecialchars($back) ?>" onsubmit="return confirm('Remove this officer?');">
+                      <form method="POST" action="<?= htmlspecialchars($back) ?>" data-confirm="Remove this officer from the list?" data-confirm-title="Remove officer" data-confirm-ok="Remove" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($o['id']) ?>">
                         <button type="submit" class="btn-sm btn-sm-danger">Remove</button>
@@ -231,9 +232,9 @@ $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organiz
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
-<script src="../assets/js/forms.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
+<script src="../assets/js/forms.js?v=<?= filemtime(__DIR__ . '/../assets/js/forms.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

@@ -40,7 +40,7 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= $title ?>: <?= htmlspecialchars($event['title']) ?> — Campus Event Hub</title>
-<link rel="stylesheet" href="../assets/css/print.css">
+<link rel="stylesheet" href="../assets/css/print.css?v=<?= filemtime(__DIR__ . '/../assets/css/print.css') ?>">
 </head>
 <body>
 
@@ -62,7 +62,7 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
 
 <main class="sheet">
   <header class="sheet-head">
-    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="sheet-logo">
+    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="Campus Event Hub logo" class="sheet-logo">
     <div class="sheet-head-text">
       <strong class="sheet-school"><?= htmlspecialchars(SCHOOL_NAME) ?></strong>
       <?php if (!empty($department['name'])): ?><span><?= htmlspecialchars($department['name']) ?> Department</span><?php endif; ?>
@@ -80,8 +80,8 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
     <div><dt>Event</dt><dd><?= htmlspecialchars($event['title']) ?></dd></div>
     <div><dt>Date &amp; time</dt><dd><?= htmlspecialchars(event_when($event)) ?></dd></div>
     <div><dt>Venue</dt><dd><?= htmlspecialchars(event_place($event)) ?><?= !empty($event['address']) ? ', ' . htmlspecialchars($event['address']) : '' ?> (<?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null)) ?>)</dd></div>
-    <div><dt>Audience</dt><dd><?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null)) ?></dd></div>
-    <div><dt>Category</dt><dd><?= htmlspecialchars($event['categories']['name'] ?? label_of(EVENT_TYPES, $event['event_type'] ?? null)) ?></dd></div>
+    <div><dt>Audience</dt><dd><?= htmlspecialchars(event_audience_label($event)) ?></dd></div>
+    <div><dt>Category</dt><dd><?= htmlspecialchars(event_category_label($event, '—')) ?></dd></div>
   </dl>
 
   <table class="sheet-table">

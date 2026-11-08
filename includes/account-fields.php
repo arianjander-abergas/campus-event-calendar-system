@@ -40,7 +40,7 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
     <legend class="<?= $labelClass ?>">I am a <span class="req">*</span></legend>
     <?php if (!empty($acctTypeLocked)): ?>
       <input type="hidden" name="account_type" value="<?= htmlspecialchars($acctType) ?>">
-      <p class="acct-locked"><strong><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $acctType)) ?></strong> account · only an admin can change this.</p>
+      <p class="acct-locked"><strong><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $acctType)) ?></strong> account · only a Super Admin can change this.</p>
     <?php else: ?>
       <div class="acct-choice">
         <?php foreach (ACCOUNT_TYPES as $key => $label): ?>
@@ -71,14 +71,14 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
         <?php foreach ($orgGroups as $deptId => $orgs): ?>
           <optgroup label="<?= htmlspecialchars($deptNames[$deptId] ?? 'Other organizations') ?>" data-department="<?= htmlspecialchars((string) $deptId) ?>">
             <?php foreach ($orgs as $o): ?>
-              <option value="<?= htmlspecialchars($o['id']) ?>" data-department="<?= htmlspecialchars((string) ($o['department_id'] ?? '')) ?>" <?= ($acct['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+              <option value="<?= htmlspecialchars($o['id']) ?>" data-department="<?= htmlspecialchars((string) ($o['department_id'] ?? '')) ?>" <?= ($acct['organization_id'] ?? '') === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
             <?php endforeach; ?>
           </optgroup>
         <?php endforeach; ?>
       </select>
       <?php if (!empty($acctOrgLocked)): ?>
         <input type="hidden" name="organization_id" value="<?= $acctVal('organization_id') ?>">
-        <p class="admin-hint">Moderators run their organization's events, so only an admin can change it.</p>
+        <p class="admin-hint">Admins run their organization's events, so only a Super Admin can change it.</p>
       <?php endif; ?>
     </div>
   </div>
@@ -93,8 +93,17 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
           <input type="hidden" name="school_id" value="<?= $acctVal('school_id') ?>">
           <p class="acct-verified">Verified by an admin. Ask an admin if it needs to change.</p>
         <?php else: ?>
+          <?php
+          // An ID saved before the format was required stays accepted while it's unchanged.
+          $acctOldSchoolId = ($acct['school_id'] ?? '') !== '' && !valid_school_id(normalize_school_id($acct['school_id']));
+          ?>
+          <?php /* The format is shown by the placeholder and checked by account.js (a message under the field
+                   only while the ID is incomplete, not the browser's bubble) and by the server. */ ?>
           <input type="text" id="school_id" name="school_id" class="<?= $inputClass ?>" value="<?= $acctVal('school_id') ?>"
-                 placeholder="e.g. <?= SCHOOL_ID_EXAMPLE ?>" maxlength="20" autocomplete="off" pattern="[A-Za-z0-9][A-Za-z0-9\- ]{3,24}" data-student-required>
+                 placeholder="e.g. <?= SCHOOL_ID_EXAMPLE ?>" maxlength="<?= $acctOldSchoolId ? 20 : 11 ?>" inputmode="numeric" autocomplete="off"
+                 aria-describedby="school_id_hint" data-school-id data-example="<?= SCHOOL_ID_EXAMPLE ?>"
+                 <?= $acctOldSchoolId ? 'data-saved="' . $acctVal('school_id') . '"' : '' ?> data-student-required>
+          <p class="acct-hint" id="school_id_hint" data-school-id-hint aria-live="polite" hidden></p>
         <?php endif; ?>
       </div>
       <div>
@@ -143,7 +152,7 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
           <li>You can register for events open to <em>any</em> of the year levels you pick.</li>
           <li>Events limited to other year levels stay closed to you.</li>
           <li>Your highest year level can't be lower than a year level you pick.</li>
-          <li>Moderators and admins see the year levels you declare, and admins may check them against the registrar's list.</li>
+          <li>Admins and Super Admins see the year levels you declare, and Super Admins may check them against the registrar's list.</li>
         </ul>
       </div>
       <label class="acct-ack"><input type="checkbox" data-irregular-ack <?= $acctLevels ? 'checked' : '' ?>> I confirm these are the year levels of my enrolled subjects.</label>

@@ -35,8 +35,9 @@ if ($eventId !== '') {
 $img = 'assets/images/event-details/';
 $posterUrl = asset_url($event['poster_url'] ?? null, $img . 'event-poster.svg');
 $orgLogo = asset_url($event['organizations']['logo_url'] ?? null, $img . 'org-logo.svg');
-$categoryName = $event['categories']['name'] ?? EVENT_TYPES[$event['event_type'] ?? 'other'] ?? 'Event';
+$categoryName = event_category_label($event);
 $orgName = $event['organizations']['name'] ?? 'Organizer';
+$coOrganizers = get_event_partner_orgs([$eventId])[$eventId] ?? []; // multi-organization events
 
 $going = $event ? get_registration_count($eventId) : 0;
 $myRegistration = $event ? get_my_registration($eventId) : null;
@@ -46,15 +47,11 @@ $reg = $event ? registration_state($event, $myRegistration, $going) : null;
 $attended = ($myRegistration['status'] ?? '') === 'attended';
 $evaluated = $attended && has_evaluated($eventId);
 
-// Schedule: this event's segments from event_programs, in sort_order.
+// Program Flow: this event's parts from event_programs, in running order (sort_order).
 $schedule = $event ? get_event_programs($eventId) : [];
 
-// "Programs" cards: other published events, soonest first, so anything
-// happening today always shows up first.
-$programCards = get_upcoming_events(3, $eventId ?: null);
 
-$notifications = get_my_notifications();
-$unreadCount = unread_count($notifications);
+$breadcrumbs = [['Dashboard', 'enduser/dashboard.php'], ['Events', 'events.php'], ['Event Details', null]];
 
 // Admins, and moderators of the event's organization, get the management links.
 $canManage = $event && can_manage_event($event, $user);
@@ -64,16 +61,18 @@ $openTo = $event ? year_levels_label($event['year_levels'] ?? []) : '';
 $banner = null;
 if ($event) {
     if ($event['status'] === 'cancelled') $banner = ['error', 'This event was cancelled.'];
-    elseif ($event['status'] === 'draft') $banner = ['info', "Draft — only admins and its organization's moderators can see this event until it is published."];
+    elseif ($event['status'] === 'draft' && ($event['approval_status'] ?? null) === 'pending') $banner = ['info', "Waiting for a Super Admin's approval — it's published once approved. Until then only admins and its organization's moderators can see it."];
+    elseif ($event['status'] === 'draft') $banner = ['info', "Draft — only Super Admins and its organization's Admins can see this event until it is published."];
     elseif ($event['status'] === 'completed') $banner = ['info', 'Completed — this event has ended.'];
     elseif (($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title><?= htmlspecialchars($event['title'] ?? 'Event Details') ?> — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -87,46 +86,7 @@ if ($event) {
 
   <?php include __DIR__ . '/../includes/nav.php'; ?>
 
-  <!-- Top bar -->
-  <header class="dash-topbar ed-topbar">
-    <?php include __DIR__ . '/../includes/topbar-start.php'; ?>
-    <nav class="ed-breadcrumb" aria-label="Breadcrumb">
-      <a href="enduser/dashboard.php">Dashboard</a>
-      <span class="ed-crumb-sep">&gt;</span>
-      <a href="events.php">Events</a>
-      <span class="ed-crumb-sep">&gt;</span>
-      <span class="ed-crumb-current">Event Details</span>
-    </nav>
-
-    <div class="ed-topbar-right">
-      <div class="ed-notif" data-notifications>
-        <button class="ed-bell" type="button" data-notif-btn aria-label="Notifications" aria-expanded="false">
-          <?= icon('bell', 20) ?>
-          <span class="ed-bell-count" data-notif-count<?= $unreadCount ? '' : ' hidden' ?>><?= $unreadCount > 9 ? '9+' : $unreadCount ?></span>
-        </button>
-        <div class="ed-notif-dropdown" data-notif-dropdown hidden>
-          <div class="ed-notif-head">Notifications</div>
-          <div class="ed-notif-list" data-notif-list><div class="ed-notif-empty">No notifications yet.</div></div>
-        </div>
-      </div>
-
-      <details class="ed-user-menu">
-        <summary>
-          <span class="avatar ed-avatar"><?= htmlspecialchars(initials($user['full_name'] ?? '')) ?></span>
-          <span class="ed-user-text">
-            <span class="ed-user-name"><?= htmlspecialchars($user['full_name']) ?></span>
-            <span class="ed-user-role"><?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></span>
-          </span>
-          <?= icon('chevron-down', 12, 'ed-user-chevron') ?>
-        </summary>
-        <div class="ed-user-dropdown">
-          <a href="enduser/profile.php">My Profile</a>
-          <a href="events.php?mine=1">My Events</a>
-          <a href="auth/logout.php">Log out</a>
-        </div>
-      </details>
-    </div>
-  </header>
+  <?php include __DIR__ . '/../includes/topbar.php'; ?>
 
   <!-- Main content -->
   <main class="dash-main ed-main">
@@ -135,9 +95,7 @@ if ($event) {
       Back to All Events
     </a>
 
-    <?php foreach (take_flashes() as $f): ?>
-      <div class="ed-flash <?= $f['type'] === 'success' ? 'ed-flash-ok' : ($f['type'] === 'error' ? 'ed-flash-error' : 'ed-flash-info') ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= htmlspecialchars($f['message']) ?></div>
-    <?php endforeach; ?>
+    <?= render_flashes() ?>
 
     <?php if (!$event): ?>
     <section class="ed-hero ed-not-found">
@@ -169,7 +127,7 @@ if ($event) {
             <?= htmlspecialchars(event_when($event)) ?>
           </div>
           <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
-          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $event['audience'] ?? null, 'Students')) ?><?= $openTo !== '' && ($event['audience'] ?? '') !== 'faculty' ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
+          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(event_audience_label($event)) ?><?= $openTo !== '' && in_array('students', event_audiences($event), true) ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
           <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
             <div class="ed-meta-row"><?= icon('link', 12) ?> <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
           <?php endif; ?>
@@ -189,12 +147,30 @@ if ($event) {
             <?php else: ?>
               <span><?= htmlspecialchars($orgName) ?></span>
             <?php endif; ?>
+            <?php foreach ($coOrganizers as $i => $co): ?>
+              <?= $i === count($coOrganizers) - 1 ? '&amp;' : ',' ?>
+              <a href="organizations.php#org-<?= htmlspecialchars($co['id']) ?>"><?= htmlspecialchars($co['name']) ?></a>
+            <?php endforeach; ?>
           </div>
         </div>
 
-        <div class="ed-register">
-          <?php if ($reg['note'] !== ''): ?>
-            <p class="ed-reg-note"><?= htmlspecialchars($reg['note']) ?></p>
+        <?php /* id="register": the "Register" button in notification emails opens the page here. */ ?>
+        <?php
+        // One line saying where the person stands, and only the buttons that apply:
+        //   open → Register Now! · registered → Registered ✓ + Cancel registration
+        //   attended → Evaluate / Completed ✓ · ended or closed → just the line.
+        // "Required" only matters while the event hasn't ended.
+        $ended = event_has_ended($event);
+        $requiredForMe = !$ended && is_required_for_me($eventId);
+        $requiredLabel = $ended ? '' : required_for_label($event);
+        $statusLine = $reg['state'] === 'registered' && $requiredForMe ? "You're registered. Your attendance is required." : $reg['note'];
+        ?>
+        <div class="ed-register" id="register">
+          <?php if ($requiredForMe && $reg['state'] !== 'registered'): ?>
+            <p class="ed-required-note" role="status"><strong>Your attendance is required.</strong><?= $reg['can_register'] ? ' Please register below.' : '' ?></p>
+          <?php endif; ?>
+          <?php if ($statusLine !== ''): ?>
+            <p class="ed-reg-note ed-reg-<?= htmlspecialchars($reg['state']) ?>"><?= htmlspecialchars($statusLine) ?></p>
           <?php endif; ?>
           <?php if ($reg['can_register']): ?>
             <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>">
@@ -209,7 +185,7 @@ if ($event) {
                 <button class="ed-btn" disabled><?= $evaluated ? 'Completed ✓' : ($reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓') ?></button>
               <?php endif; ?>
               <?php if ($reg['can_cancel']): ?>
-                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" onsubmit="return confirm('Cancel your registration for this event?');">
+                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" data-confirm="Cancel your registration for this event?" data-confirm-title="Cancel registration" data-confirm-ok="Cancel registration" data-confirm-cancel="Stay registered" data-confirm-tone="danger">
                   <input type="hidden" name="action" value="cancel_registration">
                   <button type="submit" class="ed-btn ed-btn-outline">Cancel registration</button>
                 </form>
@@ -220,9 +196,10 @@ if ($event) {
             <?php endif; ?>
           <?php endif; ?>
           <?php if ($canManage): ?>
+            <?php if ($requiredLabel !== '' && !$requiredForMe): ?><p class="ed-reg-note ed-reg-staff"><?= htmlspecialchars($requiredLabel) ?>.</p><?php endif; ?>
             <div class="ed-admin-links">
               <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
-              <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Edit schedule</a>
+              <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Edit program flow</a>
               <a href="admin/event-registrations.php?event=<?= urlencode($eventId) ?>">Registrations</a>
               <a href="admin/attendance-print.php?event=<?= urlencode($eventId) ?>">Print attendance</a>
               <a href="admin/event-evaluations.php?event=<?= urlencode($eventId) ?>">Evaluation results</a>
@@ -232,41 +209,26 @@ if ($event) {
       </div>
     </section>
     <?php endif; ?>
-
-    <!-- Programs: other published events, happening-today first -->
-    <h2 class="ed-section-title">Programs</h2>
-    <div class="ed-programs">
-      <?php if (empty($programCards)): ?>
-        <p class="ed-empty">No other upcoming events yet.</p>
-      <?php endif; ?>
-      <?php foreach ($programCards as $i => $p): ?>
-      <a class="ed-program-card" href="event-details.php?id=<?= urlencode($p['id']) ?>">
-        <!-- IMAGE SLOTS 3-5: Program card image (used when the event has no poster_url) | file: assets/images/event-details/program-<?= $i + 1 ?>.svg | 225×200 -->
-        <img src="<?= htmlspecialchars(asset_url($p['poster_url'] ?? null, $img . 'program-' . ($i + 1) . '.svg')) ?>" alt="" class="ed-program-img">
-        <div class="ed-program-body">
-          <span class="ed-program-badge"><?= htmlspecialchars($p['categories']['name'] ?? 'Event') ?></span>
-          <h3 class="ed-program-title"><?= htmlspecialchars($p['title']) ?></h3>
-          <p class="ed-program-sub"><?= htmlspecialchars(excerpt($p['description'] ?? '', 90)) ?></p>
-          <p class="ed-program-time"><?= htmlspecialchars(event_when($p)) ?></p>
-        </div>
-      </a>
-      <?php endforeach; ?>
-    </div>
   </main>
 
-  <!-- Right rail: schedule -->
+  <!-- Right rail: the program flow (section 9 of the event form) -->
   <aside class="right-rail ed-rail">
-    <div class="ed-schedule">
-      <h2 class="ed-schedule-title">Schedule</h2>
+    <div class="ed-schedule" id="program-flow">
+      <h2 class="ed-schedule-title">Program Flow</h2>
 
       <?php if (empty($schedule)): ?>
-        <p class="ed-empty">No schedule posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-programs.php?event=<?= urlencode($eventId) ?>">Add one</a>.<?php endif; ?></p>
+        <p class="ed-empty">No program flow posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Add one</a>.<?php endif; ?></p>
       <?php else: ?>
-      <!-- event_programs rows in sort_order; speaker shown on the right -->
-      <div class="ed-schedule-head">Event Program</div>
-      <ol class="ed-timeline">
-        <?php foreach ($schedule as $item): ?>
-        <li title="<?= htmlspecialchars($item['description'] ?? '') ?>"><span class="ed-tl-label"><?= htmlspecialchars($item['title']) ?></span><span class="ed-tl-dot"></span><span class="ed-tl-time"><?= htmlspecialchars($item['speaker'] ?? '') ?></span></li>
+      <ol class="ed-flow">
+        <?php foreach ($schedule as $i => $item): ?>
+        <li class="ed-flow-item">
+          <span class="ed-flow-num" aria-hidden="true"><?= $i + 1 ?></span>
+          <div class="ed-flow-body">
+            <span class="ed-flow-title"><?= htmlspecialchars($item['title']) ?></span>
+            <?php if (!empty($item['speaker'])): ?><span class="ed-flow-speaker"><?= htmlspecialchars($item['speaker']) ?></span><?php endif; ?>
+            <?php if (!empty($item['description'])): ?><span class="ed-flow-notes"><?= htmlspecialchars($item['description']) ?></span><?php endif; ?>
+          </div>
+        </li>
         <?php endforeach; ?>
       </ol>
       <?php endif; ?>
@@ -277,9 +239,8 @@ if ($event) {
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<?= notifications_bootstrap($notifications) ?>
-<script src="assets/js/sidebar.js"></script>
-<script src="assets/js/ui.js"></script>
+<script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
+<script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

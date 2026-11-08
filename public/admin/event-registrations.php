@@ -45,14 +45,15 @@ if (get_param('export') === 'csv') {
 
 $totals = array_count_values(array_column($registrations, 'status'));
 $evaluationCount = count($evaluators);
-$activeNav = 'manage-events';
-$breadcrumbs = [['Manage Events', 'event-organizer.php'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
+$activeNav = 'manage-update';
+$breadcrumbs = [['Update Events', 'event-organizer.php?view=update'], [$event['title'], 'event-organizer.php?edit=' . urlencode($eventId)], ['Registrations', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Registrations: <?= htmlspecialchars($event['title']) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -151,8 +152,8 @@ document.querySelectorAll('[data-check-all]').forEach(function (all) {
   });
 });
 </script>
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

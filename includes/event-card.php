@@ -1,10 +1,12 @@
 <?php
 /**
  * One event card (home page, dashboard, events list). Expects $ev — an
- * event row selected with EVENT_CARD_SELECT. Shows a "Today" / "Ended" /
- * "Completed" pill when it applies (or $ev['my_label'] on My Events, e.g.
- * "Registered", "Completed"), where and for whom the event is (with its year
- * levels), the live "N going" count and the organizing organization.
+ * event row selected with EVENT_CARD_SELECT. Shows one pill: $ev['my_label']
+ * on My Events (e.g. "Registered", "Completed"), else "Required" when the
+ * logged-in person must attend (the database's my_required_events()), else
+ * "Completed" / "Today" / "Ended" when it applies. Also where and for whom the
+ * event is (with its year levels), the live "N going" count and the
+ * organizing organization.
  */
 /** @var array $ev set by the page that includes this card */
 $cardToday = date('Y-m-d');
@@ -16,9 +18,11 @@ $cardOrg = $ev['organizations'] ?? null;
 ?>
 <a class="event-card" href="<?= BASE_URL ?>/event-details.php?id=<?= urlencode((string) $ev['id']) ?>">
   <div class="event-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');">
-    <span class="event-tag"><?= htmlspecialchars($ev['categories']['name'] ?? EVENT_TYPES[$ev['event_type'] ?? 'other'] ?? 'Event') ?></span>
+    <span class="event-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
     <?php if (!empty($ev['my_label'])): ?>
       <span class="status-pill status-<?= htmlspecialchars(strtolower($ev['my_label'])) ?>"><?= htmlspecialchars($ev['my_label']) ?></span>
+    <?php elseif (is_required_for_me($ev['id'] ?? null)): ?>
+      <span class="status-pill status-required" title="Your attendance is required">Required</span>
     <?php elseif (($ev['status'] ?? '') === 'completed'): ?>
       <span class="status-pill status-completed">Completed</span>
     <?php elseif ($cardLive): ?>
@@ -36,7 +40,7 @@ $cardOrg = $ev['organizations'] ?? null;
       <div class="event-meta"><?= icon('location', 14) ?> <?= htmlspecialchars(event_place($ev)) ?><?= !empty($ev['venue_type']) ? ' · ' . htmlspecialchars(label_of(VENUE_TYPES, $ev['venue_type'], '')) : '' ?></div>
     <?php endif; ?>
     <?php if (!empty($ev['audience'])): ?>
-      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'], '')) ?><?= $cardLevels !== '' ? ' · ' . htmlspecialchars($cardLevels) : '' ?></div>
+      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $cardLevels !== '' ? ' · ' . htmlspecialchars($cardLevels) : '' ?></div>
     <?php endif; ?>
     <div class="event-meta"><?= icon('people', 14) ?> <?= get_registration_count((string) $ev['id']) ?> going</div>
     <?php if (!empty($cardOrg['name'])): ?>

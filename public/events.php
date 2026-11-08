@@ -4,7 +4,7 @@
  * single filter bar; clicking a day shows every event on that date.
  *   ?month=2026-09        the month shown (default: this month)
  *   ?date=2026-09-30      the selected day (default: today, or the 1st event of the month)
- *   ?q=keyword &category=<id> &organization=<id> &audience=students|faculty
+ *   ?q=keyword &category=<id> &organization=<id> &audience=students|faculty|outsiders
  *   &venue_type=on_campus|off_campus|online
  *   ?mine=1               the logged-in user's registered events (a list)
  * The header / dashboard search boxes, "View All" links and the
@@ -40,7 +40,7 @@ $filters = [
     'q' => get_param('q'),
     'category' => is_uuid(get_param('category')) ? get_param('category') : '',
     'organization' => is_uuid(get_param('organization')) ? get_param('organization') : '',
-    'audience' => in_array(get_param('audience'), ['students', 'faculty'], true) ? get_param('audience') : '',
+    'audience' => in_array(get_param('audience'), ['students', 'faculty', 'outsiders'], true) ? get_param('audience') : '',
     'venue_type' => isset(VENUE_TYPES[get_param('venue_type')]) ? get_param('venue_type') : '',
 ];
 $isFiltered = implode('', $filters) !== '';
@@ -114,10 +114,16 @@ function calendar_time_line(array $ev): string
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?php if ($mine): ?>
+<meta name="robots" content="noindex">
+<?php else: ?>
+<?= seo_head_tags('Event Calendar — Campus Event Hub | LCUP', 'The La Consolacion University Philippines (LCUP) event calendar: every seminar, workshop, sports and cultural event by date, with venue, time and registration details.', 'events.php') ?>
+<?php endif; ?>
+<?= app_head_tags() ?>
 <title><?= htmlspecialchars($heading) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 <link rel="stylesheet" href="assets/css/calendar.css?v=<?= filemtime(__DIR__ . '/assets/css/calendar.css') ?>">
@@ -174,13 +180,14 @@ function calendar_time_line(array $ev): string
     <select name="organization" aria-label="Organization">
       <option value="">All organizations</option>
       <?php foreach ($organizations as $o): ?>
-        <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+        <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
       <?php endforeach; ?>
     </select>
     <select name="audience" aria-label="Audience">
       <option value="">Any audience</option>
       <option value="students" <?= $filters['audience'] === 'students' ? 'selected' : '' ?>>For students</option>
       <option value="faculty" <?= $filters['audience'] === 'faculty' ? 'selected' : '' ?>>For faculty</option>
+      <?php if (audiences_ready()): ?><option value="outsiders" <?= $filters['audience'] === 'outsiders' ? 'selected' : '' ?>>Open to outsiders</option><?php endif; ?>
     </select>
     <select name="venue_type" aria-label="Venue type">
       <option value="">Any venue</option>
@@ -267,7 +274,8 @@ function calendar_time_line(array $ev): string
                  aria-label="<?= htmlspecialchars($d->format('l, F j') . ': ' . (count($dayEvents) ?: 'no') . ' event' . (count($dayEvents) === 1 ? '' : 's')) ?>"<?= $iso === $selected ? ' aria-current="date"' : '' ?>>
                 <span class="cal-num"><?= $d->format('j') ?></span>
                 <?php foreach (array_slice($chipEvents, 0, 3) as $ev): ?>
-                  <span class="cal-chip cal-chip-<?= htmlspecialchars($ev['venue_type'] ?? 'on_campus') ?><?= ($ev['status'] ?? '') === 'completed' ? ' is-done' : '' ?>"><?= htmlspecialchars($ev['title']) ?></span>
+                  <?php $phase = event_phase($ev); ?>
+                  <span class="cal-chip cal-chip-<?= $phase ?>" title="<?= htmlspecialchars($ev['title'] . ' — ' . ['upcoming' => 'Upcoming', 'ongoing' => 'Happening now', 'done' => 'Completed'][$phase]) ?>"><?= htmlspecialchars($ev['title']) ?></span>
                 <?php endforeach; ?>
                 <?php if (count($chipEvents) > 3): ?><span class="cal-more">+<?= count($chipEvents) - 3 ?> more</span><?php endif; ?>
                 <?php if ($chipEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($chipEvents) ?></span><?php endif; ?>
@@ -279,10 +287,9 @@ function calendar_time_line(array $ev): string
       </table>
 
       <div class="cal-legend" aria-hidden="true">
-        <span><i class="cal-chip cal-chip-on_campus"></i> On-campus</span>
-        <span><i class="cal-chip cal-chip-off_campus"></i> Off-campus</span>
-        <span><i class="cal-chip cal-chip-online"></i> Online</span>
-        <span><i class="cal-chip cal-chip-on_campus is-done"></i> Completed</span>
+        <span><i class="cal-chip cal-chip-upcoming"></i> Upcoming</span>
+        <span><i class="cal-chip cal-chip-ongoing"></i> Happening now</span>
+        <span><i class="cal-chip cal-chip-done"></i> Completed</span>
       </div>
     </section>
 
@@ -293,22 +300,24 @@ function calendar_time_line(array $ev): string
           <h2><?= htmlspecialchars(date('l, F j, Y', strtotime($iso))) ?></h2>
           <p class="cal-day-count"><?= count($dayEvents) ?> event<?= count($dayEvents) === 1 ? '' : 's' ?><?= $iso === $today ? ' · Today' : '' ?></p>
           <?php foreach ($dayEvents as $ev):
-            $ended = ($ev['status'] ?? '') === 'completed' || ($ev['end_date'] ?? $ev['start_date']) < $today;
+            $phase = event_phase($ev);
             $levels = year_levels_label($ev['year_levels'] ?? []);
           ?>
-            <a class="cal-event" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <a class="cal-event cal-event-<?= $phase ?>" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
               <span class="cal-event-time"><?= htmlspecialchars(calendar_time_line($ev)) ?></span>
               <strong class="cal-event-title"><?= htmlspecialchars($ev['title']) ?></strong>
               <span class="cal-event-meta"><?= icon(($ev['venue_type'] ?? '') === 'online' ? 'online' : 'location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></span>
               <?php if (!empty($ev['organizations']['name'])): ?>
                 <span class="cal-event-meta"><?= icon('organizations', 13) ?> <?= htmlspecialchars($ev['organizations']['name']) ?></span>
               <?php endif; ?>
-              <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(label_of(EVENT_AUDIENCES, $ev['audience'] ?? null, 'Students')) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
+              <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
               <span class="cal-event-tags">
-                <span class="cal-tag"><?= htmlspecialchars($ev['categories']['name'] ?? label_of(EVENT_TYPES, $ev['event_type'] ?? 'other', 'Event')) ?></span>
+                <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
+                <?php if (is_required_for_me($ev['id'])): ?><span class="cal-tag cal-tag-required">Required for you</span><?php endif; ?>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>
-                <?php elseif ($ended): ?><span class="cal-tag cal-tag-muted">Ended</span>
-                <?php elseif ($ev['start_date'] <= $today): ?><span class="cal-tag cal-tag-today">Happening now</span><?php endif; ?>
+                <?php elseif ($phase === 'done'): ?><span class="cal-tag cal-tag-muted"><?= ($ev['status'] ?? '') === 'cancelled' ? 'Cancelled' : 'Ended' ?></span>
+                <?php elseif ($phase === 'ongoing'): ?><span class="cal-tag cal-tag-today">Happening now</span>
+                <?php else: ?><span class="cal-tag cal-tag-upcoming">Upcoming</span><?php endif; ?>
                 <span class="cal-tag cal-tag-plain"><?= (int) ($counts[$ev['id']] ?? 0) ?> going</span>
               </span>
             </a>
@@ -329,9 +338,9 @@ function calendar_time_line(array $ev): string
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<script src="assets/js/sidebar.js"></script>
-<script src="assets/js/ui.js"></script>
-<script src="assets/js/calendar.js"></script>
+<script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
+<script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
+<script src="assets/js/calendar.js?v=<?= filemtime(__DIR__ . '/assets/js/calendar.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

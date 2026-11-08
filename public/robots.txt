@@ -1,0 +1,15 @@
+# Campus Event Hub — what search engines may list.
+# Public pages (home, Event Calendar, Organizations) are open; account,
+# admin and API pages are private and stay out of search results.
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /enduser/
+Disallow: /api/
+Disallow: /event-details.php
+Disallow: /events.php?mine=
+
+# After deploying, replace the domain below with the live one and submit
+# the same address in Google Search Console → Sitemaps.
+Sitemap: https://YOUR-DOMAIN/sitemap.php

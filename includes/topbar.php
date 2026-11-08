@@ -1,7 +1,7 @@
 <?php
 /**
  * Top bar for every page with the sidebar: breadcrumbs (or a search box),
- * the notification bell and the user menu — or Log in / Sign up for
+ * the Light / Dim / Dark switcher, the notification bell and the user menu — or Log in / Sign up for
  * visitors who aren't logged in. Set before including:
  *   $breadcrumbs  = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['Events', null]]
  *   $topbarSearch = true   // show the event search box instead of breadcrumbs
@@ -32,6 +32,7 @@ $unreadCount = unread_count($notifications);
   <?php endif; ?>
 
   <div class="topbar-right">
+    <?php include __DIR__ . '/theme-switch.php'; ?>
     <?php if (!$topUser): ?>
       <a href="<?= BASE_URL ?>/auth/login.php" class="btn-login">LOG IN</a>
       <a href="<?= BASE_URL ?>/auth/register.php" class="btn btn-outline topbar-signup">Sign up</a>

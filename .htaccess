@@ -1,0 +1,21 @@
+# Only public/ is the website. Everything else in this folder — config/
+# (settings and passwords), includes/, supabase/, .git/, README.md — must
+# never be served, even if the whole project folder ends up in the web
+# root (as with XAMPP's htdocs link).
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # The project's address opens the site.
+  RewriteRule ^$ %{REQUEST_URI}public/ [R=302,L]
+  # Files starting with a dot (.git, .htaccess, .vscode…) — anywhere.
+  RewriteRule (^|/)\.(?!well-known/) - [F,L]
+  # public/ is served; everything else is refused.
+  RewriteRule ^public(/|$) - [L]
+  RewriteRule ^ - [F,L]
+</IfModule>
+
+# Without mod_rewrite, refuse everything rather than expose the project.
+<IfModule !mod_rewrite.c>
+  Require all denied
+</IfModule>

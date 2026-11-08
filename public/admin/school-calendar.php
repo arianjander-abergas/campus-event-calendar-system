@@ -89,10 +89,11 @@ $activeNav = 'admin-calendar';
 $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>School Calendar — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -174,7 +175,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
                     <td class="num"><a href="reports.php?school_year=<?= urlencode($sy) ?>&amp;semester=<?= urlencode($t['semester']) ?>"><?= $eventCounts[$sy . '|' . $t['semester']] ?? 0 ?></a></td>
                     <td class="admin-row-actions">
                       <a href="school-calendar.php?edit=<?= urlencode($t['id']) ?>" class="btn-sm">Edit</a>
-                      <form method="POST" action="school-calendar.php" onsubmit="return confirm('Delete this term? Its dates will follow the default calendar.');">
+                      <form method="POST" action="school-calendar.php" data-confirm="Delete this term? Its dates will follow the default calendar." data-confirm-title="Delete term" data-confirm-ok="Delete" data-confirm-tone="danger">
                         <input type="hidden" name="action" value="delete_term">
                         <input type="hidden" name="id" value="<?= htmlspecialchars($t['id']) ?>">
                         <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
@@ -192,9 +193,9 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['School Calendar', null]]
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
-<script src="../assets/js/forms.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
+<script src="../assets/js/forms.js?v=<?= filemtime(__DIR__ . '/../assets/js/forms.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

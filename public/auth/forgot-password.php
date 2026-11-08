@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Forgot Password — Campus Event Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,11 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   <div class="login-pane">
   <a href="../index.php" class="login-logo" aria-label="Campus Event Hub home">
-<<<<<<< Updated upstream
-    <img src="<?= htmlspecialchars(school_logo_url()) ?>" alt="<?= htmlspecialchars(SCHOOL_NAME) ?> logo" class="login-logo-mark" width="88" height="88">
-=======
     <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="Campus Event Hub logo" class="login-logo-mark" width="88" height="88">
->>>>>>> Stashed changes
     <span class="login-logo-text">
       <span class="campus">CAMPUS</span>
       <span class="hub">EVENT HUB</span>
