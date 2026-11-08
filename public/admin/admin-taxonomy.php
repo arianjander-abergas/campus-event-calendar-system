@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_depa
     if ($fields['name'] === '') {
         $errors[] = 'Department name is required.';
     } elseif ($fields['code'] !== null && mb_strlen($fields['code']) > 12) {
-        $errors[] = 'Keep the code short (12 characters or fewer), e.g. IT.';
+        $errors[] = 'Keep the code short (12 characters or fewer), e.g. CIT.';
     } else {
         $result = save_department_admin(is_uuid($existingId) ? $existingId : null, $fields);
         if ($result['ok']) {
@@ -281,10 +281,10 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
           <h2 class="admin-card-title">Add Department</h2>
 
           <label class="admin-label" for="dept_name">Name <span class="req">*</span></label>
-          <input type="text" id="dept_name" name="name" class="admin-input" placeholder="e.g. Information Technology" value="<?= $deptVal('name') ?>" required>
+          <input type="text" id="dept_name" name="name" class="admin-input" placeholder="e.g. College of Information Technology" value="<?= $deptVal('name') ?>" required>
 
           <label class="admin-label" for="dept_code">Short code</label>
-          <input type="text" id="dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. IT" value="<?= $deptVal('code') ?>">
+          <input type="text" id="dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. CIT" value="<?= $deptVal('code') ?>">
 
           <label class="admin-label" for="dept_description">Description</label>
           <textarea id="dept_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $deptVal('description') ?></textarea>
@@ -349,7 +349,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
           <input type="text" id="edit_dept_name" name="name" class="admin-input" value="<?= $editVal($deptEdit, 'name') ?>" required>
 
           <label class="admin-label" for="edit_dept_code">Short code</label>
-          <input type="text" id="edit_dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. IT" value="<?= $editVal($deptEdit, 'code') ?>">
+          <input type="text" id="edit_dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. CIT" value="<?= $editVal($deptEdit, 'code') ?>">
 
           <label class="admin-label" for="edit_dept_description">Description</label>
           <textarea id="edit_dept_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $editVal($deptEdit, 'description') ?></textarea>
