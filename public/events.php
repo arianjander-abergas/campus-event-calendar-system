@@ -118,6 +118,11 @@ function calendar_time_line(array $ev): string
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?php if ($mine): ?>
+<meta name="robots" content="noindex">
+<?php else: ?>
+<?= seo_head_tags('Event Calendar — Campus Event Hub | LCUP', 'The La Consolacion University Philippines (LCUP) event calendar: every seminar, workshop, sports and cultural event by date, with venue, time and registration details.', 'events.php') ?>
+<?php endif; ?>
 <?= app_head_tags() ?>
 <title><?= htmlspecialchars($heading) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
@@ -269,7 +274,8 @@ function calendar_time_line(array $ev): string
                  aria-label="<?= htmlspecialchars($d->format('l, F j') . ': ' . (count($dayEvents) ?: 'no') . ' event' . (count($dayEvents) === 1 ? '' : 's')) ?>"<?= $iso === $selected ? ' aria-current="date"' : '' ?>>
                 <span class="cal-num"><?= $d->format('j') ?></span>
                 <?php foreach (array_slice($chipEvents, 0, 3) as $ev): ?>
-                  <span class="cal-chip cal-chip-<?= htmlspecialchars($ev['venue_type'] ?? 'on_campus') ?><?= ($ev['status'] ?? '') === 'completed' ? ' is-done' : '' ?>"><?= htmlspecialchars($ev['title']) ?></span>
+                  <?php $phase = event_phase($ev); ?>
+                  <span class="cal-chip cal-chip-<?= $phase ?>" title="<?= htmlspecialchars($ev['title'] . ' — ' . ['upcoming' => 'Upcoming', 'ongoing' => 'Happening now', 'done' => 'Completed'][$phase]) ?>"><?= htmlspecialchars($ev['title']) ?></span>
                 <?php endforeach; ?>
                 <?php if (count($chipEvents) > 3): ?><span class="cal-more">+<?= count($chipEvents) - 3 ?> more</span><?php endif; ?>
                 <?php if ($chipEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($chipEvents) ?></span><?php endif; ?>
@@ -281,10 +287,9 @@ function calendar_time_line(array $ev): string
       </table>
 
       <div class="cal-legend" aria-hidden="true">
-        <span><i class="cal-chip cal-chip-on_campus"></i> On-campus</span>
-        <span><i class="cal-chip cal-chip-off_campus"></i> Off-campus</span>
-        <span><i class="cal-chip cal-chip-online"></i> Online</span>
-        <span><i class="cal-chip cal-chip-on_campus is-done"></i> Completed</span>
+        <span><i class="cal-chip cal-chip-upcoming"></i> Upcoming</span>
+        <span><i class="cal-chip cal-chip-ongoing"></i> Happening now</span>
+        <span><i class="cal-chip cal-chip-done"></i> Completed</span>
       </div>
     </section>
 
@@ -295,10 +300,10 @@ function calendar_time_line(array $ev): string
           <h2><?= htmlspecialchars(date('l, F j, Y', strtotime($iso))) ?></h2>
           <p class="cal-day-count"><?= count($dayEvents) ?> event<?= count($dayEvents) === 1 ? '' : 's' ?><?= $iso === $today ? ' · Today' : '' ?></p>
           <?php foreach ($dayEvents as $ev):
-            $ended = ($ev['status'] ?? '') === 'completed' || ($ev['end_date'] ?? $ev['start_date']) < $today;
+            $phase = event_phase($ev);
             $levels = year_levels_label($ev['year_levels'] ?? []);
           ?>
-            <a class="cal-event" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <a class="cal-event cal-event-<?= $phase ?>" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
               <span class="cal-event-time"><?= htmlspecialchars(calendar_time_line($ev)) ?></span>
               <strong class="cal-event-title"><?= htmlspecialchars($ev['title']) ?></strong>
               <span class="cal-event-meta"><?= icon(($ev['venue_type'] ?? '') === 'online' ? 'online' : 'location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></span>
@@ -310,8 +315,9 @@ function calendar_time_line(array $ev): string
                 <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
                 <?php if (is_required_for_me($ev['id'])): ?><span class="cal-tag cal-tag-required">Required for you</span><?php endif; ?>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>
-                <?php elseif ($ended): ?><span class="cal-tag cal-tag-muted">Ended</span>
-                <?php elseif ($ev['start_date'] <= $today): ?><span class="cal-tag cal-tag-today">Happening now</span><?php endif; ?>
+                <?php elseif ($phase === 'done'): ?><span class="cal-tag cal-tag-muted"><?= ($ev['status'] ?? '') === 'cancelled' ? 'Cancelled' : 'Ended' ?></span>
+                <?php elseif ($phase === 'ongoing'): ?><span class="cal-tag cal-tag-today">Happening now</span>
+                <?php else: ?><span class="cal-tag cal-tag-upcoming">Upcoming</span><?php endif; ?>
                 <span class="cal-tag cal-tag-plain"><?= (int) ($counts[$ev['id']] ?? 0) ?> going</span>
               </span>
             </a>

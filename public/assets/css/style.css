@@ -1677,7 +1677,6 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .cal-cell.is-today .cal-num { background: var(--neu-blue); box-shadow: 2px 2px 5px rgba(var(--p-accent-rgb), 0.4); }
 .neu .cal-cell.is-selected .cal-day { background: var(--neu-bg); border-color: var(--orange-strong); box-shadow: var(--neu-in); }
 .neu .cal-chip { border-radius: 6px; }
-.neu .cal-chip-on_campus { background: var(--neu-blue); }
 .neu .cal-toolbar h2,
 .neu .cal-day-events h2 { color: var(--navy); }
 /* Events on the chosen date. */
@@ -1692,7 +1691,8 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .cal-event:hover { box-shadow: var(--neu-out); border-left-color: var(--p-accent); }
 .neu .cal-event-time { color: var(--neu-link); }
 .neu .cal-tag { background: rgba(var(--p-accent-rgb), 0.12); color: var(--neu-link); }
-.neu .cal-tag-today { background: var(--p-accent); color: #fff; }
+.neu .cal-tag-today { background: #15803d; color: #fff; }
+.neu .cal-tag-upcoming { background: #c2410c; color: #fff; }
 .neu .cal-tag-plain { background: transparent; color: var(--neu-muted); }
 
 /* ---- Organizations (organizations.php) ---- */
@@ -2371,7 +2371,7 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
 /* ---- Where the dark colour was a fill behind white text ---- */
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(
   .event-tag, .row-more[open] > summary,
-  .cal-cell.is-today .cal-num, .cal-chip-on_campus, .cal-grid .day.today
+  .cal-cell.is-today .cal-num, .cal-grid .day.today
 ) { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 /* ---- Tints: messages, statuses, badges ---- */
