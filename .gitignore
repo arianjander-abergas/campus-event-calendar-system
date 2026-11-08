@@ -3,3 +3,6 @@ config/assistant.local.php
 
 # Email (SMTP) password for notifications (see config/mail.local.example.php)
 config/mail.local.php
+
+# Load balancer settings (see deploy/load-balancer/.env.example)
+deploy/load-balancer/.env

@@ -23,6 +23,75 @@ define('SUPABASE_ANON_KEY', getenv('SUPABASE_ANON_KEY') ?: 'eyJhbGciOiJIUzI1NiIs
 // "Today" (events happening today, deadlines, upcoming lists) is the Philippines' date.
 date_default_timezone_set('Asia/Manila');
 
+// ---- Running behind a load balancer (deploy/load-balancer/) -----------------
+// Off unless these environment variables are set, so XAMPP works as before.
+//   TRUSTED_PROXIES    the load balancer's addresses (IPs or CIDR ranges,
+//                      comma-separated): requests from them carry the
+//                      visitor's real IP in X-Forwarded-For.
+//   SESSION_REDIS_URL  e.g. tcp://redis:6379 — logins are kept in Redis,
+//                      shared by every app server, instead of in one
+//                      server's files (otherwise a click that lands on
+//                      another server would log the user out).
+
+/** True if $ip is in $range ("10.0.0.5" or "10.0.0.0/8"). */
+function ip_in_range(string $ip, string $range): bool
+{
+    if (!str_contains($range, '/')) return $ip === $range;
+    [$net, $bits] = explode('/', $range, 2);
+    $ipBin = @inet_pton($ip);
+    $netBin = @inet_pton($net);
+    if ($ipBin === false || $netBin === false || strlen($ipBin) !== strlen($netBin)) return false;
+    $bits = (int) $bits;
+    $bytes = intdiv($bits, 8);
+    if (substr($ipBin, 0, $bytes) !== substr($netBin, 0, $bytes)) return false;
+    if ($bits % 8 === 0) return true;
+    $mask = chr((0xff << (8 - $bits % 8)) & 0xff);
+    return (($ipBin[$bytes] & $mask) === ($netBin[$bytes] & $mask));
+}
+
+if (($proxies = getenv('TRUSTED_PROXIES')) && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    foreach (array_filter(array_map('trim', explode(',', $proxies))) as $range) {
+        if (ip_in_range($remote, $range)) {
+            // The load balancer appends the address it saw: the last entry is the visitor.
+            $chain = array_map('trim', explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']));
+            $client = end($chain);
+            if (filter_var($client, FILTER_VALIDATE_IP)) $_SERVER['REMOTE_ADDR'] = $client;
+            break;
+        }
+    }
+}
+
+if (($redisUrl = getenv('SESSION_REDIS_URL')) && session_status() === PHP_SESSION_NONE) {
+    if (extension_loaded('redis')) {
+        ini_set('session.save_handler', 'redis');
+        ini_set('session.save_path', $redisUrl);
+    } else {
+        error_log('SESSION_REDIS_URL is set but the PHP redis extension is missing; sessions stay on this server.');
+    }
+}
+
+/** The Redis server shared by every app server (SESSION_REDIS_URL), or null when there isn't one. */
+function shared_redis(): ?Redis
+{
+    static $redis = false;
+    if ($redis !== false) return $redis;
+    $redis = null;
+    $url = getenv('SESSION_REDIS_URL');
+    if (!$url || !extension_loaded('redis')) return null;
+    $parts = parse_url(str_replace('tcp://', 'redis://', $url));
+    try {
+        $r = new Redis();
+        if ($r->connect($parts['host'] ?? 'redis', (int) ($parts['port'] ?? 6379), 1.5)) {
+            if (!empty($parts['pass'])) $r->auth($parts['pass']);
+            $redis = $r;
+        }
+    } catch (Throwable $e) {
+        error_log('Redis unavailable: ' . $e->getMessage());
+    }
+    return $redis;
+}
+
 // ---- School identity --------------------------------------------------------
 // Shown in the header, sidebar, footer, login pages and on every printout.
 const SCHOOL_NAME = 'La Consolacion University Philippines';
@@ -636,7 +705,7 @@ function safe_redirect_target(?string $target, string $default): string
 /** Absolute URL of a page on this site (for links Supabase sends by email / OAuth). */
 function app_url(string $path = ''): string
 {
-    $origin = getenv('APP_ORIGIN') ?: ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http')
+    $origin = getenv('APP_ORIGIN') ?: ((is_https_request() ? 'https' : 'http')
         . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
     return rtrim($origin, '/') . BASE_URL . '/' . ltrim($path, '/');
 }

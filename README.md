@@ -263,3 +263,32 @@ It never sends accounts' emails, School IDs or passwords. An event's own contact
 - `includes/assistant-widget.php`: the chat box, included by `includes/nav.php`.
 - `public/api/assistant.php`: the endpoint.
 - `public/assets/js/assistant.js` and `public/assets/css/assistant.css`: behaviour and styles.
+
+## Load balancing (many users at once)
+
+`deploy/load-balancer/` runs the site on **three app servers behind an Nginx load balancer**, for a VPS or cloud server (DigitalOcean, AWS, Azure…) with Docker. Shared hosting (cPanel) can't run it; there the host handles traffic.
+
+```
+visitors ──> lb (Nginx :80) ──> app1 / app2 / app3 (PHP + Apache, public/)
+                                     │
+                                     ├── redis (shared logins and assistant limits)
+                                     └── Supabase (the same database, logins and files for all)
+```
+
+- **Spreading the load:** each request goes to the app server with the fewest requests in progress (`least_conn`). A server that stops answering is skipped until it recovers, and a request that fails is retried on the next one, so the site stays up while one server is down or being updated.
+- **Staying logged in:** logins are kept in Redis (`SESSION_REDIS_URL`), not in one server's files, so it doesn't matter which server answers a click. The Event Hub Assistant's limits are counted in Redis too.
+- **Fair use:** each visitor's IP may make 20 requests a second (bursts up to 60) and 30 connections at once; beyond that Nginx answers 429. The app sees the visitor's real IP and https from the load balancer's headers (`TRUSTED_PROXIES`).
+- **Health:** `health.php` answers `ok <server>` per app server; open `/lb-status` a few times to watch it answer from app1, app2 and app3.
+
+**Run it** (Docker Compose 2.24+), from the project folder:
+
+1. `cp deploy/load-balancer/.env.example deploy/load-balancer/.env` and set `APP_ORIGIN` to the live address.
+2. Put `config/mail.local.php` and `config/assistant.local.php` in place (they're copied into the servers), or use the `.env` variables.
+3. `docker compose -f deploy/load-balancer/docker-compose.yml up -d --build`
+4. Open `http://<server address>/lb-status`. For HTTPS, put the server behind a TLS proxy or add a certificate to `nginx.conf` (e.g. with Certbot).
+
+More servers: copy an `appN` block in `docker-compose.yml` and add `server appN:80 …;` to `nginx.conf`.
+
+**The database is shared:** extra app servers spread the PHP work, but every one of them talks to the same Supabase project. When many people use the site at once, check Supabase's usage (Dashboard → Reports) and move to a bigger plan or compute size if the database is the limit.
+
+On XAMPP none of this is switched on; the site runs as a single server as before.
