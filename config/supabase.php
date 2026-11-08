@@ -500,6 +500,25 @@ function is_long_event(array $ev): bool
     return $s && $e && ($e - $s) / 86400 >= 7;
 }
 
+/**
+ * Where an event is right now (Philippine time): 'upcoming' (hasn't
+ * started), 'ongoing' (started, not ended yet) or 'done' (ended, completed
+ * or cancelled). No start time = from the start of the start date; no end
+ * time = until the end of the end date.
+ */
+function event_phase(array $ev): string
+{
+    if (in_array($ev['status'] ?? '', ['completed', 'cancelled'], true)) return 'done';
+    $startDate = (string) ($ev['start_date'] ?? '');
+    $endDate = (string) (($ev['end_date'] ?? '') ?: $startDate);
+    $start = strtotime($startDate . ' ' . (!empty($ev['start_time']) ? $ev['start_time'] : '00:00:00'));
+    $end = !empty($ev['end_time']) ? strtotime($endDate . ' ' . $ev['end_time']) : strtotime($endDate . ' +1 day');
+    $now = time();
+    if ($end && $now >= $end) return 'done';
+    if ($start && $now >= $start) return 'ongoing';
+    return 'upcoming';
+}
+
 /** Venue, or "Online" for online events. */
 function event_place(array $ev): string
 {
@@ -1290,6 +1309,58 @@ function app_head_tags(): string
         . '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n"
         . '<meta name="apple-mobile-web-app-title" content="Event Hub">' . "\n"
         . '<script src="' . $b . '/assets/js/app.js?v=' . (int) @filemtime(__DIR__ . '/../public/assets/js/app.js') . '" defer></script>';
+}
+
+const SITE_NAME = 'Campus Event Hub';
+const SITE_DESCRIPTION = 'Campus Event Hub is the official event calendar of La Consolacion University Philippines (LCUP): '
+    . 'browse upcoming seminars, workshops, sports and cultural events, register online, and get notified about campus activities.';
+
+/**
+ * Tags that let search engines (Google) and link previews (Messenger,
+ * Facebook) show a public page properly: description, canonical address,
+ * Open Graph / Twitter card and, on the home page, the site's structured
+ * data. Set APP_ORIGIN (e.g. https://eventhub.lcup.edu.ph) on the live
+ * server so every address uses the real domain.
+ * $path: the page, relative to the site root ("index.php", "events.php").
+ */
+function seo_head_tags(string $title, string $description, string $path, bool $home = false): string
+{
+    $e = fn(string $s) => htmlspecialchars($s, ENT_QUOTES);
+    $url = app_url($path);
+    $image = app_url('assets/images/lcup-campus.jpg');
+    $tags = [
+        '<meta name="description" content="' . $e($description) . '">',
+        '<meta name="robots" content="index, follow">',
+        '<link rel="canonical" href="' . $e($url) . '">',
+        '<meta property="og:type" content="website">',
+        '<meta property="og:site_name" content="' . SITE_NAME . '">',
+        '<meta property="og:title" content="' . $e($title) . '">',
+        '<meta property="og:description" content="' . $e($description) . '">',
+        '<meta property="og:url" content="' . $e($url) . '">',
+        '<meta property="og:image" content="' . $e($image) . '">',
+        '<meta property="og:locale" content="en_PH">',
+        '<meta name="twitter:card" content="summary_large_image">',
+        '<meta name="twitter:title" content="' . $e($title) . '">',
+        '<meta name="twitter:description" content="' . $e($description) . '">',
+        '<meta name="twitter:image" content="' . $e($image) . '">',
+    ];
+    if ($home) {
+        $data = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => SITE_NAME,
+            'alternateName' => 'LCUP Campus Event Hub',
+            'url' => app_url(''),
+            'description' => $description,
+            'publisher' => [
+                '@type' => 'CollegeOrUniversity',
+                'name' => 'La Consolacion University Philippines',
+                'logo' => app_url('assets/images/school-logo.png'),
+            ],
+        ];
+        $tags[] = '<script type="application/ld+json">' . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
+    }
+    return implode("\n", $tags);
 }
 
 /** ' data-theme="dark"' for <html>, so the page is drawn in the chosen look straight away ('' for light). */
