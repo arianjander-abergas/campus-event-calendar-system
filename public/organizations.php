@@ -18,10 +18,12 @@ $activeNav = 'organizations';
 $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= seo_head_tags('Organizations — Campus Event Hub | LCUP', 'Student organizations of La Consolacion University Philippines (LCUP): their departments, officers and upcoming campus events.', 'organizations.php') ?>
+<?= app_head_tags() ?>
 <title>Organizations — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 </head>
@@ -42,17 +44,6 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
 
   <?php if (empty($organizations)): ?>
     <p class="events-empty">No organizations yet.</p>
-  <?php endif; ?>
-
-  <?php if (count($organizations) > 1): ?>
-    <nav class="org-jump" aria-label="Jump to organization">
-      <?php foreach ($byDepartment as $deptName => $orgs): ?>
-        <span class="org-jump-dept"><?= htmlspecialchars($deptName) ?>:</span>
-        <?php foreach ($orgs as $org): ?>
-          <a href="#org-<?= htmlspecialchars($org['id']) ?>"><?= htmlspecialchars($org['name']) ?></a>
-        <?php endforeach; ?>
-      <?php endforeach; ?>
-    </nav>
   <?php endif; ?>
 
   <?php foreach ($byDepartment as $deptName => $orgs): ?>
@@ -125,8 +116,8 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<script src="assets/js/sidebar.js"></script>
-<script src="assets/js/ui.js"></script>
+<script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
+<script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

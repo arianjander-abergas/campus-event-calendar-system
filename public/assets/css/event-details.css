@@ -21,11 +21,11 @@
 
 .event-details-page {
   --ed-bg: #ebebeb;
-  --ed-navy: #1f3f8f;
-  --ed-navy-dark: #17326f;
+  --ed-navy: var(--p-accent-deeper);
+  --ed-navy-dark: var(--p-dark-hi);
   --ed-text: #111;
   --ed-muted: #555;
-  --ed-line: #2c4a8f;
+  --ed-line: var(--p-accent-deep);
 
   font-family: "Lexend", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--ed-bg);
@@ -37,104 +37,9 @@
 
 /* Sidebar: highlight "Event" as the current section on this page. */
 .event-details-page .submenu-toggle.is-current {
-  background: #2c4f9e;
+  background: var(--p-accent-deep);
   color: #fff;
 }
-
-/* ---- Top bar ---- */
-.ed-topbar {
-  padding: 18px 40px 18px 42px;
-  min-height: 88px;
-  border-bottom: 1px solid #d6d6d6;
-}
-.ed-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 0.88rem; color: #333; }
-.ed-breadcrumb a { color: #333; }
-.ed-breadcrumb a:hover { color: var(--ed-navy); }
-.ed-crumb-sep { color: #666; }
-.ed-crumb-current { color: #111; font-weight: 500; }
-
-.ed-topbar-right { display: flex; align-items: center; gap: 30px; }
-
-/* Notification bell */
-.ed-notif { position: relative; }
-.ed-bell {
-  position: relative;
-  display: flex;
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-}
-/* IMAGE SLOT 9 — notification bell */
-.ed-bell img { width: 26px; height: 26px; object-fit: contain; display: block; }
-.ed-bell-count {
-  position: absolute;
-  top: -4px;
-  right: -6px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: #e53935;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ed-bell-count[hidden] { display: none; }
-.ed-notif-dropdown {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: -10px;
-  width: 300px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  z-index: 30;
-  overflow: hidden;
-}
-.ed-notif-dropdown[hidden] { display: none; }
-.ed-notif-head { padding: 12px 16px; font-weight: 700; border-bottom: 1px solid #eee; }
-.ed-notif-list { max-height: 320px; overflow-y: auto; }
-.ed-notif-empty { padding: 16px; font-size: 0.85rem; color: var(--ed-muted); }
-.ed-notif-list .notif-item { padding: 10px 16px; border-bottom: 1px solid #f1f1f1; }
-.ed-notif-list .notif-item.unread { background: #f3f6fd; }
-.ed-notif-list .notif-title { margin: 0 0 2px; font-weight: 600; font-size: 0.85rem; }
-.ed-notif-list .notif-message { margin: 0; font-size: 0.8rem; color: var(--ed-muted); }
-
-/* User menu (click the name/arrow to show "Log out") */
-.ed-user-menu { position: relative; }
-.ed-user-menu summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  list-style: none;
-  cursor: pointer;
-}
-.ed-user-menu summary::-webkit-details-marker { display: none; }
-/* IMAGE SLOT 10 — user avatar */
-.ed-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.ed-user-text { display: flex; flex-direction: column; line-height: 1.2; }
-.ed-user-name { font-weight: 600; font-size: 0.95rem; color: #111; }
-.ed-user-role { font-size: 0.8rem; color: var(--ed-muted); }
-/* IMAGE SLOT 11 — user menu arrow */
-.ed-user-chevron { width: 18px; height: 18px; object-fit: contain; margin-left: 18px; transition: transform 0.15s ease; }
-.ed-user-menu[open] .ed-user-chevron { transform: rotate(180deg); }
-.ed-user-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 160px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  z-index: 30;
-  padding: 6px;
-}
-.ed-user-dropdown a { display: block; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; color: #222; }
-.ed-user-dropdown a:hover { background: #f1f3f8; }
 
 /* ---- Main column ---- */
 .ed-main { padding: 28px 22px 40px 22px; min-width: 0; }
@@ -212,7 +117,7 @@
   cursor: pointer;
 }
 .ed-btn:hover:not(:disabled) { background: var(--ed-navy-dark); }
-.ed-btn:disabled { background: #5d7ab8; cursor: default; }
+.ed-btn:disabled { background: var(--p-accent-mid); cursor: default; }
 
 /* Programs */
 .ed-section-title { margin: 12px 0 6px 6px; font-size: 1.2rem; font-weight: 600; }
@@ -305,7 +210,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #0e2a5e;
+  background: var(--p-dark);
   transform: translate(-50%, -50%);
 }
 /* Line keeps going a little past the last item, like the design. */
@@ -322,11 +227,8 @@
 .ed-org-text a { color: var(--ed-navy); font-weight: 500; }
 .ed-org-text a:hover { text-decoration: underline; }
 .ed-meta-row a { color: var(--ed-navy); font-weight: 600; text-decoration: underline; }
-.ed-flash-info { background: #eaf2fd; color: #1a4f9c; }
+.ed-flash-info { background: var(--p-soft-2); color: var(--p-accent-deep); }
 .ed-empty a { color: var(--ed-navy); font-weight: 600; }
-.ed-notif-list .notif-item { display: block; color: inherit; }
-a.notif-item:hover { background: #f8fafc; }
-.ed-notif-list .notif-time { margin: 4px 0 0; font-size: 0.7rem; color: #9ca3af; }
 
 /* ---- Responsive ---- */
 @media (max-width: 1100px) {
@@ -342,10 +244,6 @@ a.notif-item:hover { background: #f8fafc; }
 }
 @media (max-width: 760px) {
   .event-details-page .dashboard-shell { grid-template-columns: 1fr; }
-  .ed-topbar { padding: 10px 16px; flex-wrap: wrap; gap: 10px 12px; min-height: 0; }
-  .ed-topbar-right { margin-left: auto; gap: 14px; }
-  .ed-user-text { display: none; }
-  .ed-user-chevron { margin-left: 4px; }
   .ed-main { padding: 20px 16px 24px; }
   .ed-back { margin-left: 0; }
   .ed-hero { padding: 16px; }
@@ -368,7 +266,40 @@ a.ed-program-card:hover .ed-program-title { color: var(--ed-navy); }
 
 /* ---- Evaluation (attendees evaluate the event once) ---- */
 a.ed-btn { display: inline-block; text-decoration: none; }
-.ed-btn-evaluate { background: #f4622c; font-weight: 600; }
-.ed-btn-evaluate:hover { background: #d94f1e !important; }
+.ed-btn-evaluate { background: var(--p-accent); font-weight: 600; }
+.ed-btn-evaluate:hover { background: var(--p-accent-text) !important; }
 .ed-eval-note { margin: 8px 0 0; font-size: 0.75rem; color: #444; text-align: right; }
 .ed-admin-links { flex-wrap: wrap; }
+
+/* "Your attendance is required." above the Register button. */
+.ed-required-note {
+  margin: 0 0 10px; padding: 9px 12px; border-radius: 10px;
+  background: var(--p-soft-2); border-left: 4px solid var(--p-accent);
+  color: var(--p-dark); font-size: 0.82rem; line-height: 1.45; text-align: left;
+}
+.ed-required-note strong { color: var(--p-accent-text); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .ed-required-note { background: var(--p-dk-surface); color: var(--text-main); }
+
+/* ---- Program Flow (right rail): the event's parts in order, numbered on a line ----
+   Filled in section 9 of the event form (event_programs). */
+.ed-flow { list-style: none; margin: 6px 0 0; padding: 0; }
+.ed-flow-item { position: relative; display: flex; gap: 12px; padding: 0 0 16px; }
+.ed-flow-item:last-child { padding-bottom: 0; }
+.ed-flow-item:not(:last-child)::before {
+  content: ""; position: absolute; left: 12px; top: 28px; bottom: 2px; width: 2px;
+  background: rgba(var(--p-accent-rgb), 0.45);
+}
+.ed-flow-num {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--p-accent); color: #fff; font-size: 0.78rem; font-weight: 800;
+}
+.ed-flow-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-top: 3px; }
+.ed-flow-title { font-size: 0.88rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.ed-flow-speaker { font-size: 0.78rem; font-weight: 600; color: var(--p-accent); overflow-wrap: anywhere; }
+.ed-flow-notes { font-size: 0.76rem; line-height: 1.45; opacity: 0.8; overflow-wrap: anywhere; }
+
+/* Registration box status line: ended / closed stand out a little; the
+   "Required for …" detail for Admins is quieter. */
+.ed-reg-ended, .ed-reg-closed { font-weight: 700; }
+.ed-reg-staff { margin: 10px 0 4px; font-size: 0.74rem; opacity: 0.75; }

@@ -1,17 +1,19 @@
 <?php
 /**
- * Admin: event reports. Filter by school year, semester, department,
+ * Admin: event reports. Filter by school year, semester, month, department,
  * organization, audience and venue type (or a date range), then see:
  * totals, events per semester / month / week, per department and
- * organization, and the full event list. Print-ready ("Print report") and
- * downloadable as CSV. Numbers come from the event_report view.
+ * organization, and the full event list. Print-ready ("Print report" prints
+ * the totals and tables only, no graphs) and downloadable as an Excel
+ * workbook. Numbers come from the event_report view.
  *
- *   ?school_year=2026-2027|all &semester=1st|2nd|summer &department=<id>
+ *   ?school_year=2026-2027|all &semester=1st|2nd|summer &month=2026-10 &department=<id>
  *   &organization=<id> &audience=students|faculty|all
- *   &venue_type=on_campus|off_campus|online &from=Y-m-d &to=Y-m-d &export=csv
+ *   &venue_type=on_campus|off_campus|online &from=Y-m-d &to=Y-m-d &export=xlsx
  */
 require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../includes/charts.php';
+require_once __DIR__ . '/../../includes/spreadsheet.php';
 
 $user = require_admin();
 
@@ -32,6 +34,7 @@ $filters = [
     'venue_type' => isset(VENUE_TYPES[$param('venue_type')]) ? $param('venue_type') : '',
     'from' => $isDate($param('from')) ? $param('from') : '',
     'to' => $isDate($param('to')) ? $param('to') : '',
+    'month' => '', // checked below, against the months on offer
 ];
 if (!in_array($filters['school_year'], $schoolYears, true) && $filters['school_year'] !== 'all') {
     $schoolYears[] = $filters['school_year'];
@@ -39,15 +42,27 @@ if (!in_array($filters['school_year'], $schoolYears, true) && $filters['school_y
 }
 
 $rows = get_event_report($filters);
+
+// Month: one month of the chosen school year (or semester); with "All school
+// years", the months that have events. Applied to the rows above.
+$monthOptions = $filters['school_year'] !== 'all'
+    ? month_list(...term_range($filters['school_year'], $filters['semester']))
+    : array_keys(group_rows($rows, fn($r) => substr($r['start_date'], 0, 7)));
+sort($monthOptions);
+if (in_array($param('month'), $monthOptions, true)) {
+    $filters['month'] = $param('month');
+    $rows = array_values(array_filter($rows, fn($r) => str_starts_with((string) $r['start_date'], $filters['month'])));
+}
 $totals = report_totals($rows);
 $held = array_values(array_filter($rows, fn($r) => $r['status'] !== 'cancelled'));
 
-// ---- Describe the filters (page subtitle, printout, CSV name) ----
+// ---- Describe the filters (page subtitle, printout, Excel file name) ----
 $deptName = array_column($departments, null, 'id')[$filters['department']] ?? null;
 $orgName = array_column($organizations, 'name', 'id')[$filters['organization']] ?? '';
 $scope = array_filter([
     $filters['school_year'] === 'all' ? 'All school years' : 'SY ' . $filters['school_year'],
     $filters['semester'] !== '' ? SEMESTERS[$filters['semester']] : '',
+    $filters['month'] !== '' ? month_label($filters['month']) : '',
     $filters['from'] !== '' || $filters['to'] !== '' ? trim(($filters['from'] !== '' ? format_event_date($filters['from']) : '…') . ' to ' . ($filters['to'] !== '' ? format_event_date($filters['to']) : '…')) : '',
     $deptName ? 'Department: ' . department_label($deptName) : '',
     $orgName !== '' ? 'Organization: ' . $orgName : '',
@@ -55,13 +70,13 @@ $scope = array_filter([
     $filters['venue_type'] !== '' ? VENUE_TYPES[$filters['venue_type']] : '',
 ]);
 $scopeText = implode(' · ', $scope);
-$isFiltered = $filters['semester'] !== '' || $filters['department'] !== '' || $filters['organization'] !== ''
+$isFiltered = $filters['semester'] !== '' || $filters['month'] !== '' || $filters['department'] !== '' || $filters['organization'] !== ''
     || $filters['audience'] !== '' || $filters['venue_type'] !== '' || $filters['from'] !== '' || $filters['to'] !== ''
     || $filters['school_year'] !== $current['school_year'];
 
-// ---- CSV: the event list with every column ----
-if (get_param('export') === 'csv') {
-    send_csv('events-report-' . slugify($scopeText) . '.csv',
+// ---- Excel: the event list with every column ----
+if (get_param('export') === 'xlsx') {
+    send_xlsx('events-report-' . slugify($scopeText) . '.xlsx', 'Events report',
         ['Start date', 'End date', 'Event', 'Status', 'Organization', 'Department', 'Category', 'Audience', 'Venue type', 'Venue',
          'School year', 'Semester', 'Registered', 'Attended', 'No-show', 'Evaluations', 'Average rating', 'Interpretation'],
         array_map(fn($r) => [
@@ -73,8 +88,10 @@ if (get_param('export') === 'csv') {
         ], $rows));
 }
 
-// ---- Months covered: the chosen dates, the school year (or semester), or the events' own range ----
-if ($filters['from'] !== '' || $filters['to'] !== '') {
+// ---- Months covered: the chosen month, the chosen dates, the school year (or semester), or the events' own range ----
+if ($filters['month'] !== '') {
+    $rangeFrom = $rangeTo = $filters['month'] . '-01';
+} elseif ($filters['from'] !== '' || $filters['to'] !== '') {
     $rangeFrom = $filters['from'] ?: ($rows[0]['start_date'] ?? date('Y-m-d'));
     $rangeTo = $filters['to'] ?: (end($rows)['start_date'] ?? date('Y-m-d'));
 } elseif ($filters['school_year'] !== 'all') {
@@ -123,10 +140,11 @@ $activeNav = 'admin-reports';
 $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Reports — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -158,7 +176,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
         <p class="page-sub"><?= htmlspecialchars($scopeText) ?></p>
       </div>
       <div class="page-head-actions">
-        <a href="<?= htmlspecialchars($query(['export' => 'csv'])) ?>" class="btn btn-outline">Download CSV</a>
+        <a href="<?= htmlspecialchars($query(['export' => 'xlsx'])) ?>" class="btn btn-outline">Download Excel</a>
         <button type="button" class="btn btn-primary" data-print>Print report</button>
       </div>
     </div>
@@ -182,6 +200,14 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
           <?php endforeach; ?>
         </select>
       </label>
+      <label>Month
+        <select name="month">
+          <option value="">All months</option>
+          <?php foreach ($monthOptions as $m): ?>
+            <option value="<?= $m ?>" <?= $filters['month'] === $m ? 'selected' : '' ?>><?= htmlspecialchars(month_label($m)) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
       <label>Department
         <select name="department">
           <option value="">All departments</option>
@@ -194,7 +220,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
         <select name="organization">
           <option value="">All organizations</option>
           <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars($o['name']) ?></option>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
           <?php endforeach; ?>
         </select>
       </label>
@@ -241,7 +267,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
     <?php else: ?>
 
     <!-- Per month -->
-    <section class="admin-panel chart-panel">
+    <section class="admin-panel chart-panel no-print">
       <div class="admin-panel-head">
         <div>
           <h2>Events per month</h2>
@@ -398,9 +424,9 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
-<script src="../assets/js/charts.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
+<script src="../assets/js/charts.js?v=<?= filemtime(__DIR__ . '/../assets/js/charts.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

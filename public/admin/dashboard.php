@@ -83,10 +83,11 @@ $activeNav = 'admin-dashboard';
 $breadcrumbs = [['Admin Dashboard', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Admin Dashboard — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -226,7 +227,7 @@ $breadcrumbs = [['Admin Dashboard', null]];
             <h2>This week's events</h2>
             <p><?= htmlspecialchars(week_label($weekStart)) ?></p>
           </div>
-          <a href="event-organizer.php">Manage events ›</a>
+          <a href="event-organizer.php?view=update">Manage events ›</a>
         </div>
         <?php if (empty($thisWeek)): ?>
           <p class="admin-muted">No events this week.</p>
@@ -279,9 +280,9 @@ $breadcrumbs = [['Admin Dashboard', null]];
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
-<script src="../assets/js/charts.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
+<script src="../assets/js/charts.js?v=<?= filemtime(__DIR__ . '/../assets/js/charts.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

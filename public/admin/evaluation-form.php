@@ -1,13 +1,17 @@
 <?php
 /**
- * Admin: the event evaluation form — ONE form used for every event.
- * Add, edit, reorder, hide or delete questions (questions people already
- * answered can only be hidden, so past results stay complete). Replace the
- * default questions with the school's official evaluation form.
+ * Super Admins and Admins: the event evaluation form — ONE form used for
+ * every event. Add, edit, reorder, hide or delete questions (questions people
+ * already answered can only be hidden, so past results stay complete).
+ * Replace the default questions with the school's official evaluation form.
+ * "Results by event" lists the latest events' evaluations (an Admin: their
+ * organization's events) with a link to each event's full results.
+ * Admins editing it needs migration 20261018150000_audiences_and_evaluation_form.sql.
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
+$user = require_staff();
+$isSuper = is_super_admin_user($user);
 
 $editId = get_param('edit');
 $editQuestion = $editId !== '' ? get_evaluation_question_admin($editId) : null;
@@ -61,14 +65,24 @@ $f = $editQuestion ?? ['question_type' => 'rating', 'is_required' => true, 'sect
 $val = fn(string $key) => htmlspecialchars((string) ($f[$key] ?? ''));
 $isEditing = !empty($f['id']);
 
+// Monitoring: the latest events that have evaluations (an Admin: their organization's).
+$results = array_values(array_filter(
+    get_event_report(['school_year' => 'all'] + ($isSuper ? [] : ['organization' => (string) ($user['organization_id'] ?? '')])),
+    fn($r) => (int) ($r['evaluation_count'] ?? 0) > 0
+));
+usort($results, fn($a, $b) => strcmp($b['start_date'], $a['start_date']));
+$results = array_slice($results, 0, 10);
+$canEdit = $isSuper || audiences_ready(); // Admins: once the database update is in
+
 $activeNav = 'admin-evaluation';
-$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]];
+$breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], ['Evaluation Form', null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= app_head_tags() ?>
 <title>Evaluation Form — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
@@ -93,9 +107,12 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
 
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
+    <?php if (!$canEdit): ?>
+      <div class="admin-note"><strong>View only for now.</strong> Admins can edit the evaluation form once a Super Admin runs the latest database update (Database update page).</div>
+    <?php endif; ?>
 
-    <p class="admin-note">Replace the default questions below with the school's official event evaluation form.
-      Rating questions use the scale <strong>5 Excellent · 4 Very Satisfactory · 3 Satisfactory · 2 Fair · 1 Poor</strong>.
+    <p class="admin-note">The school's evaluation form, in parts (Part I, Part II…): questions with the same <strong>Section</strong> are shown together.
+      Rating questions are 1 to 5 stars: <strong>1 – Needs Improvement · 2 – Fair · 3 – Satisfactory · 4 – Very Satisfactory · 5 – Excellent</strong>.
       Once someone has answered a question it can't be deleted, only hidden, so past results stay complete.</p>
 
     <div class="admin-split">
@@ -105,7 +122,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
         <h2 class="admin-card-title"><?= $isEditing ? 'Edit Question' : 'Add Question' ?></h2>
 
         <label class="admin-label" for="section">Section</label>
-        <input type="text" id="section" name="section" class="admin-input" list="sectionList" maxlength="80" placeholder="e.g. Resource Speaker" value="<?= $val('section') ?>">
+        <input type="text" id="section" name="section" class="admin-input" list="sectionList" maxlength="80" placeholder="e.g. Part I: Activity Experience" value="<?= $val('section') ?>">
         <datalist id="sectionList">
           <?php foreach ($sections as $s): ?><option value="<?= htmlspecialchars($s) ?>"><?php endforeach; ?>
         </datalist>
@@ -115,7 +132,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
 
         <span class="admin-label">Answer type</span>
         <div class="admin-radio-row">
-          <label class="admin-radio"><input type="radio" name="question_type" value="rating" <?= ($f['question_type'] ?? 'rating') === 'rating' ? 'checked' : '' ?>> Rating (5 to 1)</label>
+          <label class="admin-radio"><input type="radio" name="question_type" value="rating" <?= ($f['question_type'] ?? 'rating') === 'rating' ? 'checked' : '' ?>> Rating (1 to 5 stars)</label>
           <label class="admin-radio"><input type="radio" name="question_type" value="text" <?= ($f['question_type'] ?? '') === 'text' ? 'checked' : '' ?>> Written answer</label>
         </div>
         <?php if ($isEditing && ($answeredById[$f['id']] ?? 0) > 0): ?>
@@ -141,7 +158,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
             <?php endif; ?>
             <?php $lastSection = null; foreach ($questions as $i => $q): $answered = (int) ($q['event_evaluation_answers'][0]['count'] ?? 0); ?>
               <?php if ($q['section'] !== $lastSection): $lastSection = $q['section']; ?>
-                <tr><td colspan="5" style="background:#f8f9fb"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
+                <tr class="admin-section-row"><td colspan="5"><strong><?= htmlspecialchars($q['section']) ?></strong></td></tr>
               <?php endif; ?>
               <tr class="<?= $q['is_active'] ? '' : 'admin-row-hidden' ?>">
                 <td>
@@ -154,7 +171,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
                   <?= htmlspecialchars($q['question']) ?>
                   <div class="admin-table-sub"><?= $q['is_required'] ? 'Required' : 'Optional' ?><?= $q['is_active'] ? '' : ' · Hidden from the form' ?></div>
                 </td>
-                <td class="nowrap"><?= $q['question_type'] === 'rating' ? 'Rating 5–1' : 'Written' ?></td>
+                <td class="nowrap"><?= $q['question_type'] === 'rating' ? 'Rating 1–5' : 'Written' ?></td>
                 <td class="num"><?= $answered ?></td>
                 <td class="admin-row-actions">
                   <a href="evaluation-form.php?edit=<?= urlencode($q['id']) ?>" class="btn-sm">Edit</a>
@@ -163,7 +180,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
                     <input type="hidden" name="id" value="<?= htmlspecialchars($q['id']) ?>">
                     <button type="submit" class="btn-sm<?= $q['is_active'] ? '' : ' btn-sm-accent' ?>"><?= $q['is_active'] ? 'Hide' : 'Show' ?></button>
                   </form>
-                  <form method="POST" action="evaluation-form.php" onsubmit="return confirm('Delete this question?');">
+                  <form method="POST" action="evaluation-form.php" data-confirm="Delete this question from the evaluation form?" data-confirm-title="Delete question" data-confirm-ok="Delete" data-confirm-tone="danger">
                     <input type="hidden" name="action" value="delete_question">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($q['id']) ?>">
                     <button type="submit" class="btn-sm btn-sm-danger" <?= $answered ? 'disabled title="Already answered — hide it instead"' : '' ?>>Delete</button>
@@ -175,6 +192,36 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
         </table>
       </div>
     </div>
+
+    <section class="admin-panel" id="results" style="margin-top:24px">
+      <div class="admin-panel-head">
+        <div>
+          <h2>Results by event</h2>
+          <p><?= $isSuper ? 'The latest events with evaluations.' : 'Your organization\'s latest events with evaluations.' ?> Open one to see every answer.</p>
+        </div>
+      </div>
+      <?php if (!$results): ?>
+        <p class="admin-muted">No evaluations yet. Attendees can answer the form once they're marked Attended.</p>
+      <?php else: ?>
+        <div class="admin-table-wrap">
+          <table class="admin-table admin-table-compact">
+            <thead><tr><th>Event</th><th>Date</th><th>Attended</th><th>Evaluations</th><th>Average rating</th><th><span class="visually-hidden">Results</span></th></tr></thead>
+            <tbody>
+              <?php foreach ($results as $r): ?>
+                <tr>
+                  <td><strong><?= htmlspecialchars($r['title']) ?></strong><div class="admin-table-sub"><?= htmlspecialchars($r['organization_name'] ?? '') ?></div></td>
+                  <td class="nowrap"><?= htmlspecialchars(format_event_date($r['start_date'])) ?></td>
+                  <td><?= (int) ($r['attended_count'] ?? 0) ?></td>
+                  <td><?= (int) $r['evaluation_count'] ?><?= (int) ($r['attended_count'] ?? 0) > 0 ? ' <span class="admin-table-sub">(' . htmlspecialchars(format_percent((int) $r['evaluation_count'] / max(1, (int) $r['attended_count']))) . ')</span>' : '' ?></td>
+                  <td><?= $r['average_rating'] !== null ? htmlspecialchars(format_rating((float) $r['average_rating']) . ' · ' . rating_interpretation((float) $r['average_rating'])) : '—' ?></td>
+                  <td><a href="event-evaluations.php?event=<?= urlencode($r['id'] ?? $r['event_id'] ?? '') ?>" class="btn-sm">See results</a></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
+    </section>
 
     <section class="admin-panel" id="preview" style="margin-top:24px">
       <div class="admin-panel-head">
@@ -193,9 +240,9 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Evaluation Form', null]]
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
-<script src="../assets/js/forms.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
+<script src="../assets/js/forms.js?v=<?= filemtime(__DIR__ . '/../assets/js/forms.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

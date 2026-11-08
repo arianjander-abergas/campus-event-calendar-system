@@ -3,13 +3,148 @@
  * Import & Verify helpers (admin/import.php): reading uploaded spreadsheets
  * — Excel workbooks (.xlsx) and CSV files, first sheet — and comparing
  * their rows with the student accounts or an event's registrations.
+ * Also send_xlsx(): downloads as an Excel workbook (Reports).
  *
- * An .xlsx file is a ZIP of XML files. It's unpacked here with plain PHP
- * (gzinflate), so XAMPP's "zip" extension doesn't have to be switched on.
+ * An .xlsx file is a ZIP of XML files. It's unpacked (and written) here with
+ * plain PHP, so XAMPP's "zip" extension doesn't have to be switched on.
  */
 
 const SPREADSHEET_MAX_ROWS = 5000;
 const SPREADSHEET_MAX_COLS = 40;
+
+/**
+ * Download one sheet as an Excel workbook (.xlsx): a bold, frozen header row
+ * with filters, then the rows. Whole numbers and decimals become numbers,
+ * 'Y-m-d' values become dates, everything else stays text (never a formula).
+ */
+function send_xlsx(string $filename, string $sheetName, array $header, array $rows): void
+{
+    $esc = fn($s) => htmlspecialchars((string) $s, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+    $cols = count($header);
+    $widths = array_map(fn($h) => mb_strlen((string) $h), $header);
+
+    // One cell: s="1" header, "2" date, "3" decimal (0.00), "0" anything else.
+    $cell = function ($value, string $ref, bool $isHeader) use ($esc): string {
+        if ($value === null || $value === '') return '';
+        if ($isHeader) return '<c r="' . $ref . '" s="1" t="inlineStr"><is><t>' . $esc($value) . '</t></is></c>';
+        if (is_int($value) || (is_string($value) && preg_match('/^-?\d{1,15}$/', $value))) {
+            return '<c r="' . $ref . '"><v>' . (int) $value . '</v></c>';
+        }
+        if (is_float($value) || (is_string($value) && preg_match('/^-?\d+\.\d+$/', $value))) {
+            return '<c r="' . $ref . '" s="3"><v>' . (float) $value . '</v></c>';
+        }
+        if (is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1])) {
+            $serial = (int) (gmmktime(0, 0, 0, (int) $m[2], (int) $m[3], (int) $m[1]) / 86400) + 25569; // days since 1899-12-30
+            return '<c r="' . $ref . '" s="2"><v>' . $serial . '</v></c>';
+        }
+        return '<c r="' . $ref . '" t="inlineStr"><is><t xml:space="preserve">' . $esc($value) . '</t></is></c>';
+    };
+
+    $sheetRows = '';
+    foreach (array_merge([$header], array_values($rows)) as $r => $row) {
+        $xml = '';
+        foreach (array_values($row) as $c => $value) {
+            if ($c >= $cols) break;
+            $xml .= $cell($value, xlsx_column_letter($c) . ($r + 1), $r === 0);
+            if ($r > 0) $widths[$c] = max($widths[$c], mb_strlen((string) $value));
+        }
+        $sheetRows .= '<row r="' . ($r + 1) . '">' . $xml . '</row>';
+    }
+    $colsXml = '';
+    foreach ($widths as $c => $w) {
+        $colsXml .= '<col min="' . ($c + 1) . '" max="' . ($c + 1) . '" width="' . min(60, max(10, $w + 2)) . '" customWidth="1"/>';
+    }
+    $lastRef = xlsx_column_letter(max(0, $cols - 1)) . (count($rows) + 1);
+    $sheetName = $esc(mb_substr(preg_replace('~[\\\\/?*\[\]:]~', ' ', $sheetName) ?: 'Sheet1', 0, 31));
+    $ns = 'http://schemas.openxmlformats.org';
+
+    $files = [
+        '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Types xmlns="' . $ns . '/package/2006/content-types">'
+            . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            . '<Default Extension="xml" ContentType="application/xml"/>'
+            . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+            . '</Types>',
+        '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="' . $ns . '/package/2006/relationships">'
+            . '<Relationship Id="rId1" Type="' . $ns . '/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            . '</Relationships>',
+        'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<workbook xmlns="' . $ns . '/spreadsheetml/2006/main" xmlns:r="' . $ns . '/officeDocument/2006/relationships">'
+            . '<sheets><sheet name="' . $sheetName . '" sheetId="1" r:id="rId1"/></sheets>'
+            . '</workbook>',
+        'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<Relationships xmlns="' . $ns . '/package/2006/relationships">'
+            . '<Relationship Id="rId1" Type="' . $ns . '/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+            . '<Relationship Id="rId2" Type="' . $ns . '/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+            . '</Relationships>',
+        'xl/styles.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<styleSheet xmlns="' . $ns . '/spreadsheetml/2006/main">'
+            . '<numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts>'
+            . '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
+            . '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>'
+            . '<fill><patternFill patternType="solid"><fgColor rgb="FFE8ECF3"/></patternFill></fill></fills>'
+            . '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
+            . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+            . '<cellXfs count="4">'
+            . '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            . '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>'
+            . '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+            . '<xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+            . '</cellXfs>'
+            . '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
+            . '</styleSheet>',
+        'xl/worksheets/sheet1.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            . '<worksheet xmlns="' . $ns . '/spreadsheetml/2006/main">'
+            . '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+            . '<cols>' . $colsXml . '</cols>'
+            . '<sheetData>' . $sheetRows . '</sheetData>'
+            . '<autoFilter ref="A1:' . $lastRef . '"/>'
+            . '</worksheet>',
+    ];
+
+    $zip = zip_build($files);
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . strlen($zip));
+    header('Cache-Control: no-store');
+    echo $zip;
+    exit;
+}
+
+/** 0 -> 'A', 25 -> 'Z', 26 -> 'AA'. */
+function xlsx_column_letter(int $index): string
+{
+    $letters = '';
+    for ($n = $index + 1; $n > 0; $n = intdiv($n - 1, 26)) {
+        $letters = chr(65 + ($n - 1) % 26) . $letters;
+    }
+    return $letters;
+}
+
+/**
+ * A ZIP file holding $files (name => contents), compressed with deflate
+ * (zlib, always on in PHP) — the reverse of zip_list_entries / zip_read_entry.
+ */
+function zip_build(array $files): string
+{
+    $now = getdate();
+    $time = ($now['hours'] << 11) | ($now['minutes'] << 5) | intdiv($now['seconds'], 2);
+    $date = (max(0, $now['year'] - 1980) << 9) | ($now['mon'] << 5) | $now['mday'];
+    $body = '';
+    $directory = '';
+    foreach ($files as $name => $data) {
+        $packed = gzdeflate($data, 6);
+        // version needed, flags (UTF-8 names), method (deflate), time, date, CRC-32, sizes, name length, extra length
+        $head = pack('vvvvvVVVvv', 20, 0x0800, 8, $time, $date, crc32($data), strlen($packed), strlen($data), strlen($name), 0);
+        $directory .= pack('V', 0x02014b50) . pack('v', 20) . $head . pack('vvvVV', 0, 0, 0, 0, strlen($body)) . $name;
+        $body .= pack('V', 0x04034b50) . $head . $name . $packed;
+    }
+    return $body . $directory
+        . pack('VvvvvVVv', 0x06054b50, 0, 0, count($files), count($files), strlen($directory), strlen($body), 0);
+}
 
 /**
  * Rows of the first sheet as lists of trimmed strings (empty rows skipped).

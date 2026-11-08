@@ -1,16 +1,36 @@
 <?php
 /**
- * Admin: every account, its details and its role. Roles:
+ * Super Admins: every account, its details and its role. Roles (profiles.role):
  *   Student / Faculty (user) — browse, register, evaluate
- *   Moderator — runs their own organization's events
- *   Admin — everything
- * The database only lets admins change roles, so this page is how someone
- * becomes (or stops being) a moderator or an admin. Admins can also correct
- * or verify a student's School ID here.
+ *   Admin (moderator)        — runs their own organization's events; new
+ *                              events need a Super Admin's approval
+ *   Super Admin (admin)      — everything, and approvals
+ * The database only lets Super Admins change roles, so this page is how
+ * someone becomes (or stops being) an Admin or a Super Admin. Each account
+ * can also be edited (user-edit.php) or deleted, and a student's School ID
+ * corrected or verified. The protected account (profiles.is_super_admin —
+ * Arian Abergas) can't be demoted or deleted.
+ *
+ * Two pages (sidebar: Users & Roles, Approvals):
+ *   users.php                 the accounts
+ *   users.php?tab=approvals   Approvals — what waits for a Super Admin:
+ *       &kind=events     Admins' new events (published once approved)
+ *       &kind=profiles   profile edits (saved once approved)
+ *       &status=approved|rejected  decided ones (default: waiting)
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$user = require_admin();
+$tab = get_param('tab') === 'approvals' ? 'approvals' : 'accounts';
+// Approvals: Super Admins (everything, and they decide) and Admins (their own
+// organization's events and their own profile edits — the database's rules
+// limit what they see). The accounts list: Super Admins only.
+$user = $tab === 'approvals' ? require_staff() : require_admin();
+$isSuper = is_super_admin_user($user);
+
+$kind = get_param('kind') === 'profiles' ? 'profiles' : 'events';
+$decision = in_array(get_param('status'), ['approved', 'rejected'], true) ? get_param('status') : 'pending';
+$approvalsUrl = fn(string $k, string $s = 'pending', int $page = 1): string
+    => 'users.php?' . http_build_query(['tab' => 'approvals', 'kind' => $k] + ($s !== 'pending' ? ['status' => $s] : []) + ($page > 1 ? ['page' => $page] : []));
 
 $q = get_param('q');
 $roleFilter = isset(ROLES[get_param('role')]) ? get_param('role') : '';
@@ -19,12 +39,27 @@ $back = 'users.php' . (($qs = http_build_query(array_filter(['q' => $q, 'role' =
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post_param('action');
-    if ($action === 'set_role') {
+    if (!$isSuper) {
+        $result = ['ok' => false, 'message' => 'Only a Super Admin can do that.'];
+    } elseif ($action === 'set_role') {
         $result = set_user_role_admin(post_param('id'), post_param('role'));
+    } elseif ($action === 'delete_account') {
+        $result = delete_account_admin(post_param('id'));
     } elseif ($action === 'set_school_id' && is_uuid(post_param('id'))) {
         $result = set_school_id_admin(post_param('id'), post_param('school_id'), isset($_POST['verified']));
+    } elseif ($action === 'review_event' || $action === 'review_profile') {
+        $approve = post_param('decision') === 'approve';
+        $result = $action === 'review_event'
+            ? review_event_admin(post_param('id'), $approve, post_param('note'))
+            : review_profile_request(post_param('id'), $approve, post_param('note'));
+    } elseif ($action === 'note_event' || $action === 'note_profile') {
+        $result = save_approval_note($action === 'note_event' ? 'event' : 'profile', post_param('id'), post_param('note'));
     } else {
         $result = ['ok' => false, 'message' => 'Unknown action.'];
+    }
+    if (str_starts_with($action, 'review_') || str_starts_with($action, 'note_')) {
+        // Back to the same approvals list (only links to this page's Approvals tab are accepted).
+        $back = preg_match('~^users\.php\?tab=approvals(&[\w%.+\-=&]*)?$~', post_param('back')) ? post_param('back') : $approvalsUrl(str_ends_with($action, '_event') ? 'events' : 'profiles');
     }
     flash($result['ok'] ? 'success' : 'error', $result['message']);
     header('Location: ' . $back);
@@ -32,6 +67,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $all = get_all_profiles_admin();
+$names = array_column($all, 'full_name', 'id');
+$protected = array_flip(protected_account_ids()); // can't be demoted or deleted
+
+if ($tab === 'approvals') {
+    // What's waiting (sub-tab counts, the sidebar's count) and the list shown.
+    $waitingEvents = get_event_approvals_admin('pending');
+    $approvalsReady = supabase_last_error() === '';
+    $waitingProfiles = $approvalsReady ? get_profile_requests_admin('pending') : [];
+    $_SESSION['approvals_waiting'] = ['count' => count($waitingEvents) + count($waitingProfiles), 'at' => time()];
+    $departments = get_departments();
+    $organizations = get_organizations();
+    $rows = $decision === 'pending'
+        ? ($kind === 'events' ? $waitingEvents : $waitingProfiles)
+        : ($approvalsReady ? ($kind === 'events' ? get_event_approvals_admin($decision) : get_profile_requests_admin($decision)) : []);
+    $pager = paginate($rows, 10, (int) get_param('page', '1'));
+    $pageUrl = fn(int $p): string => $approvalsUrl($kind, $decision, $p);
+    $here = $approvalsUrl($kind, $decision, $pager['page']);
+}
 $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter) {
     if ($roleFilter !== '' && $p['role'] !== $roleFilter) return false;
     if ($typeFilter !== '' && ($p['account_type'] ?? '') !== $typeFilter) return false;
@@ -44,15 +97,17 @@ $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, 
 $roleCounts = array_count_values(array_column($all, 'role'));
 $editSchoolId = get_param('school_id_for');
 
-$activeNav = 'admin-users';
-$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
+$activeNav = $tab === 'approvals' ? 'admin-approvals' : 'admin-users';
+$pageTitle = $tab === 'approvals' ? 'Approvals' : 'Users & Roles';
+$breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], [$pageTitle, null]];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Users &amp; Roles — Campus Event Hub</title>
+<?= app_head_tags() ?>
+<title><?= htmlspecialchars($pageTitle) ?> — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
@@ -66,9 +121,14 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
   <main class="dash-main">
     <div class="page-head">
       <div>
-        <h1 class="page-title">Users &amp; Roles</h1>
-        <p class="page-sub"><?= count($all) ?> accounts · <?= (int) ($roleCounts['admin'] ?? 0) ?> admin<?= ($roleCounts['admin'] ?? 0) == 1 ? '' : 's' ?> · <?= (int) ($roleCounts['moderator'] ?? 0) ?> moderator<?= ($roleCounts['moderator'] ?? 0) == 1 ? '' : 's' ?></p>
+        <h1 class="page-title"><?= htmlspecialchars($pageTitle) ?></h1>
+        <?php if ($tab === 'approvals'): ?>
+          <p class="page-sub"><?= $isSuper ? 'Admins\' new events and profile edits waiting for a Super Admin' : 'Your organization\'s events and your profile edits, and what the Super Admins decided' ?></p>
+        <?php else: ?>
+          <p class="page-sub"><?= count($all) ?> accounts · <?= (int) ($roleCounts['admin'] ?? 0) ?> Super Admin<?= ($roleCounts['admin'] ?? 0) == 1 ? '' : 's' ?> · <?= (int) ($roleCounts['moderator'] ?? 0) ?> Admin<?= ($roleCounts['moderator'] ?? 0) == 1 ? '' : 's' ?></p>
+        <?php endif; ?>
       </div>
+      <?php if ($tab === 'accounts'): ?>
       <form method="get" class="admin-search users-filter" role="search">
         <input type="search" name="q" class="admin-input" placeholder="Name, School ID, course, org or department" value="<?= htmlspecialchars($q) ?>" aria-label="Search users">
         <select name="role" class="admin-input" aria-label="Role">
@@ -85,28 +145,37 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
         </select>
         <button type="submit" class="btn btn-outline">Filter</button>
       </form>
+      <?php endif; ?>
     </div>
 
     <?= render_flashes() ?>
+
+    <?php if ($tab === 'approvals'): ?>
+      <?php include __DIR__ . '/../../includes/approvals.php'; ?>
+    <?php else: ?>
 
     <details class="admin-panel roles-panel">
       <summary><strong>What each role can do</strong> <span class="admin-muted">— click to show</span></summary>
       <div class="admin-table-wrap">
         <table class="admin-table admin-table-compact roles-table">
-          <thead><tr><th>Can…</th><th>Student / Faculty</th><th>Moderator</th><th>Admin</th></tr></thead>
+          <thead><tr><th>Can…</th><th>Student / Faculty</th><th>Admin</th><th>Super Admin</th></tr></thead>
           <tbody>
             <?php foreach ([
               ['Browse the Event Calendar, register, cancel, evaluate attended events', 'yes', 'yes', 'yes'],
-              ['Create, edit, publish and cancel events', 'no', 'Own organization', 'All events'],
+              ['Create, edit and cancel events', 'no', 'Own organization', 'All events'],
+              ['Publish new events', 'no', 'After a Super Admin approves', 'yes'],
+              ['Save changes to their own profile', 'After a Super Admin approves', 'After a Super Admin approves', 'yes'],
               ['Delete events', 'no', 'no', 'yes'],
               ['Edit schedules, see registrations, mark attendance, print attendance sheets', 'no', 'Own organization', 'All events'],
               ['Import attendance from Excel', 'no', 'Own organization', 'All events'],
               ['See evaluation results', 'no', 'Own organization', 'All events'],
               ['Manage organization officers', 'no', 'Own organization', 'All organizations'],
               ['Import the student list and verify School IDs', 'no', 'no', 'yes'],
-              ['Admin Dashboard, Reports, Evaluation Form', 'no', 'no', 'yes'],
+              ['Admin Dashboard, Reports', 'no', 'no', 'yes'],
+              ['Edit the evaluation form and see its results', 'no', 'Own organization\x27s results', 'yes'],
               ['Categories, departments, organizations, school calendar', 'no', 'no', 'yes'],
-              ['Change roles and School IDs', 'no', 'no', 'yes'],
+              ['Change roles and School IDs, edit and delete accounts', 'no', 'no', 'yes'],
+              ['Approve Admins\' new events and profile edits (Approvals)', 'no', 'no', 'yes'],
             ] as [$what, $u, $m, $a]): ?>
               <tr>
                 <td><?= htmlspecialchars($what) ?></td>
@@ -118,7 +187,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
           </tbody>
         </table>
       </div>
-      <p class="admin-hint">A moderator needs an organization — their events, officers and attendance imports are limited to it, and they can't move themselves to another organization. The database enforces all of this, not just these pages.</p>
+      <p class="admin-hint">An Admin needs an organization — their events, officers and attendance imports are limited to it, and they can't move themselves to another organization. Their new events are published once a Super Admin approves them, and profile edits (except a Super Admin's own) wait for a Super Admin too. <?= $protected ? htmlspecialchars(implode(', ', array_intersect_key($names, $protected))) . '\'s account is protected: it can\'t be demoted or deleted. ' : '' ?>The database enforces all of this, not just these pages.</p>
     </details>
 
     <div class="admin-table-wrap">
@@ -146,7 +215,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
                   <form method="POST" action="<?= htmlspecialchars($back) ?>" class="inline-edit" autocomplete="off">
                     <input type="hidden" name="action" value="set_school_id">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
-                    <input type="text" name="school_id" class="admin-input" value="<?= htmlspecialchars($sid['school_id'] ?? '') ?>" placeholder="<?= SCHOOL_ID_EXAMPLE ?>" required maxlength="20" aria-label="School ID">
+                    <input type="text" name="school_id" class="admin-input" value="<?= htmlspecialchars($sid['school_id'] ?? '') ?>" placeholder="<?= SCHOOL_ID_EXAMPLE ?>" required maxlength="20" inputmode="numeric" title="Format: <?= SCHOOL_ID_EXAMPLE ?>" aria-label="School ID">
                     <label class="admin-checkbox"><input type="checkbox" name="verified" <?= !empty($sid['verified_at']) ? 'checked' : '' ?>> Verified</label>
                     <button type="submit" class="btn-sm btn-sm-accent">Save</button>
                     <a href="<?= htmlspecialchars($back) ?>" class="btn-sm">Cancel</a>
@@ -165,11 +234,14 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
                 <div class="admin-table-sub"><?= htmlspecialchars($p['organizations']['name'] ?? 'No organization') ?></div>
               </td>
               <td class="nowrap"><?= htmlspecialchars(format_event_date($p['created_at'] ?? null)) ?></td>
-              <td><span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span></td>
-              <td class="admin-row-actions">
-                <?php if (!$isMe): ?>
+              <td>
+                <span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span>
+                <?php if (isset($protected[$p['id']])): ?><div class="admin-table-sub">Protected</div><?php endif; ?>
+              </td>
+              <td class="admin-row-actions user-actions">
+                <?php if (!$isMe && !isset($protected[$p['id']])): ?>
                   <form method="POST" action="<?= htmlspecialchars($back) ?>" class="role-form"
-                        onsubmit="var s=this.role; return confirm('Change <?= htmlspecialchars(addslashes($p['full_name'])) ?> to ' + s.options[s.selectedIndex].text + '?');">
+                        data-confirm="Change <?= htmlspecialchars($p['full_name']) ?> to {select:role}?" data-confirm-title="Change role" data-confirm-ok="Change role">
                     <input type="hidden" name="action" value="set_role">
                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                     <select name="role" class="admin-input role-select" aria-label="Role of <?= htmlspecialchars($p['full_name']) ?>">
@@ -180,18 +252,28 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', null]];
                     <button type="submit" class="btn-sm btn-sm-accent">Save</button>
                   </form>
                 <?php endif; ?>
+                <a href="user-edit.php?id=<?= urlencode($p['id']) ?>&amp;back=<?= urlencode($back) ?>" class="btn-sm">Edit</a>
+                <?php if (!$isMe && !isset($protected[$p['id']])): ?>
+                  <form method="POST" action="<?= htmlspecialchars($back) ?>"
+                        data-confirm="Delete <?= htmlspecialchars($p['full_name']) ?>’s account? They won’t be able to log in, and their registrations go with it. This can’t be undone." data-confirm-title="Delete account" data-confirm-ok="Delete account" data-confirm-tone="danger">
+                    <input type="hidden" name="action" value="delete_account">
+                    <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
+                    <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
+                  </form>
+                <?php endif; ?>
               </td>
             </tr>
           <?php endforeach; ?>
         </tbody>
       </table>
     </div>
+    <?php endif; ?>
   </main>
 
 </div>
 
-<script src="../assets/js/sidebar.js"></script>
-<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/../assets/js/sidebar.js') ?>"></script>
+<script src="../assets/js/ui.js?v=<?= filemtime(__DIR__ . '/../assets/js/ui.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

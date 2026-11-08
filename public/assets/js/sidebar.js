@@ -1,8 +1,8 @@
 /**
  * Campus Event Hub — the sidebar (includes/nav.php).
  *
- * "Events" group: clicking it opens/closes its sub-links. It starts open on
- * pages that belong to it (All Events, My Events, Next Event).
+ * "Events" and "Manage Events" groups: clicking one opens/closes its
+ * sub-links. Each starts open on pages that belong to it.
  *
  * Phones / foldables (≤ 760px): the top bar's menu button ([data-nav-toggle],
  * includes/topbar-start.php) slides the sidebar in (body.nav-open). The ✕
@@ -11,15 +11,15 @@
  * sidebar on hover instead — CSS only, style.css.)
  */
 document.addEventListener("DOMContentLoaded", () => {
-  const btn = document.getElementById("eventDropdownBtn");
-  const submenu = document.getElementById("eventSubmenu");
-  if (btn && submenu) {
+  document.querySelectorAll(".submenu-toggle[aria-controls]").forEach((btn) => {
+    const submenu = document.getElementById(btn.getAttribute("aria-controls"));
+    if (!submenu) return;
     btn.addEventListener("click", () => {
       const open = btn.getAttribute("aria-expanded") === "true";
       submenu.hidden = open;
       btn.setAttribute("aria-expanded", String(!open));
     });
-  }
+  });
 
   const sidebar = document.getElementById("sidebar");
   const toggles = document.querySelectorAll("[data-nav-toggle]");

@@ -12,7 +12,7 @@ header('Cache-Control: no-store');
 
 if (!is_staff_user()) {
     http_response_code(403);
-    echo json_encode(['error' => 'Admins and moderators only.']);
+    echo json_encode(['error' => 'Admins and Super Admins only.']);
     exit;
 }
 

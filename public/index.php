@@ -17,11 +17,13 @@ $activeNav = 'home';
 $topbarSearch = true;
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Campus Event Hub — La Consolacion University Philippines</title>
+<?= seo_head_tags('Campus Event Hub — LCUP Event Calendar | La Consolacion University Philippines', SITE_DESCRIPTION, 'index.php', true) ?>
+<?= app_head_tags() ?>
+<title>Campus Event Hub — LCUP Event Calendar | La Consolacion University Philippines</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 </head>
 <body class="neu">
@@ -148,9 +150,9 @@ $topbarSearch = true;
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 
-<script src="assets/js/sidebar.js"></script>
-<script src="assets/js/ui.js"></script>
-<script src="assets/js/main.js"></script>
+<script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
+<script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
+<script src="assets/js/main.js?v=<?= filemtime(__DIR__ . '/assets/js/main.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>
