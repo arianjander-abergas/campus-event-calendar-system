@@ -22,6 +22,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<?= seo_head_tags('Organizations — Campus Event Hub | LCUP', 'Student organizations of La Consolacion University Philippines (LCUP): their departments, officers and upcoming campus events.', 'organizations.php') ?>
 <?= app_head_tags() ?>
 <title>Organizations — Campus Event Hub</title>
 <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">

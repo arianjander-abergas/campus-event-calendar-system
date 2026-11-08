@@ -125,10 +125,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cal-chip-on_campus { background: var(--navy); }
-.cal-chip-off_campus { background: var(--orange-strong); }
-.cal-chip-online { background: #0f766e; }
-.cal-chip.is-done { background: #6b7280; }
+/* Chip colour = where the event is now (event_phase()): orange = upcoming,
+   green = happening now, grey = completed / ended. White text stays readable
+   (4.5:1 or more) on all three, in every theme. */
+.cal-chip-upcoming { background: #c2410c; }
+.cal-chip-ongoing { background: #15803d; }
+.cal-chip-done { background: #6b7280; }
 .cal-more { font-size: 0.75rem; font-weight: 700; color: var(--blue-accent); }
 /* Small screens show a count bubble instead of the titles. */
 .cal-dot { display: none; }
@@ -169,10 +171,22 @@
 .cal-event-meta { display: flex; align-items: center; gap: 6px; font-size: 0.76rem; color: var(--text-muted); }
 .cal-event-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .cal-tag { padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: var(--navy); font-size: 0.75rem; font-weight: 700; }
-.cal-tag-today { background: var(--orange-strong); color: #fff; }
+.cal-tag-today { background: #15803d; color: #fff; }
+.cal-tag-upcoming { background: #c2410c; color: #fff; }
 .cal-tag-done { background: var(--p-soft-8); color: var(--p-accent-deep); }
 .cal-tag-muted { background: #e5e7eb; color: #4b5563; }
 .cal-tag-plain { background: transparent; color: var(--text-muted); padding-left: 0; }
+
+/* Each event's side stripe and status tag use its calendar colour: orange =
+   upcoming, green = happening now, grey = completed / ended. (body … keeps
+   them ahead of the soft-page and dark-theme rules in style.css.) */
+body .cal-event.cal-event-upcoming, body .cal-event.cal-event-upcoming:hover { border-left-color: #c2410c; }
+body .cal-event.cal-event-ongoing, body .cal-event.cal-event-ongoing:hover { border-left-color: #15803d; }
+body .cal-event.cal-event-done, body .cal-event.cal-event-done:hover { border-left-color: #6b7280; }
+body .cal-event-tags .cal-tag.cal-tag-upcoming { background: #c2410c; color: #fff; }
+body .cal-event-tags .cal-tag.cal-tag-today { background: #15803d; color: #fff; }
+body .cal-event-tags .cal-tag.cal-tag-done,
+body .cal-event-tags .cal-tag.cal-tag-muted { background: #6b7280; color: #fff; }
 
 @media (max-width: 1100px) {
   .cal-layout { grid-template-columns: 1fr; }
