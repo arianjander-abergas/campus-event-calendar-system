@@ -24,7 +24,9 @@ RUN a2enmod rewrite headers \
       'ServerSignature Off' \
       > /etc/apache2/conf-available/campus-event-hub.conf \
  && a2enconf campus-event-hub \
- && { echo 'expose_php = Off'; echo 'upload_max_filesize = 10M'; echo 'post_max_size = 12M'; } \
+ && { echo 'expose_php = Off'; echo 'upload_max_filesize = 10M'; echo 'post_max_size = 12M'; \
+      echo '; Like XAMPP: pages can start printing before the login cookie is sent.'; \
+      echo 'output_buffering = 4096'; } \
       > /usr/local/etc/php/conf.d/campus-event-hub.ini
 
 COPY . /var/www/html/
