@@ -1396,7 +1396,8 @@ function seo_head_tags(string $title, string $description, string $path, bool $h
 {
     $e = fn(string $s) => htmlspecialchars($s, ENT_QUOTES);
     $url = app_url($path);
-    $image = app_url('assets/images/lcup-campus.jpg');
+    // The logo on the site's navy, 1200×630 (the shape link previews use, so nothing is cropped).
+    $image = app_url('assets/images/app/share-preview.png');
     $tags = [
         '<meta name="description" content="' . $e($description) . '">',
         '<meta name="robots" content="index, follow">',
@@ -1407,6 +1408,9 @@ function seo_head_tags(string $title, string $description, string $path, bool $h
         '<meta property="og:description" content="' . $e($description) . '">',
         '<meta property="og:url" content="' . $e($url) . '">',
         '<meta property="og:image" content="' . $e($image) . '">',
+        '<meta property="og:image:width" content="1200">',
+        '<meta property="og:image:height" content="630">',
+        '<meta property="og:image:alt" content="' . SITE_NAME . ' logo">',
         '<meta property="og:locale" content="en_PH">',
         '<meta name="twitter:card" content="summary_large_image">',
         '<meta name="twitter:title" content="' . $e($title) . '">',
