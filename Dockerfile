@@ -11,7 +11,11 @@
 FROM php:8.2-apache
 
 # curl, mbstring, fileinfo, zlib and openssl are already built into this image.
+# status: off. Render's proxy reaches Apache from inside the container, so
+# /server-status ("local visitors only") would be open to everyone.
+# zz- name: loads after Debian's security.conf, so ServerTokens Prod wins.
 RUN a2enmod rewrite headers \
+ && a2dismod -f status \
  && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
  && printf '%s\n' \
       '<Directory /var/www/html/public>' \
@@ -22,8 +26,8 @@ RUN a2enmod rewrite headers \
       'SetEnvIf X-Forwarded-Proto "^https$" HTTPS=on' \
       'ServerTokens Prod' \
       'ServerSignature Off' \
-      > /etc/apache2/conf-available/campus-event-hub.conf \
- && a2enconf campus-event-hub \
+      > /etc/apache2/conf-available/zz-campus-event-hub.conf \
+ && a2enconf zz-campus-event-hub \
  && { echo 'expose_php = Off'; echo 'upload_max_filesize = 10M'; echo 'post_max_size = 12M'; \
       echo '; Like XAMPP: pages can start printing before the login cookie is sent.'; \
       echo 'output_buffering = 4096'; } \
