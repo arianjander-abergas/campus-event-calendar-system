@@ -10,6 +10,6 @@ Disallow: /api/
 Disallow: /event-details.php
 Disallow: /events.php?mine=
 
-# After deploying, replace the domain below with the live one and submit
-# the same address in Google Search Console → Sitemaps.
-Sitemap: https://YOUR-DOMAIN/sitemap.php
+# If the site moves to another domain, change the address below and submit
+# it in Google Search Console → Sitemaps.
+Sitemap: https://campus-event-calendar-system.onrender.com/sitemap.php

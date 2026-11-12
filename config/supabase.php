@@ -642,6 +642,7 @@ const DB_UPDATES = [
     '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
     '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
     '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
+    '20261112120000_security_hardening.sql' => ['Security: registrations start as "registered" (only event admins mark attendance), and image uploads are limited to 5 MB', 'rpc', 'registrations_are_guarded', []],
 ];
 
 /**

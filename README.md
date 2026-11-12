@@ -283,7 +283,7 @@ visitors ──> lb (Nginx :80) ──> app1 / app2 / app3 (PHP + Apache, public
 **Run it** (Docker Compose 2.24+), from the project folder:
 
 1. `cp deploy/load-balancer/.env.example deploy/load-balancer/.env` and set `APP_ORIGIN` to the live address.
-2. Put `config/mail.local.php` and `config/assistant.local.php` in place (they're copied into the servers), or use the `.env` variables.
+2. Put the email password and assistant key in that `.env` (`SMTP_USERNAME`, `SMTP_PASSWORD`, `ANTHROPIC_API_KEY`). `config/*.local.php` are not copied into the servers, so passwords never end up inside an image.
 3. `docker compose -f deploy/load-balancer/docker-compose.yml up -d --build`
 4. Open `http://<server address>/lb-status`. For HTTPS, put the server behind a TLS proxy or add a certificate to `nginx.conf` (e.g. with Certbot).
 
