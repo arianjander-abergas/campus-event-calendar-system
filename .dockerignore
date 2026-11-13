@@ -1,0 +1,10 @@
+# Not copied into the app servers' images (deploy/load-balancer/Dockerfile).
+.git
+.github
+.vscode
+docs
+deploy/load-balancer/.env
+*.md
+# Passwords and keys never go into an image: set them as environment
+# variables on the host (Render → Environment, or deploy/load-balancer/.env).
+config/*.local.php
