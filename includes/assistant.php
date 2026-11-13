@@ -1077,9 +1077,26 @@ function assistant_rate_limit(?array $user): string
     return '';
 }
 
-/** Sliding-window counter in the temp folder: true (and counted) if fewer than $max in the last $seconds. */
+/**
+ * Sliding-window counter: true (and counted) if fewer than $max in the last
+ * $seconds. Kept in Redis when the site runs on several servers (so a
+ * limit holds whichever server answers), else in this server's temp folder.
+ */
 function assistant_allow(string $key, int $max, int $seconds): bool
 {
+    if ($redis = shared_redis()) {
+        try {
+            $k = 'ceh:assistant:' . md5(SUPABASE_URL . '|' . $key);
+            $now = microtime(true);
+            $redis->zRemRangeByScore($k, '-inf', (string) ($now - $seconds));
+            if ($redis->zCard($k) >= $max) return false;
+            $redis->zAdd($k, $now, $now . ':' . bin2hex(random_bytes(3)));
+            $redis->expire($k, $seconds);
+            return true;
+        } catch (Throwable $e) {
+            // Redis hiccup: fall back to this server's own counter.
+        }
+    }
     $file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ceh-assistant-' . md5(SUPABASE_URL . '|' . $key) . '.json';
     $fp = @fopen($file, 'c+');
     if (!$fp) return true; // can't count: don't lock anyone out
