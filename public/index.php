@@ -112,7 +112,7 @@ $topbarSearch = true;
       <?php endif; ?>
       <?php foreach ($todayEvents as $ev): ?>
         <a class="upcoming-item" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
-          <div class="upcoming-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+          <div class="upcoming-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
           <div class="upcoming-info">
             <div class="u-title"><?= htmlspecialchars($ev['title']) ?></div>
             <div class="u-meta"><?= htmlspecialchars(trim(format_event_time($ev['start_time']) . ' | ' . event_place($ev), ' |')) ?></div>
@@ -156,4 +156,3 @@ $topbarSearch = true;
 <?= presence_script_tag() ?>
 </body>
 </html>
-z

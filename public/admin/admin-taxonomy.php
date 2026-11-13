@@ -421,7 +421,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
                 <tr>
                   <td>
                     <?php if (!empty($o['logo_url'])): ?>
-                      <img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-table-logo">
+                      <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-table-logo">
                     <?php else: ?>
                       <span class="admin-table-logo admin-table-logo-initials"><?= htmlspecialchars(initials($o['name'])) ?></span>
                     <?php endif; ?>

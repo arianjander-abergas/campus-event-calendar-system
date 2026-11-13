@@ -366,7 +366,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
                   <tr>
                     <td>
                       <?php if ($heading === 'Organization' && !empty($first['organization_logo_url'])): ?>
-                        <span class="admin-org-cell"><img src="<?= htmlspecialchars(asset_url($first['organization_logo_url'])) ?>" alt="" class="admin-org-logo"><?= htmlspecialchars($name !== '' ? $name : 'None') ?></span>
+                        <span class="admin-org-cell"><img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($first['organization_logo_url'])) ?>" alt="" class="admin-org-logo"><?= htmlspecialchars($name !== '' ? $name : 'None') ?></span>
                       <?php else: ?>
                         <?= htmlspecialchars($name !== '' ? $name : ($heading === 'Department' ? 'No department' : 'None')) ?>
                       <?php endif; ?>

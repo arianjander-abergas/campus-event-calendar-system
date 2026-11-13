@@ -152,8 +152,28 @@
     update();
   }
 
+  /* ---------------- Lazy event posters ---------------- */
+  // Posters (.lazy-bg, the picture in --bg) only download when their card
+  // gets within ~300px of the screen, so long pages load fast and use less
+  // data. Cards hidden in the dashboard carousel load when they're shown.
+  function setupLazyPosters() {
+    const items = document.querySelectorAll(".lazy-bg:not(.is-loaded)");
+    if (!items.length) return;
+    const load = (el) => el.classList.add("is-loaded");
+    if (!("IntersectionObserver" in window)) { items.forEach(load); return; }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        load(entry.target);
+        observer.unobserve(entry.target);
+      });
+    }, { rootMargin: "300px 0px" });
+    items.forEach((el) => observer.observe(el));
+  }
+
   function init() {
     document.documentElement.classList.add("js-ui");
+    setupLazyPosters();
     setupReveal();
     setupCountUp();
     setupFlashes();

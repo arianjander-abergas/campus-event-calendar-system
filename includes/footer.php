@@ -15,7 +15,7 @@ $footerUser = current_user();
 <footer class="site-footer">
   <div class="site-footer-bar">
     <a href="<?= BASE_URL ?>/index.php" class="site-footer-brand">
-      <img src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="" class="site-footer-logo" width="28" height="28">
+      <img loading="lazy" decoding="async" src="<?= htmlspecialchars(school_logo_url(true)) ?>" alt="" class="site-footer-logo" width="28" height="28">
       <span>
         <strong>Campus Event Hub</strong>
         <span><?= htmlspecialchars(SCHOOL_NAME) ?></span>

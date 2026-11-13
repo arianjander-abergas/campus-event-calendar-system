@@ -39,6 +39,9 @@ $manageMenu = fn(): string =>
     . $navLink('/admin/event-organizer.php?view=update', 'manage-update', 'list', 'Update Events', 16)
     . '</div></div>';
 ?>
+<?php /* Scripts are on: event posters below wait until they scroll near (assets/js/ui.js);
+         without scripts style.css shows them straight away. */ ?>
+<script>document.documentElement.classList.add("js-lazy");</script>
 <?php /* .neu: the home page's dark-blue neumorphic sidebar on every page (style.css). */ ?>
 <aside class="sidebar neu" id="sidebar" aria-label="Site menu">
   <div class="sidebar-top">

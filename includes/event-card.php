@@ -17,7 +17,7 @@ $cardOnline = ($ev['venue_type'] ?? '') === 'online';
 $cardOrg = $ev['organizations'] ?? null;
 ?>
 <a class="event-card" href="<?= BASE_URL ?>/event-details.php?id=<?= urlencode((string) $ev['id']) ?>">
-  <div class="event-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');">
+  <div class="event-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')">
     <span class="event-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
     <?php if (!empty($ev['my_label'])): ?>
       <span class="status-pill status-<?= htmlspecialchars(strtolower($ev['my_label'])) ?>"><?= htmlspecialchars($ev['my_label']) ?></span>
@@ -46,7 +46,7 @@ $cardOrg = $ev['organizations'] ?? null;
     <?php if (!empty($cardOrg['name'])): ?>
       <div class="event-org">
         <?php if (!empty($cardOrg['logo_url'])): ?>
-          <img src="<?= htmlspecialchars(asset_url($cardOrg['logo_url'])) ?>" alt="" class="event-org-logo" width="22" height="22">
+          <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($cardOrg['logo_url'])) ?>" alt="" class="event-org-logo" width="22" height="22">
         <?php else: ?>
           <span class="event-org-logo event-org-initials" aria-hidden="true"><?= htmlspecialchars(initials($cardOrg['name'])) ?></span>
         <?php endif; ?>

@@ -52,7 +52,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
     <section class="org-card" id="org-<?= htmlspecialchars($org['id']) ?>">
       <header class="org-card-head">
         <?php if (!empty($org['logo_url'])): ?>
-          <img src="<?= htmlspecialchars(asset_url($org['logo_url'])) ?>" alt="" class="org-logo">
+          <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($org['logo_url'])) ?>" alt="" class="org-logo">
         <?php else: ?>
           <span class="org-logo org-logo-initials"><?= htmlspecialchars(initials($org['name'])) ?></span>
         <?php endif; ?>
@@ -78,7 +78,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
               <?php foreach ($org['officers'] as $o): ?>
                 <li class="officer-card">
                   <?php if (!empty($o['photo_url'])): ?>
-                    <img src="<?= htmlspecialchars(asset_url($o['photo_url'])) ?>" alt="" class="officer-photo">
+                    <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($o['photo_url'])) ?>" alt="" class="officer-photo">
                   <?php else: ?>
                     <span class="officer-photo officer-initials"><?= htmlspecialchars(initials($o['full_name'])) ?></span>
                   <?php endif; ?>
@@ -97,7 +97,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
           <?php else: ?>
             <?php foreach (array_slice($org['upcoming_events'], 0, 4) as $ev): ?>
               <a class="mini-row" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
-                <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+                <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
                 <div class="mini-info">
                   <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
                   <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
