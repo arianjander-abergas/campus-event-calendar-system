@@ -199,7 +199,7 @@ $breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organiz
                   <tr>
                     <td>
                       <?php if (!empty($o['photo_url'])): ?>
-                        <img src="<?= htmlspecialchars(asset_url($o['photo_url'])) ?>" alt="" class="admin-table-logo admin-table-avatar">
+                        <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($o['photo_url'])) ?>" alt="" class="admin-table-logo admin-table-avatar">
                       <?php else: ?>
                         <span class="admin-table-logo admin-table-avatar admin-table-logo-initials"><?= htmlspecialchars(initials($o['full_name'])) ?></span>
                       <?php endif; ?>

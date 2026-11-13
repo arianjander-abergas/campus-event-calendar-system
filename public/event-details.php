@@ -139,7 +139,7 @@ if ($event) {
 
         <div class="ed-organizer">
           <!-- IMAGE SLOT 2: Organization logo (used when the org has no logo_url) | file: assets/images/event-details/org-logo.svg | 72×72 -->
-          <img src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="ed-org-logo">
+          <img loading="lazy" decoding="async" src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="ed-org-logo">
           <div class="ed-org-text">
             <span>Organize by</span>
             <?php if (!empty($event['organizations']['id'])): ?>

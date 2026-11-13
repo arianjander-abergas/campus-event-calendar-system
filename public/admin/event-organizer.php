@@ -507,7 +507,7 @@ $breadcrumbs[] = [$pageTitle, null];
                       $isPicked = in_array($o['id'], $pickedIds, true) || $isOwn; ?>
                       <label class="org-option<?= $isOwn ? ' is-locked' : '' ?>">
                         <input type="checkbox" <?= $isOwn ? 'disabled data-own' : 'name="organization_ids[]"' ?> value="<?= htmlspecialchars($o['id']) ?>" data-org-name="<?= htmlspecialchars($o['name']) ?>" <?= $isPicked ? 'checked' : '' ?>>
-                        <?php if (!empty($o['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                        <?php if (!empty($o['logo_url'])): ?><img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($o['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
                         <span><?= htmlspecialchars(organization_label($o)) ?><?= $isOwn ? ' <em>(your organization)</em>' : '' ?></span>
                       </label>
                     <?php endforeach; ?>
@@ -781,7 +781,7 @@ $breadcrumbs[] = [$pageTitle, null];
               <td>
                 <?php if (!empty($ev['organizations']['name'])): ?>
                   <span class="admin-org-cell">
-                    <?php if (!empty($ev['organizations']['logo_url'])): ?><img src="<?= htmlspecialchars(asset_url($ev['organizations']['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
+                    <?php if (!empty($ev['organizations']['logo_url'])): ?><img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($ev['organizations']['logo_url'])) ?>" alt="" class="admin-org-logo"><?php endif; ?>
                     <?= htmlspecialchars($ev['organizations']['name']) ?>
                   </span>
                   <?php if (!empty($partners[$ev['id']])): ?>

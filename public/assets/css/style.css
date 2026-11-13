@@ -2579,3 +2579,55 @@ body .dash-topbar .topbar-brand .brand-text .campus, .site-footer-brand strong {
 .install-help p { margin: 0 0 14px; font-size: 0.82rem; color: var(--text-muted); }
 .install-help-actions { display: flex; justify-content: flex-end; }
 :root:is([data-theme="dark"], [data-theme="dim"]) .install-help h2 { color: var(--text-main); }
+
+/* Appearance menu: a soft dark drop shadow instead of the neumorphic white glow
+   (same look as the profile / notification menus). */
+.neu .theme-dropdown,
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .theme-dropdown {
+  box-shadow: 0 14px 32px rgba(14, 42, 94, 0.28), 0 2px 8px rgba(14, 42, 94, 0.14);
+  border: 1px solid rgba(14, 42, 94, 0.08);
+}
+:root:is([data-theme="dark"], [data-theme="dim"]) .neu .theme-dropdown {
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- Tablet (761–1100px): title in the top bar, tidy slim sidebar ---- */
+@media (min-width: 761px) and (max-width: 1100px) {
+  /* "CAMPUS EVENT HUB" at the start of the top bar (the logo is already in
+     the slim sidebar, and the menu button is only for phones). */
+  .topbar-start { display: flex; }
+  .topbar-start .nav-toggle,
+  .topbar-start .topbar-brand img { display: none; }
+  .topbar-brand { display: inline-flex; align-items: center; margin-right: 6px; }
+  .topbar-brand .brand-text { line-height: 1.05; }
+  .topbar-brand .brand-text .campus { font-size: 1rem; color: var(--orange-text); }
+  .topbar-brand .brand-text .hub { font-size: 0.78rem; color: var(--text-main); }
+
+  /* Install card: just the app icon in a small square while the sidebar is
+     slim; the full card comes back when it expands (hover / keyboard). */
+  .sidebar:not(:hover):not(:focus-within) .side-install {
+    width: 44px; height: 44px; padding: 0; margin: 12px auto 0;
+    justify-content: center; border-radius: 12px;
+  }
+  .sidebar:not(:hover):not(:focus-within) .side-install [data-install-label] { display: none; }
+  .side-install [data-install-label] { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* ============================================================
+   LAZY LOADING — save data, open pages faster.
+   Event posters (.lazy-bg) keep their picture in --bg; it is only used
+   (= downloaded) once ui.js marks the card .is-loaded as it nears the
+   screen. Without scripts (no html.js-lazy) they load straight away.
+   ============================================================ */
+.lazy-bg.is-loaded,
+html:not(.js-lazy) .lazy-bg { background-image: var(--bg); }
+
+/* Long pages: the browser skips laying out sections that are far off
+   screen until you scroll near them (screen only — printing is unchanged). */
+@media screen {
+  .org-card, .about-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 420px;
+  }
+}

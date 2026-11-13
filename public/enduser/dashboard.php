@@ -107,7 +107,7 @@ $topbarSearch = true;
           $rowHref = $toEvaluate ? 'evaluate.php?event=' . urlencode($ev['id']) : '../event-details.php?id=' . urlencode($ev['id']);
         ?>
           <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>">
-            <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+            <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
               <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
@@ -138,7 +138,7 @@ $topbarSearch = true;
         <?php endif; ?>
         <?php foreach ($trending as $ev): ?>
           <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
-            <div class="mini-thumb" style="background-image:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>');"></div>
+            <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
               <div class="mini-meta"><?= icon('calendar', 13) ?> <?= htmlspecialchars(event_date_range($ev)) ?> &nbsp; <?= icon('location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></div>
