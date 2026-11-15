@@ -1043,9 +1043,30 @@ function auth_error_message(array $result, string $fallback): string
     if (($data['error_code'] ?? '') === 'email_address_not_authorized' || str_contains($msg, 'cannot be used as it is not authorized')
         || stripos($msg, 'error sending') !== false) {
         error_log('[auth] ' . $msg . ' — check Supabase → Authentication → Emails → SMTP Settings');
-        return 'The email couldn\'t be sent right now. Please try again later, and if it keeps happening, tell the site\'s admin (the site\'s email sender isn\'t set up yet).';
+        return 'The email couldn\'t be sent right now. Please try again later, and if it keeps happening, tell the site\'s admin (the site\'s email sender isn\'t working).';
     }
     return $msg;
+}
+
+// ---- Passwords ----------------------------------------------------------------
+// Shortest password for a new account or a password change (sign-up, reset
+// link, profile). Keep it the same as Supabase → Authentication → Sign In /
+// Providers → Email → "Minimum password length", which also guards sign-ups
+// made straight to Supabase. Older, shorter passwords still log in.
+const PASSWORD_MIN_LENGTH = 8;
+
+/**
+ * Eye button that shows / hides the password field with this id. Goes inside
+ * a <div class="password-wrap"> next to the field; assets/js/auth.js does the
+ * switching (same button as the login page's).
+ */
+function password_toggle_button(string $inputId): string
+{
+    $img = BASE_URL . '/assets/images/login/';
+    return '<button type="button" class="login-field-toggle" data-toggle-password="' . htmlspecialchars($inputId) . '" aria-label="Show password">'
+        . '<img class="icon-hidden" src="' . $img . 'icon-eye-off.svg" alt="" width="22" height="22">'
+        . '<img class="icon-visible" src="' . $img . 'icon-eye.svg" alt="" width="22" height="22" hidden>'
+        . '</button>';
 }
 
 // ---- School email accounts -------------------------------------------------

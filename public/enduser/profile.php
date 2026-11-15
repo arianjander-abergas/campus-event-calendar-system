@@ -24,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'change_password') {
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
-        if (strlen($password) < 6) {
-            $errors[] = 'Your new password must be at least 6 characters.';
+        if (strlen($password) < PASSWORD_MIN_LENGTH) {
+            $errors[] = 'Your new password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.';
         } elseif ($password !== $confirm) {
             $errors[] = 'The new passwords do not match.';
         } else {
@@ -175,13 +175,13 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
           <h2 id="password-modal-title">Change password</h2>
           <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
         </div>
-        <p>Use at least 6 characters. You'll log in with the new password from now on.</p>
+        <p>Use at least <?= PASSWORD_MIN_LENGTH ?> characters. You'll log in with the new password from now on.</p>
         <p class="acct-modal-error" role="alert" data-password-error<?= $passwordErrors ? '' : ' hidden' ?>><?= htmlspecialchars(implode(' ', $passwordErrors)) ?></p>
 
         <label class="admin-label" for="password">New Password</label>
-        <input type="password" id="password" name="password" class="admin-input" minlength="6" required autocomplete="new-password">
+        <input type="password" id="password" name="password" class="admin-input" minlength="<?= PASSWORD_MIN_LENGTH ?>" required autocomplete="new-password">
         <label class="admin-label" for="confirm_password">Confirm New Password</label>
-        <input type="password" id="confirm_password" name="confirm_password" class="admin-input" minlength="6" required autocomplete="new-password">
+        <input type="password" id="confirm_password" name="confirm_password" class="admin-input" minlength="<?= PASSWORD_MIN_LENGTH ?>" required autocomplete="new-password">
         <label class="password-show"><input type="checkbox" data-password-show> Show passwords</label>
 
         <div class="acct-modal-actions">
@@ -233,7 +233,7 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
 
   form.addEventListener('submit', function (e) {
     var message = '', field = null;
-    if (fields[0].value.length < 6) { message = 'Your new password must be at least 6 characters.'; field = fields[0]; }
+    if (fields[0].value.length < <?= PASSWORD_MIN_LENGTH ?>) { message = 'Your new password must be at least <?= PASSWORD_MIN_LENGTH ?> characters.'; field = fields[0]; }
     else if (fields[1].value !== fields[0].value) { message = 'The new passwords do not match.'; field = fields[1]; }
     if (!message) return;
     e.preventDefault();
