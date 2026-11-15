@@ -471,6 +471,16 @@ button.login-field-icon { cursor: pointer; }
 .login-field-toggle img { width: 22px; height: 22px; }
 .login-field-toggle img[hidden] { display: none; }
 
+/* Sign-up / new-password fields with the eye button inside, on the right. */
+.password-wrap { position: relative; margin-bottom: 18px; }
+.login-glass .password-wrap { margin-bottom: 16px; }
+/* input.login-input: wins over the later .login-glass input rules (also on phones). */
+.login-page .password-wrap input.login-input { margin-bottom: 0; padding-right: 46px; }
+.password-wrap .login-field-toggle { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); }
+/* The eye icons are light grey for the dark pages; darker on the light reset page. */
+.login-page:not(.login-glass) .password-wrap .login-field-toggle img { filter: brightness(0.45); }
+.login-page:not(.login-glass) .password-wrap .login-field-toggle:hover { background: rgba(0, 0, 0, 0.06); }
+
 .login-glass .login-forgot { margin: -4px 0 22px auto; color: var(--glass-link); }
 
 .login-glass .login-btn {
@@ -870,6 +880,8 @@ button.login-field-icon { cursor: pointer; }
   .login-glass .login-input { height: 42px; font-size: 0.85rem; padding-left: 12px; padding-right: 12px; }
   .login-glass .register-form .login-input,
   .login-glass .register-form .admin-input { margin-bottom: 10px; }
+  .login-glass .register-form .password-wrap { margin-bottom: 10px; }
+  .login-glass .password-wrap .login-field-toggle { width: 34px; height: 34px; }
   .login-glass .register-form .acct-type { margin-bottom: 8px; }
   .login-glass .register-form .acct-choice,
   .login-glass .register-form .acct-grid { grid-template-columns: 1fr 1fr; gap: 10px; column-gap: 10px; }

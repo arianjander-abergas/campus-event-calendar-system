@@ -53,8 +53,8 @@ if ($step === 'new-password') {
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'set_password') {
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
-        if (strlen($password) < 6) {
-            $error = 'Password must be at least 6 characters.';
+        if (strlen($password) < PASSWORD_MIN_LENGTH) {
+            $error = 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.';
         } elseif ($password !== (is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '')) {
             $error = 'Passwords do not match.';
         } else {
@@ -102,9 +102,15 @@ $_SESSION['callback_nonce'] = $_SESSION['callback_nonce'] ?? bin2hex(random_byte
     <form method="POST" class="login-form">
       <input type="hidden" name="action" value="set_password">
       <label for="password">New Password</label>
-      <input type="password" id="password" name="password" class="login-input" required minlength="6" autocomplete="new-password">
+      <div class="password-wrap">
+        <input type="password" id="password" name="password" class="login-input" required minlength="<?= PASSWORD_MIN_LENGTH ?>" autocomplete="new-password" placeholder="At least <?= PASSWORD_MIN_LENGTH ?> characters">
+        <?= password_toggle_button('password') ?>
+      </div>
       <label for="confirm_password">Confirm New Password</label>
-      <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="6" autocomplete="new-password">
+      <div class="password-wrap">
+        <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="<?= PASSWORD_MIN_LENGTH ?>" autocomplete="new-password">
+        <?= password_toggle_button('confirm_password') ?>
+      </div>
       <button type="submit" class="login-btn login-submit">Save password</button>
     </form>
   <?php else: ?>
@@ -122,6 +128,9 @@ $_SESSION['callback_nonce'] = $_SESSION['callback_nonce'] ?? bin2hex(random_byte
   <?php endif; ?>
 </main>
 
+<?php if ($step === 'new-password'): ?>
+<script src="../assets/js/auth.js?v=<?= filemtime(__DIR__ . '/../assets/js/auth.js') ?>"></script>
+<?php endif; ?>
 <?php if ($step !== 'new-password' && !$error): ?>
 <script>
   // Supabase returns "#access_token=...&refresh_token=...&type=recovery" or "#error_description=...".

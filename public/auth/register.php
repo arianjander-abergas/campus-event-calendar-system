@@ -40,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!email_allowed($email)) {
         $errors[] = school_email_rule_message();
     }
-    if (strlen($password) < 6) {
-        $errors[] = 'Password must be at least 6 characters.';
+    if (strlen($password) < PASSWORD_MIN_LENGTH) {
+        $errors[] = 'Password must be at least ' . PASSWORD_MIN_LENGTH . ' characters.';
     } elseif ($password !== $confirm) {
         $errors[] = 'Passwords do not match.';
     }
@@ -181,11 +181,17 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
 
       <div>
         <label for="password">Password</label>
-        <input type="password" id="password" name="password" class="login-input" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters">
+        <div class="password-wrap">
+          <input type="password" id="password" name="password" class="login-input" required minlength="<?= PASSWORD_MIN_LENGTH ?>" autocomplete="new-password" placeholder="At least <?= PASSWORD_MIN_LENGTH ?> characters">
+          <?= password_toggle_button('password') ?>
+        </div>
       </div>
       <div>
         <label for="confirm_password">Confirm Password</label>
-        <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="6" autocomplete="new-password" placeholder="Type it again">
+        <div class="password-wrap">
+          <input type="password" id="confirm_password" name="confirm_password" class="login-input" required minlength="<?= PASSWORD_MIN_LENGTH ?>" autocomplete="new-password" placeholder="Type it again">
+          <?= password_toggle_button('confirm_password') ?>
+        </div>
       </div>
 
       <?php include __DIR__ . '/../../includes/account-fields.php'; ?>
