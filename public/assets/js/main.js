@@ -45,7 +45,7 @@ function buildCalendar() {
     const more = onDay.length - shown;
     list.innerHTML = `<h4>${esc(title)} · ${onDay.length} event${onDay.length === 1 ? "" : "s"}</h4>`
       + (onDay.length
-        ? onDay.slice(0, shown).map((e) => `<a href="${esc(eventUrl + encodeURIComponent(e.id))}"><strong>${esc(e.title)}</strong>`
+        ? onDay.slice(0, shown).map((e) => `<a href="${esc(eventUrl + encodeURIComponent(e.id))}" data-event-modal><strong>${esc(e.title)}</strong>`
             + `<span>${esc([e.time || "All day", e.place].filter(Boolean).join(" · "))}${e.status === "completed" ? " · Completed" : ""}</span></a>`).join("")
         : "<p>No events on this date.</p>")
       + (calendarUrl ? `<a class="cal-open-link" href="${esc(calendarUrl + "?date=" + date)}">${more > 0 ? "See all " + onDay.length + " in the Event Calendar ›" : "Open this day in the Event Calendar ›"}</a>` : "");

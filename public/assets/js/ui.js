@@ -8,6 +8,7 @@
  *   - Flash messages get a ✕ button; success messages close by themselves.
  *   - A "back to top" button appears after scrolling down a long page.
  *   - The top bar gets a deeper shadow once the page is scrolled (phones).
+ *   - Tabs ([data-tabs], e.g. the Reports breakdown) show one panel at a time.
  *
  * Everything that moves is skipped when the visitor's device asks for
  * reduced motion; the page works the same without this file.
@@ -171,6 +172,48 @@
     items.forEach((el) => observer.observe(el));
   }
 
+  /* ---------------- Tabs ---------------- */
+  // [data-tabs] holds buttons role="tab" aria-controls="<panel id>"; the
+  // chosen one's panel gets .is-active (CSS hides the others while scripts
+  // are on; without them every panel shows). The choice is kept in the
+  // address (#view=<panel id> — not the bare id, so the page doesn't jump
+  // to it), so a refresh — or a form marked data-keep-tab, like the
+  // Reports filters — comes back to the same tab.
+  function setupTabs() {
+    document.querySelectorAll("[data-tabs]").forEach((list) => {
+      const tabs = Array.from(list.querySelectorAll('[role="tab"]'));
+      if (!tabs.length) return;
+      function select(tab, remember) {
+        tabs.forEach((t) => {
+          const on = t === tab;
+          t.classList.toggle("active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+          t.tabIndex = on ? 0 : -1;
+          document.getElementById(t.getAttribute("aria-controls"))?.classList.toggle("is-active", on);
+        });
+        const hash = "#view=" + tab.getAttribute("aria-controls");
+        document.querySelectorAll("form[data-keep-tab]").forEach((form) => {
+          form.setAttribute("action", (form.getAttribute("action") || "").split("#")[0] + hash);
+        });
+        if (remember) history.replaceState(history.state, "", hash);
+      }
+      tabs.forEach((tab, i) => {
+        tab.addEventListener("click", () => select(tab, true));
+        // Arrow keys move between tabs (Home / End: first / last).
+        tab.addEventListener("keydown", (e) => {
+          const to = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+          if (to === undefined) return;
+          e.preventDefault();
+          const next = tabs[(to + tabs.length) % tabs.length];
+          select(next, true);
+          next.focus();
+        });
+      });
+      const fromAddress = tabs.find((t) => "#view=" + t.getAttribute("aria-controls") === location.hash);
+      if (fromAddress) select(fromAddress, false);
+    });
+  }
+
   function init() {
     document.documentElement.classList.add("js-ui");
     setupLazyPosters();
@@ -178,6 +221,7 @@
     setupCountUp();
     setupFlashes();
     setupScrollBits();
+    setupTabs();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

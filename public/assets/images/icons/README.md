@@ -31,14 +31,14 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `evaluation.svg` | EVL | Evaluation | Sidebar (admin), dashboard "Please evaluate" box, Manage Events side links |
 | `tag.svg` | TAG | Categories | Sidebar (admin) |
 | `schedule.svg` | SCH | School calendar / schedule | Sidebar (admin), Manage Events "Edit the schedule" |
-| `people.svg` | PPL | People / going / users | Sidebar (admin "Users & Roles", moderator "Our Officers"), event cards "N going", event details, dashboard trending, home "Easy Participation", Manage Events |
+| `people.svg` | PPL | People / going / users | Sidebar (admin "Users", moderator "Our Officers"), event cards "N going", event details, dashboard trending, home "Easy Participation", Manage Events |
 | `search.svg` | SRC | Search | Top-bar search box, home About "Discover" |
 | `bell.svg` | BEL | Notifications | Top-bar bell, home "Stay Updated" + About |
 | `location.svg` | LOC | Venue | Event cards, dashboard lists, organizations page, evaluation page |
 | `online.svg` | ONL | Online event | Event cards, event details |
-| `campus.svg` | CMP | On / off campus | Event details |
-| `audience.svg` | AUD | Who it's for (students / faculty) | Event cards, event details |
-| `certificate.svg` | CRT | Certificates | Home "Earn Certificates" |
+| `campus.svg` | CMP | On / off campus | (not used at the moment — the venue type is on the venue line) |
+| `audience.svg` | AUD | Who it's for (students / faculty) | Event details / pop-up, Event Calendar day list |
+| `certificate.svg` | CRT | Certificates / roles | Home "Earn Certificates", sidebar (admin "Roles") |
 | `link.svg` | LNK | Online link | Event details "Join online" |
 | `email.svg` | EML | Contact | Event details contact line |
 | `megaphone.svg` | MEG | Announcements | Home hero "Stay Updated" badge, dashboard Announcements |
@@ -46,7 +46,7 @@ In code, an icon is `<?= icon('bell') ?>` (optional size: `icon('bell', 20)`), d
 | `view.svg` | VEW | View page | Manage Events "View the event page" |
 | `register.svg` | REG | Register | Home About "Register", sidebar "Sign up" (logged out) |
 | `import.svg` | IMP | Import & Verify (Excel upload) | Sidebar (admin + moderator) |
-| `arrow-left.svg` | — | Back | Event details "Back to All Events" |
+| `arrow-left.svg` | — | Back | Event details "Back" |
 | `menu.svg` | — | Open the menu | Top bar on tablets and phones (opens the sidebar) |
 | `close.svg` | — | Close the menu | Sidebar on tablets and phones |
 

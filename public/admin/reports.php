@@ -1,11 +1,14 @@
 <?php
 /**
- * Admin: event reports. Filter by school year, semester, month, department,
- * organization, audience and venue type (or a date range), then see:
- * totals, events per semester / month / week, per department and
- * organization, and the full event list. Print-ready ("Print report" prints
- * the totals and tables only, no graphs) and downloadable as an Excel
- * workbook. Numbers come from the event_report view.
+ * Admin: event reports. Filter by school year, semester, month (department,
+ * organization, audience and venue type under "More filters"), or a date
+ * range, then see — kept short so it reads at a glance:
+ *   four totals (events held, registrations, attendance rate, rating),
+ *   the events-per-month graph, and ONE breakdown table at a time
+ *   (tabs: month / week / semester / department / organization / events).
+ * Print-ready ("Print report" prints the totals and every breakdown, no
+ * graphs) and downloadable as an Excel workbook with every column.
+ * Numbers come from the event_report view.
  *
  *   ?school_year=2026-2027|all &semester=1st|2nd|summer &month=2026-10 &department=<id>
  *   &organization=<id> &audience=students|faculty|all
@@ -114,10 +117,13 @@ ksort($byDepartment);
 $byOrganization = group_rows($rows, fn($r) => $r['organization_name'] ?? '');
 ksort($byOrganization);
 
-$maxPerMonth = 1;
+// Per month: only the months with events held (the empty ones only add noise).
+$monthTotals = [];
 foreach ($months as $m) {
-    $maxPerMonth = max($maxPerMonth, report_totals($byMonth[$m] ?? [])['events']);
+    $t = report_totals($byMonth[$m] ?? []);
+    if ($t['events'] > 0) $monthTotals[$m] = $t;
 }
+$maxPerMonth = $monthTotals ? max(array_column($monthTotals, 'events')) : 1;
 $maxPerWeek = $byWeek ? max(array_map('count', $byWeek)) : 1;
 
 // Chart: events per month by venue type.
@@ -183,7 +189,9 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
 
     <?= render_flashes() ?>
 
-    <form class="report-filters" method="get" action="reports.php">
+    <?php // The less-used filters are folded under "More filters" (open while one of them is set).
+      $moreFilters = count(array_filter([$filters['department'], $filters['organization'], $filters['audience'], $filters['venue_type']], fn($v) => $v !== '')); ?>
+    <form class="report-filters" method="get" action="reports.php" data-keep-tab>
       <label>School year
         <select name="school_year">
           <?php foreach ($schoolYears as $sy): ?>
@@ -208,58 +216,61 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
           <?php endforeach; ?>
         </select>
       </label>
-      <label>Department
-        <select name="department">
-          <option value="">All departments</option>
-          <?php foreach ($departments as $d): ?>
-            <option value="<?= htmlspecialchars($d['id']) ?>" <?= $filters['department'] === $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars(department_label($d)) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Organization
-        <select name="organization">
-          <option value="">All organizations</option>
-          <?php foreach ($organizations as $o): ?>
-            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Audience
-        <select name="audience">
-          <option value="">All audiences</option>
-          <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
-            <option value="<?= $key ?>" <?= $filters['audience'] === $key ? 'selected' : '' ?>>For <?= htmlspecialchars($label) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
-      <label>Venue type
-        <select name="venue_type">
-          <option value="">All venue types</option>
-          <?php foreach (VENUE_TYPES as $key => $label): ?>
-            <option value="<?= $key ?>" <?= $filters['venue_type'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-          <?php endforeach; ?>
-        </select>
-      </label>
       <?php if ($filters['from'] !== '' || $filters['to'] !== ''): ?>
         <input type="hidden" name="from" value="<?= htmlspecialchars($filters['from']) ?>">
         <input type="hidden" name="to" value="<?= htmlspecialchars($filters['to']) ?>">
       <?php endif; ?>
       <button type="submit" class="btn btn-accent">Apply</button>
       <?php if ($isFiltered): ?><a href="reports.php" class="filter-clear">Reset</a><?php endif; ?>
+      <details class="report-more"<?= $moreFilters ? ' open' : '' ?>>
+        <summary>More filters<?= $moreFilters ? ' (' . $moreFilters . ' on)' : '' ?></summary>
+        <div class="report-more-fields">
+          <label>Department
+            <select name="department">
+              <option value="">All departments</option>
+              <?php foreach ($departments as $d): ?>
+                <option value="<?= htmlspecialchars($d['id']) ?>" <?= $filters['department'] === $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars(department_label($d)) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>Organization
+            <select name="organization">
+              <option value="">All organizations</option>
+              <?php foreach ($organizations as $o): ?>
+                <option value="<?= htmlspecialchars($o['id']) ?>" <?= $filters['organization'] === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>Audience
+            <select name="audience">
+              <option value="">All audiences</option>
+              <?php foreach (EVENT_AUDIENCES as $key => $label): ?>
+                <option value="<?= $key ?>" <?= $filters['audience'] === $key ? 'selected' : '' ?>>For <?= htmlspecialchars($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+          <label>Venue type
+            <select name="venue_type">
+              <option value="">All venue types</option>
+              <?php foreach (VENUE_TYPES as $key => $label): ?>
+                <option value="<?= $key ?>" <?= $filters['venue_type'] === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+        </div>
+      </details>
     </form>
 
     <?php if ($filters['from'] !== '' || $filters['to'] !== ''): ?>
       <p class="admin-note no-print">Showing events that start from <?= htmlspecialchars($filters['from'] !== '' ? format_event_date($filters['from']) : 'the beginning') ?> to <?= htmlspecialchars($filters['to'] !== '' ? format_event_date($filters['to']) : 'the latest event') ?>. <a href="<?= htmlspecialchars($query(['school_year' => $filters['school_year'] === 'all' ? $current['school_year'] : $filters['school_year'], 'from' => '', 'to' => ''])) ?>">Show the whole school year</a></p>
     <?php endif; ?>
 
-    <!-- Totals -->
-    <div class="kpi-grid kpi-grid-wide">
-      <div class="kpi"><span class="kpi-label">Events held</span><span class="kpi-value"><?= $totals['events'] ?></span><span class="kpi-sub"><?= $totals['on_campus'] ?> on-campus · <?= $totals['off_campus'] ?> off-campus · <?= $totals['online'] ?> online</span></div>
-      <div class="kpi"><span class="kpi-label">For students / faculty</span><span class="kpi-value"><?= $totals['for_students'] ?> / <?= $totals['for_faculty'] ?></span><span class="kpi-sub">+ <?= $totals['for_all'] ?> for both</span></div>
-      <div class="kpi"><span class="kpi-label">Cancelled</span><span class="kpi-value"><?= $totals['cancelled'] ?></span><span class="kpi-sub">not counted elsewhere</span></div>
-      <div class="kpi"><span class="kpi-label">Registrations</span><span class="kpi-value"><?= number_format($totals['registered']) ?></span><span class="kpi-sub"><?= number_format($totals['attended']) ?> attended · <?= number_format($totals['no_show']) ?> no-show</span></div>
+    <!-- Totals: the four numbers that matter (the splits are in the graph and the tabs below) -->
+    <div class="kpi-grid report-kpis">
+      <div class="kpi"><span class="kpi-label">Events held</span><span class="kpi-value"><?= $totals['events'] ?></span><span class="kpi-sub"><?= $totals['cancelled'] ? $totals['cancelled'] . ' cancelled, not counted' : 'none cancelled' ?></span></div>
+      <div class="kpi"><span class="kpi-label">Registrations</span><span class="kpi-value"><?= number_format($totals['registered']) ?></span><span class="kpi-sub"><?= number_format($totals['attended']) ?> attended</span></div>
       <div class="kpi"><span class="kpi-label">Attendance rate</span><span class="kpi-value"><?= format_percent($totals['attendance_rate']) ?></span><span class="kpi-sub">of registrants, ended events</span></div>
-      <div class="kpi"><span class="kpi-label">Evaluation</span><span class="kpi-value"><?= format_rating($totals['average_rating']) ?></span><span class="kpi-sub"><?= $totals['average_rating'] !== null ? htmlspecialchars(rating_interpretation($totals['average_rating'])) . ' · ' : '' ?><?= $totals['evaluations'] ?> response<?= $totals['evaluations'] === 1 ? '' : 's' ?></span></div>
+      <div class="kpi"><span class="kpi-label">Average rating</span><span class="kpi-value"><?= format_rating($totals['average_rating']) ?></span><span class="kpi-sub"><?= $totals['average_rating'] !== null ? htmlspecialchars(rating_interpretation($totals['average_rating'])) . ' · ' : '' ?><?= $totals['evaluations'] ?> response<?= $totals['evaluations'] === 1 ? '' : 's' ?></span></div>
     </div>
 
     <?php if (empty($rows)): ?>
@@ -278,72 +289,73 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
       <?= chart_stacked_columns($chartColumns, $chartSeries, 'Events per month by venue type, ' . $scopeText) ?>
     </section>
 
-    <section class="admin-panel admin-panel-flush">
-      <div class="admin-panel-head"><div><h2>Monthly summary</h2><p>Cancelled events are left out of every column except Cancelled.</p></div></div>
-      <div class="admin-table-wrap" style="box-shadow:none;border-radius:0">
-        <table class="admin-table admin-table-compact">
-          <thead>
-            <tr>
-              <th>Month</th><th>Events</th>
-              <th class="num">On-campus</th><th class="num">Off-campus</th><th class="num">Online</th>
-              <th class="num">Students</th><th class="num">Faculty</th><th class="num">Both</th>
-              <th class="num">Attended</th><th class="num">Rating</th><th class="num">Cancelled</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($months as $m): $t = report_totals($byMonth[$m] ?? []); ?>
-              <tr>
-                <td class="nowrap"><?= htmlspecialchars(month_label($m)) ?></td>
-                <td><?= $cellBar($t['events'], $maxPerMonth) ?></td>
-                <td class="num"><?= $t['on_campus'] ?></td><td class="num"><?= $t['off_campus'] ?></td><td class="num"><?= $t['online'] ?></td>
-                <td class="num"><?= $t['for_students'] ?></td><td class="num"><?= $t['for_faculty'] ?></td><td class="num"><?= $t['for_all'] ?></td>
-                <td class="num"><?= $t['attended'] ?></td><td class="num"><?= format_rating($t['average_rating']) ?></td><td class="num"><?= $t['cancelled'] ?></td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total</td><td class="num" style="text-align:left"><?= $totals['events'] ?></td>
-              <td class="num"><?= $totals['on_campus'] ?></td><td class="num"><?= $totals['off_campus'] ?></td><td class="num"><?= $totals['online'] ?></td>
-              <td class="num"><?= $totals['for_students'] ?></td><td class="num"><?= $totals['for_faculty'] ?></td><td class="num"><?= $totals['for_all'] ?></td>
-              <td class="num"><?= $totals['attended'] ?></td><td class="num"><?= format_rating($totals['average_rating']) ?></td><td class="num"><?= $totals['cancelled'] ?></td>
-            </tr>
-          </tfoot>
-        </table>
+    <?php
+      // The breakdowns: ONE table at a time (tabs, assets/js/ui.js), short
+      // columns only — every column is in the Excel download. Printing
+      // prints all of them, one after the other.
+      $tabs = [
+          'by-month' => ['By month', 'Per month'],
+          'by-week' => ['By week', 'Per week'],
+          'by-semester' => ['By semester', 'Per semester'],
+          'by-department' => ['By department', 'Per department'],
+          'by-organization' => ['By organization', 'Per organization'],
+          'by-event' => ['All events (' . count($rows) . ')', 'Event list'],
+      ];
+      $panelAttrs = fn(string $id): string => 'class="report-panel' . ($id === array_key_first($tabs) ? ' is-active' : '')
+          . '" id="' . $id . '" role="tabpanel" aria-labelledby="tab-' . $id . '"';
+      $panelTitle = fn(string $id): string => '<h3 class="report-panel-title print-only">' . htmlspecialchars($tabs[$id][1]) . '</h3>'; // headings on paper
+      $flatWrap = '<div class="admin-table-wrap" style="box-shadow:none;border-radius:0">';
+    ?>
+    <section class="admin-panel admin-panel-flush report-breakdown">
+      <div class="admin-panel-head">
+        <div><h2>Breakdown</h2><p>Group the events by month, week, semester, department or organization. Cancelled events are left out of every number.</p></div>
       </div>
-    </section>
+      <div class="admin-tabs admin-subtabs report-tabs no-print" role="tablist" aria-label="Group the events" data-tabs>
+        <?php foreach ($tabs as $id => [$label]): $first = $id === array_key_first($tabs); ?>
+          <button type="button" class="admin-tab<?= $first ? ' active' : '' ?>" role="tab" id="tab-<?= $id ?>" aria-controls="<?= $id ?>" aria-selected="<?= $first ? 'true' : 'false' ?>"<?= $first ? '' : ' tabindex="-1"' ?>><?= htmlspecialchars($label) ?></button>
+        <?php endforeach; ?>
+      </div>
 
-    <div class="admin-grid-halves">
-      <!-- Per semester -->
-      <section class="admin-panel admin-panel-flush">
-        <div class="admin-panel-head"><div><h2>Per semester</h2><p>Terms follow the <a href="school-calendar.php">school calendar</a>.</p></div></div>
-        <div class="admin-table-wrap" style="box-shadow:none;border-radius:0">
+      <div <?= $panelAttrs('by-month') ?>><?= $panelTitle('by-month') ?>
+        <?= $flatWrap ?>
           <table class="admin-table admin-table-compact">
-            <thead><tr><th>Semester</th><th class="num">Events</th><th class="num">On-campus</th><th class="num">Online</th><th class="num">Attended</th><th class="num">Rating</th></tr></thead>
+            <thead><tr><th>Month</th><th>Events</th><th class="num">Attended</th><th class="num">Rating</th></tr></thead>
             <tbody>
-              <?php foreach ($bySemester as $key => $group): [$sy, $sem] = explode('|', $key); $t = report_totals($group); ?>
+              <?php if (!$monthTotals): ?><tr><td colspan="4" class="admin-table-empty">No events held.</td></tr><?php endif; ?>
+              <?php foreach ($monthTotals as $m => $t): ?>
                 <tr>
-                  <td><a class="row-link" href="<?= htmlspecialchars($query(['school_year' => $sy, 'semester' => $sem])) ?>"><?= htmlspecialchars(label_of(SEMESTERS, $sem)) ?></a><div class="admin-table-sub">SY <?= htmlspecialchars($sy) ?></div></td>
-                  <td class="num"><strong><?= $t['events'] ?></strong></td><td class="num"><?= $t['on_campus'] ?></td><td class="num"><?= $t['online'] ?></td>
-                  <td class="num"><?= $t['attended'] ?></td><td class="num"><?= format_rating($t['average_rating']) ?></td>
+                  <td class="nowrap">
+                    <?php if (in_array($m, $monthOptions, true)): ?>
+                      <a class="row-link" href="<?= htmlspecialchars($query(['month' => $m])) ?>"><?= htmlspecialchars(month_label($m)) ?></a>
+                    <?php else: ?>
+                      <?= htmlspecialchars(month_label($m)) ?>
+                    <?php endif; ?>
+                  </td>
+                  <td><?= $cellBar($t['events'], $maxPerMonth) ?></td>
+                  <td class="num"><?= $t['attended'] ?></td>
+                  <td class="num"><?= format_rating($t['average_rating']) ?></td>
                 </tr>
               <?php endforeach; ?>
             </tbody>
+            <tfoot>
+              <tr><td>Total</td><td class="num" style="text-align:left"><?= $totals['events'] ?></td><td class="num"><?= $totals['attended'] ?></td><td class="num"><?= format_rating($totals['average_rating']) ?></td></tr>
+            </tfoot>
           </table>
         </div>
-      </section>
+        <?php if (count($months) > count($monthTotals)): ?>
+          <p class="admin-hint admin-table-note"><?= count($months) - count($monthTotals) ?> month<?= count($months) - count($monthTotals) === 1 ? '' : 's' ?> without events left out.</p>
+        <?php endif; ?>
+      </div>
 
-      <!-- Per week -->
-      <section class="admin-panel admin-panel-flush">
-        <div class="admin-panel-head"><div><h2>Per week</h2><p>Weeks run Monday to Sunday; only weeks with events are listed.</p></div></div>
-        <div class="admin-table-wrap" style="box-shadow:none;border-radius:0">
+      <div <?= $panelAttrs('by-week') ?>><?= $panelTitle('by-week') ?>
+        <?= $flatWrap ?>
           <table class="admin-table admin-table-compact">
-            <thead><tr><th>Week</th><th>Events</th><th class="num">Attended</th></tr></thead>
+            <thead><tr><th>Week (Mon–Sun)</th><th>Events</th><th class="num">Attended</th></tr></thead>
             <tbody>
               <?php if (empty($byWeek)): ?><tr><td colspan="3" class="admin-table-empty">No events held.</td></tr><?php endif; ?>
               <?php foreach ($byWeek as $monday => $group): $t = report_totals($group); ?>
                 <tr>
-                  <td class="nowrap"><a class="row-link" href="<?= htmlspecialchars($query(['school_year' => 'all', 'semester' => '', 'from' => $monday, 'to' => date('Y-m-d', strtotime($monday . ' +6 days'))])) ?>"><?= htmlspecialchars(week_label($monday)) ?></a></td>
+                  <td class="nowrap"><a class="row-link" href="<?= htmlspecialchars($query(['school_year' => 'all', 'semester' => '', 'month' => '', 'from' => $monday, 'to' => date('Y-m-d', strtotime($monday . ' +6 days'))])) ?>"><?= htmlspecialchars(week_label($monday)) ?></a></td>
                   <td><?= $cellBar($t['events'], $maxPerWeek) ?></td>
                   <td class="num"><?= $t['attended'] ?></td>
                 </tr>
@@ -351,14 +363,30 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
             </tbody>
           </table>
         </div>
-      </section>
-    </div>
+      </div>
 
-    <div class="admin-grid-halves">
-      <?php foreach (['Department' => $byDepartment, 'Organization' => $byOrganization] as $heading => $groups): ?>
-        <section class="admin-panel admin-panel-flush">
-          <div class="admin-panel-head"><div><h2>Per <?= strtolower($heading) ?></h2></div></div>
-          <div class="admin-table-wrap" style="box-shadow:none;border-radius:0">
+      <div <?= $panelAttrs('by-semester') ?>><?= $panelTitle('by-semester') ?>
+        <?= $flatWrap ?>
+          <table class="admin-table admin-table-compact">
+            <thead><tr><th>Semester</th><th class="num">Events</th><th class="num">Attended</th><th class="num">Rating</th></tr></thead>
+            <tbody>
+              <?php foreach ($bySemester as $key => $group): [$sy, $sem] = explode('|', $key); $t = report_totals($group); ?>
+                <tr>
+                  <td><a class="row-link" href="<?= htmlspecialchars($query(['school_year' => $sy, 'semester' => $sem, 'month' => ''])) ?>"><?= htmlspecialchars(label_of(SEMESTERS, $sem)) ?></a><div class="admin-table-sub">SY <?= htmlspecialchars($sy) ?></div></td>
+                  <td class="num"><strong><?= $t['events'] ?></strong></td>
+                  <td class="num"><?= $t['attended'] ?></td>
+                  <td class="num"><?= format_rating($t['average_rating']) ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <p class="admin-hint admin-table-note">Terms follow the <a href="school-calendar.php">school calendar</a>.</p>
+      </div>
+
+      <?php foreach (['by-department' => ['Department', $byDepartment], 'by-organization' => ['Organization', $byOrganization]] as $id => [$heading, $groups]): ?>
+        <div <?= $panelAttrs($id) ?>><?= $panelTitle($id) ?>
+          <?= $flatWrap ?>
             <table class="admin-table admin-table-compact">
               <thead><tr><th><?= $heading ?></th><th class="num">Events</th><th class="num">Attended</th><th class="num">Rate</th><th class="num">Rating</th></tr></thead>
               <tbody>
@@ -380,38 +408,37 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
               </tbody>
             </table>
           </div>
-        </section>
+        </div>
       <?php endforeach; ?>
-    </div>
 
-    <!-- Every event -->
-    <section class="admin-panel admin-panel-flush">
-      <div class="admin-panel-head"><div><h2>Event list (<?= count($rows) ?>)</h2><p>Rating = mean of all 1–5 answers (5 = Excellent).</p></div></div>
-      <div class="admin-table-wrap" style="box-shadow:none;border-radius:0">
-        <table class="admin-table admin-table-compact report-events">
-          <thead>
-            <tr><th>Date</th><th>Event</th><th>Organization</th><th>Audience</th><th>Venue type</th><th class="num">Registered</th><th class="num">Attended</th><th class="num">Evaluations</th><th class="num">Rating</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            <?php foreach ($rows as $r): ?>
-              <tr>
-                <td class="nowrap"><?= htmlspecialchars(format_event_date($r['start_date'])) ?></td>
-                <td>
-                  <a class="row-link" href="../event-details.php?id=<?= urlencode($r['id']) ?>"><?= htmlspecialchars($r['title']) ?></a>
-                  <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([$r['category_name'] ?? '', $r['department_code'] ?? $r['department_name'] ?? '']))) ?></div>
-                </td>
-                <td><?= htmlspecialchars($r['organization_name'] ?? '—') ?></td>
-                <td><?= htmlspecialchars(label_of(EVENT_AUDIENCES, $r['audience'])) ?></td>
-                <td class="nowrap"><span class="admin-org-cell"><span class="series-dot" style="background:<?= VENUE_TYPE_COLORS[$r['venue_type']] ?? '#999' ?>"></span><?= htmlspecialchars(label_of(VENUE_TYPES, $r['venue_type'])) ?></span></td>
-                <td class="num"><?= (int) $r['registered_count'] ?></td>
-                <td class="num"><?= (int) $r['attended_count'] ?></td>
-                <td class="num"><a href="event-evaluations.php?event=<?= urlencode($r['id']) ?>"><?= (int) $r['evaluation_count'] ?></a></td>
-                <td class="num"><?= $r['average_rating'] !== null ? format_rating((float) $r['average_rating']) : '—' ?></td>
-                <td><span class="admin-status admin-status-<?= htmlspecialchars($r['status']) ?>"><?= htmlspecialchars(ucfirst($r['status'])) ?></span></td>
-              </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
+      <div <?= $panelAttrs('by-event') ?>><?= $panelTitle('by-event') ?>
+        <?= $flatWrap ?>
+          <table class="admin-table admin-table-compact report-events">
+            <thead>
+              <tr><th>Date</th><th>Event</th><th class="num">Registered</th><th class="num">Attended</th><th class="num">Rating</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <?php foreach ($rows as $r): ?>
+                <tr>
+                  <td class="nowrap"><?= htmlspecialchars(format_event_date($r['start_date'])) ?></td>
+                  <td>
+                    <a class="row-link" href="../event-details.php?id=<?= urlencode($r['id']) ?>"><?= htmlspecialchars($r['title']) ?></a>
+                    <div class="admin-table-sub"><?= htmlspecialchars(implode(' · ', array_filter([$r['organization_name'] ?? '', $r['category_name'] ?? '']))) ?></div>
+                  </td>
+                  <td class="num"><?= (int) $r['registered_count'] ?></td>
+                  <td class="num"><?= (int) $r['attended_count'] ?></td>
+                  <td class="num">
+                    <?php if ($r['average_rating'] !== null): ?>
+                      <a href="event-evaluations.php?event=<?= urlencode($r['id']) ?>" title="<?= (int) $r['evaluation_count'] ?> evaluation<?= (int) $r['evaluation_count'] === 1 ? '' : 's' ?>"><?= format_rating((float) $r['average_rating']) ?></a>
+                    <?php else: ?>—<?php endif; ?>
+                  </td>
+                  <td><span class="admin-status admin-status-<?= htmlspecialchars($r['status']) ?>"><?= htmlspecialchars(ucfirst($r['status'])) ?></span></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <p class="admin-hint admin-table-note">Rating = mean of all 1–5 answers (5 = Excellent). Audience, venue and evaluation counts are in the Excel download.</p>
       </div>
     </section>
     <?php endif; ?>

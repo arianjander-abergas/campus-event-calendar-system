@@ -66,9 +66,10 @@ const ASSISTANT_BASIC_PAGES = [
     'dashboard' => ['dashboard'],
     'reports' => ['reports', 'report'],
     'evaluation_form' => ['evaluation form', 'evaluation questions'],
-    'categories_orgs' => ['categories and orgs', 'categories orgs', 'categories', 'category', 'departments', 'department'],
+    'categories_orgs' => ['categories and orgs', 'categories orgs', 'categories', 'category', 'departments', 'department', 'venues', 'venue list'],
     'school_calendar' => ['school calendar', 'academic calendar', 'semester dates', 'school year'],
-    'users_roles' => ['users and roles', 'user roles', 'users', 'roles'],
+    'roles' => ['users and roles', 'user roles', 'roles'],
+    'users' => ['users'],
     'import_verify' => ['import and verify', 'import', 'verify', 'attendance sheet'],
     'event_calendar' => ['event calendar', 'events calendar', 'calendar', 'events page', 'all events', 'events'],
     'organizations' => ['organizations', 'organization', 'orgs', 'org', 'clubs'],
@@ -263,7 +264,7 @@ function assistant_basic_has(string $m, array $phrases): bool
 function assistant_basic_refusal(string $m): string
 {
     if (preg_match('/ (make me|give me|turn me into|set me as|promote me to) (an |a )?(admin|moderator) /', $m)) {
-        return 'Only an admin can change roles, on the Users & Roles page. Ask an admin if you need one.';
+        return 'Only a Super Admin can change roles, on the Roles page. Ask a Super Admin if you need one.';
     }
     $attacks = [
         '/ (hack|hacking|hacked) (into|the|this|your|a|an|my|someone|someones|admin|account|accounts|site|website|system|database|server|events?|users?) /',
@@ -497,6 +498,7 @@ function assistant_basic_navigate(string $m, ?array $user, array $orgs, ?array $
         if ($key === 'categories_orgs') {
             if (assistant_basic_has($m, ['departments', 'department'])) $input['tab'] = 'departments';
             elseif (assistant_basic_has($m, ['organizations', 'organization', 'orgs'])) $input['tab'] = 'organizations';
+            elseif (assistant_basic_has($m, ['venues', 'venue'])) $input['tab'] = 'venues';
         }
         return assistant_basic_open($input, $user);
     }
@@ -614,8 +616,8 @@ function assistant_basic_howto(string $m, ?array $user): ?array
     }
     if (assistant_basic_has($m, ['moderator', 'admin', 'role', 'roles'])) {
         return $role === 'admin'
-            ? assistant_basic_say('You change roles on **Users & Roles**. Want me to open it?', null, ['page' => 'users_roles'])
-            : assistant_basic_say('Roles are given by Super Admins on the Users & Roles page. Ask a Super Admin if you need to be an Admin.');
+            ? assistant_basic_say('You change roles on the **Roles** page. Want me to open it?', null, ['page' => 'roles'])
+            : assistant_basic_say('Roles are given by Super Admins on the Roles page. Ask a Super Admin if you need to be an Admin.');
     }
     if (assistant_basic_has($m, ['profile', 'school id', 'department', 'course', 'year level', 'irregular', 'my details', 'my info'])) {
         return assistant_basic_say('Your department, organization, School ID, course and year level are on **My Profile**; change them with **Edit my profile** (a Super Admin approves changes before they\'re saved).' . $guestNote

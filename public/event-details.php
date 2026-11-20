@@ -1,9 +1,18 @@
 <?php
+/**
+ * One event. Two ways to show it:
+ *   event-details.php?id=…          the full page (no id: the next event)
+ *   event-details.php?id=…&modal=1  just the details, for the pop-up that
+ *                                   opens when an event is clicked
+ *                                   (assets/js/event-modal.js)
+ * Both use includes/event-detail.php, so they always show the same thing.
+ */
 require_once __DIR__ . '/../config/supabase.php';
 
 $user = require_login(); // redirects to login.php if not authenticated
 
 $eventId = get_param('id');
+$edModal = get_param('modal') === '1' && is_uuid($eventId);
 $activeNav = $eventId === '' ? 'event' : 'events'; // sidebar: "Next Event" vs "All Events"
 
 // ---- Register / cancel (redirect after POST so a refresh doesn't resubmit) ----
@@ -16,7 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_uuid($eventId)) {
         $result = cancel_registration($eventId);
         flash($result['ok'] ? 'success' : 'error', $result['message']);
     }
-    header('Location: event-details.php?id=' . urlencode($eventId));
+    // From the pop-up: back to the pop-up's details, with the message in them.
+    header('Location: event-details.php?id=' . urlencode($eventId) . ($edModal ? '&modal=1' : ''));
     exit;
 }
 
@@ -32,7 +42,7 @@ if ($eventId !== '') {
 
 // Placeholder images (numbered IMAGE SLOTs — see assets/css/event-details.css).
 // An event's own poster / organization logo from Supabase is used when set.
-$img = 'assets/images/event-details/';
+$img = BASE_URL . '/assets/images/event-details/';
 $posterUrl = asset_url($event['poster_url'] ?? null, $img . 'event-poster.svg');
 $orgLogo = asset_url($event['organizations']['logo_url'] ?? null, $img . 'org-logo.svg');
 $categoryName = event_category_label($event);
@@ -66,6 +76,35 @@ if ($event) {
     elseif ($event['status'] === 'completed') $banner = ['info', 'Completed — this event has ended.'];
     elseif (($event['end_date'] ?? '') < date('Y-m-d')) $banner = ['info', 'This event has ended.'];
 }
+
+// ---- The pop-up: only the details (no sidebar or top bar) ----
+// X-Event-Modal tells event-modal.js this is the pop-up's content; anything
+// else (the login page after a logout, an error page) makes it open the
+// full page instead.
+if ($edModal) {
+    header('X-Event-Modal: 1');
+    header('Cache-Control: no-store');
+    if (!$event) {
+        echo '<p class="ed-empty ed-modal-missing">This event doesn\'t exist or isn\'t published yet.</p>';
+        exit;
+    }
+    ?>
+    <?php foreach (take_flashes() as $f): /* Registered / cancelled: said right here */ ?>
+      <div class="ed-flash <?= $f['type'] === 'success' ? 'ed-flash-ok' : ($f['type'] === 'error' ? 'ed-flash-error' : 'ed-flash-info') ?>" role="<?= $f['type'] === 'error' ? 'alert' : 'status' ?>"><?= htmlspecialchars($f['message']) ?></div>
+    <?php endforeach; ?>
+    <?php include __DIR__ . '/../includes/event-detail.php'; ?>
+    <details class="ed-modal-flow"<?= $schedule ? '' : ' open' ?>>
+      <summary>Program flow <span class="ed-modal-count"><?= $schedule ? count($schedule) . ' part' . (count($schedule) === 1 ? '' : 's') : 'none yet' ?></span></summary>
+      <?php if ($schedule): ?>
+        <?php include __DIR__ . '/../includes/event-program-flow.php'; ?>
+      <?php else: ?>
+        <p class="ed-empty">No program flow posted yet.<?php if ($canManage): ?> <a href="<?= htmlspecialchars(BASE_URL . '/admin/event-organizer.php?edit=' . urlencode($eventId)) ?>#sec-program">Add one</a>.<?php endif; ?></p>
+      <?php endif; ?>
+    </details>
+    <p class="ed-modal-foot"><a href="<?= htmlspecialchars(BASE_URL . '/event-details.php?id=' . urlencode($eventId)) ?>">Open the full page ›</a></p>
+    <?php
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en"<?= theme_attr() ?>>
@@ -82,7 +121,8 @@ if ($event) {
 </head>
 <body class="event-details-page neu">
 
-<div class="dashboard-shell">
+<?php /* No event to show: no right column. */ ?>
+<div class="dashboard-shell<?= $event ? '' : ' no-rail' ?>">
 
   <?php include __DIR__ . '/../includes/nav.php'; ?>
 
@@ -90,9 +130,10 @@ if ($event) {
 
   <!-- Main content -->
   <main class="dash-main ed-main">
-    <a href="events.php" class="ed-back">
+    <?php /* data-back: goes back to the page the person came from (assets/js/back-link.js); events.php without it. */ ?>
+    <a href="events.php" class="ed-back" data-back>
       <?= icon('arrow-left', 18) ?>
-      Back to All Events
+      Back
     </a>
 
     <?= render_flashes() ?>
@@ -103,137 +144,23 @@ if ($event) {
       <p><?= $eventId === '' ? 'There are no upcoming events right now.' : "This event doesn't exist or isn't published yet." ?> <a href="events.php">Browse all events</a>.</p>
     </section>
     <?php else: ?>
-      <?php if ($banner): ?>
-        <div class="ed-flash <?= $banner[0] === 'error' ? 'ed-flash-error' : 'ed-flash-info' ?>"><?= htmlspecialchars($banner[1]) ?></div>
-      <?php endif; ?>
-
-    <!-- Event hero card -->
-    <section class="ed-hero">
-      <!-- IMAGE SLOT 1: Event poster (used when the event has no poster_url) | file: assets/images/event-details/event-poster.svg | 340×345 -->
-      <img src="<?= htmlspecialchars($posterUrl) ?>" alt="<?= htmlspecialchars($event['title']) ?> poster" class="ed-poster">
-
-      <div class="ed-hero-info">
-        <span class="ed-category"><?= htmlspecialchars($categoryName) ?></span>
-        <h1 class="ed-title"><?= htmlspecialchars($event['title']) ?></h1>
-        <p class="ed-desc"><?= nl2br(htmlspecialchars($event['description'] ?? '')) ?></p>
-
-        <div class="ed-meta">
-          <div class="ed-meta-row">
-            <?= icon('location', 12) ?>
-            <?= htmlspecialchars(event_place($event)) ?><?= !empty($event['address']) ? ' — ' . htmlspecialchars($event['address']) : '' ?>
-          </div>
-          <div class="ed-meta-row">
-            <?= icon('calendar', 12) ?>
-            <?= htmlspecialchars(event_when($event)) ?>
-          </div>
-          <div class="ed-meta-row"><?= icon(($event['venue_type'] ?? '') === 'online' ? 'online' : 'campus', 12) ?> <?= htmlspecialchars(label_of(VENUE_TYPES, $event['venue_type'] ?? null, 'On-campus')) ?></div>
-          <div class="ed-meta-row"><?= icon('audience', 12) ?> For <?= htmlspecialchars(event_audience_label($event)) ?><?= $openTo !== '' && in_array('students', event_audiences($event), true) ? ' · Open to ' . htmlspecialchars($openTo) . ' students' : '' ?></div>
-          <?php if (!empty($event['online_event_link']) && preg_match('~^https?://~i', $event['online_event_link'])): ?>
-            <div class="ed-meta-row"><?= icon('link', 12) ?> <a href="<?= htmlspecialchars($event['online_event_link']) ?>" target="_blank" rel="noopener">Join online</a></div>
-          <?php endif; ?>
-          <div class="ed-meta-row"><?= icon('people', 12) ?> <?= $going ?> going<?= !empty($event['registration_limit']) ? ' · ' . (int) $event['registration_limit'] . ' slots' : '' ?></div>
-          <?php if (!empty($event['contact_email']) || !empty($event['contact_number'])): ?>
-            <div class="ed-meta-row"><?= icon('email', 12) ?> <?= htmlspecialchars(implode(' · ', array_filter([$event['contact_email'] ?? '', $event['contact_number'] ?? '']))) ?></div>
-          <?php endif; ?>
-        </div>
-
-        <div class="ed-organizer">
-          <!-- IMAGE SLOT 2: Organization logo (used when the org has no logo_url) | file: assets/images/event-details/org-logo.svg | 72×72 -->
-          <img loading="lazy" decoding="async" src="<?= htmlspecialchars($orgLogo) ?>" alt="" class="ed-org-logo">
-          <div class="ed-org-text">
-            <span>Organize by</span>
-            <?php if (!empty($event['organizations']['id'])): ?>
-              <a href="organizations.php#org-<?= htmlspecialchars($event['organizations']['id']) ?>"><?= htmlspecialchars($orgName) ?></a>
-            <?php else: ?>
-              <span><?= htmlspecialchars($orgName) ?></span>
-            <?php endif; ?>
-            <?php foreach ($coOrganizers as $i => $co): ?>
-              <?= $i === count($coOrganizers) - 1 ? '&amp;' : ',' ?>
-              <a href="organizations.php#org-<?= htmlspecialchars($co['id']) ?>"><?= htmlspecialchars($co['name']) ?></a>
-            <?php endforeach; ?>
-          </div>
-        </div>
-
-        <?php /* id="register": the "Register" button in notification emails opens the page here. */ ?>
-        <?php
-        // One line saying where the person stands, and only the buttons that apply:
-        //   open → Register Now! · registered → Registered ✓ + Cancel registration
-        //   attended → Evaluate / Completed ✓ · ended or closed → just the line.
-        // "Required" only matters while the event hasn't ended.
-        $ended = event_has_ended($event);
-        $requiredForMe = !$ended && is_required_for_me($eventId);
-        $requiredLabel = $ended ? '' : required_for_label($event);
-        $statusLine = $reg['state'] === 'registered' && $requiredForMe ? "You're registered. Your attendance is required." : $reg['note'];
-        ?>
-        <div class="ed-register" id="register">
-          <?php if ($requiredForMe && $reg['state'] !== 'registered'): ?>
-            <p class="ed-required-note" role="status"><strong>Your attendance is required.</strong><?= $reg['can_register'] ? ' Please register below.' : '' ?></p>
-          <?php endif; ?>
-          <?php if ($statusLine !== ''): ?>
-            <p class="ed-reg-note ed-reg-<?= htmlspecialchars($reg['state']) ?>"><?= htmlspecialchars($statusLine) ?></p>
-          <?php endif; ?>
-          <?php if ($reg['can_register']): ?>
-            <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>">
-              <input type="hidden" name="action" value="register">
-              <button type="submit" class="ed-btn">Register Now!</button>
-            </form>
-          <?php elseif ($reg['state'] === 'registered' || $reg['state'] === 'attended'): ?>
-            <div class="ed-reg-actions">
-              <?php if ($attended && !$evaluated): ?>
-                <a href="enduser/evaluate.php?event=<?= urlencode($eventId) ?>" class="ed-btn ed-btn-evaluate">Evaluate this event</a>
-              <?php else: ?>
-                <button class="ed-btn" disabled><?= $evaluated ? 'Completed ✓' : ($reg['state'] === 'attended' ? 'Attended ✓' : 'Registered ✓') ?></button>
-              <?php endif; ?>
-              <?php if ($reg['can_cancel']): ?>
-                <form method="POST" action="event-details.php?id=<?= urlencode($eventId) ?>" data-confirm="Cancel your registration for this event?" data-confirm-title="Cancel registration" data-confirm-ok="Cancel registration" data-confirm-cancel="Stay registered" data-confirm-tone="danger">
-                  <input type="hidden" name="action" value="cancel_registration">
-                  <button type="submit" class="ed-btn ed-btn-outline">Cancel registration</button>
-                </form>
-              <?php endif; ?>
-            </div>
-            <?php if ($attended): ?>
-              <p class="ed-eval-note"><?= $evaluated ? 'Completed: you attended and your evaluation was submitted. Thank you for your feedback!' : 'Thanks for attending! Please tell us how the event went.' ?></p>
-            <?php endif; ?>
-          <?php endif; ?>
-          <?php if ($canManage): ?>
-            <?php if ($requiredLabel !== '' && !$requiredForMe): ?><p class="ed-reg-note ed-reg-staff"><?= htmlspecialchars($requiredLabel) ?>.</p><?php endif; ?>
-            <div class="ed-admin-links">
-              <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>">Edit event</a>
-              <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Edit program flow</a>
-              <a href="admin/event-registrations.php?event=<?= urlencode($eventId) ?>">Registrations</a>
-              <a href="admin/attendance-print.php?event=<?= urlencode($eventId) ?>">Print attendance</a>
-              <a href="admin/event-evaluations.php?event=<?= urlencode($eventId) ?>">Evaluation results</a>
-            </div>
-          <?php endif; ?>
-        </div>
-      </div>
-    </section>
+      <?php include __DIR__ . '/../includes/event-detail.php'; ?>
     <?php endif; ?>
   </main>
 
+  <?php if ($event): ?>
   <!-- Right rail: the program flow (section 9 of the event form) -->
   <aside class="right-rail ed-rail">
     <div class="ed-schedule" id="program-flow">
       <h2 class="ed-schedule-title">Program Flow</h2>
-
-      <?php if (empty($schedule)): ?>
-        <p class="ed-empty">No program flow posted yet.<?php if ($canManage && $event): ?> <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Add one</a>.<?php endif; ?></p>
+      <?php if ($schedule): ?>
+        <?php include __DIR__ . '/../includes/event-program-flow.php'; ?>
       <?php else: ?>
-      <ol class="ed-flow">
-        <?php foreach ($schedule as $i => $item): ?>
-        <li class="ed-flow-item">
-          <span class="ed-flow-num" aria-hidden="true"><?= $i + 1 ?></span>
-          <div class="ed-flow-body">
-            <span class="ed-flow-title"><?= htmlspecialchars($item['title']) ?></span>
-            <?php if (!empty($item['speaker'])): ?><span class="ed-flow-speaker"><?= htmlspecialchars($item['speaker']) ?></span><?php endif; ?>
-            <?php if (!empty($item['description'])): ?><span class="ed-flow-notes"><?= htmlspecialchars($item['description']) ?></span><?php endif; ?>
-          </div>
-        </li>
-        <?php endforeach; ?>
-      </ol>
+        <p class="ed-empty">No program flow posted yet.<?php if ($canManage): ?> <a href="admin/event-organizer.php?edit=<?= urlencode($eventId) ?>#sec-program">Add one</a>.<?php endif; ?></p>
       <?php endif; ?>
     </div>
   </aside>
+  <?php endif; ?>
 
 </div>
 
@@ -241,6 +168,7 @@ if ($event) {
 
 <script src="assets/js/sidebar.js?v=<?= filemtime(__DIR__ . '/assets/js/sidebar.js') ?>"></script>
 <script src="assets/js/ui.js?v=<?= filemtime(__DIR__ . '/assets/js/ui.js') ?>"></script>
+<script src="assets/js/back-link.js?v=<?= filemtime(__DIR__ . '/assets/js/back-link.js') ?>"></script>
 <?= presence_script_tag() ?>
 </body>
 </html>

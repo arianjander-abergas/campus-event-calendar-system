@@ -1,6 +1,6 @@
 <?php
 /**
- * Super Admin: edit one account (Users & Roles › Edit) — name, role,
+ * Super Admin: edit one account (Users › Edit) — name, role,
  * student / faculty, department, organization, and for students the School
  * ID (verified or not), course, highest year level and regular / irregular.
  * Saved straight away (no approval needed). The protected account
@@ -85,8 +85,9 @@ $acctOrgLocked = false;
 $acctSchoolIdLocked = false;
 $acctOptional = $roleValue === 'admin';
 
-$activeNav = 'admin-users';
-$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Users & Roles', $back], ['Edit account', null]];
+$fromRoles = str_contains($back, 'tab=roles');
+$activeNav = $fromRoles ? 'admin-roles' : 'admin-users';
+$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], [$fromRoles ? 'Roles' : 'Users', $back], ['Edit account', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en"<?= theme_attr() ?>>

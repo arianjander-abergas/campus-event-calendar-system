@@ -185,6 +185,40 @@ button { font-family: inherit; cursor: pointer; }
   .ceh-confirm-actions .btn { flex: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .ceh-confirm[open] { animation: none; } }
+
+/* ---- The event pop-up (assets/js/event-modal.js) ----
+   Only the frame is here; the details inside it are styled by
+   event-details.css (loaded when the first pop-up opens). */
+.event-modal {
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  padding: 0; border: none; border-radius: 18px;
+  background: var(--card-bg); color: var(--text-main);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+.event-modal[open] { display: flex; flex-direction: column; animation: ceh-confirm-in 0.18s ease-out; }
+.event-modal::backdrop { background: rgba(var(--p-darker-rgb), 0.55); }
+.event-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 26px 18px; }
+.event-modal-close {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--card-bg); color: var(--text-main); /* stays visible over a poster (phones) */
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  font-size: 1.5rem; line-height: 1; cursor: pointer;
+}
+.event-modal-close:hover { background: var(--p-soft-2); }
+.event-modal-loading { margin: 0; padding: 56px 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+html.event-modal-open { overflow: hidden; } /* the page behind doesn't scroll */
+:root:is([data-theme="dark"], [data-theme="dim"]) .event-modal-close { background: var(--surface-2); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .event-modal-close:hover { background: var(--border); }
+@media (max-width: 560px) {
+  .event-modal { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); border-radius: 16px; }
+  .event-modal-body { padding: 20px 16px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .event-modal[open] { animation: none; } }
 .btn-muted { background: var(--p-hi); color: var(--text-main); } /* the highlight colour: the secondary button */
 .btn-muted:hover { background: var(--p-soft-10); }
 
@@ -517,20 +551,30 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 4px;
 }
 
-/* Organizing organization (logo + name) at the bottom of an event card. */
-.event-org {
+/* Bottom row of an event card: organizing organization (logo + name) on the
+   left, "N going" on the right. */
+.event-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--border);
   font-size: 0.75rem;
+  min-width: 0;
+}
+.event-org {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
   font-weight: 600;
   color: var(--text-main);
   min-width: 0;
 }
 .event-org span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-going { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; margin-left: auto; color: var(--text-muted); white-space: nowrap; }
 .event-org-logo { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .event-org-initials {
   display: flex; align-items: center; justify-content: center;
@@ -1569,7 +1613,7 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 .neu .event-card { background: var(--neu-bg); border-radius: 18px; box-shadow: var(--neu-out); }
 .neu .event-card:hover { box-shadow: 10px 10px 22px var(--neu-dark), -10px -10px 22px var(--neu-light); }
 .neu .feature-item { border-right-color: rgba(var(--p-shadow-rgb), 0.4); }
-.neu .event-org,
+.neu .event-foot,
 .neu .upcoming-item { border-color: rgba(var(--p-shadow-rgb), 0.4); }
 .neu .stat-value { color: var(--neu-link); }
 

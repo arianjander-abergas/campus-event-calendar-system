@@ -5,8 +5,9 @@
  * current page:
  *   'home' | 'dashboard' | 'events' | 'my-events' | 'event' | 'organizations' | 'profile'
  *   'manage-create' | 'manage-update' | 'import' | 'my-officers'  (moderators and admins)
- *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-taxonomy'
- *   'admin-calendar' | 'admin-users' | 'admin-approvals'  (admins)
+ *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-calendar'
+ *   'admin-categories' | 'admin-departments' | 'admin-organizations' | 'admin-venues'  (Categories ▾)
+ *   'admin-users' | 'admin-roles' | 'admin-approvals'  (admins)
  * Logged-out visitors see the public links (Log in / Sign up are in the top
  * bar; on phones they're also at the bottom of this menu).
  *
@@ -38,6 +39,7 @@ $manageMenu = fn(): string =>
     . $navLink('/admin/event-organizer.php', 'manage-create', 'register', 'Create Event', 16)
     . $navLink('/admin/event-organizer.php?view=update', 'manage-update', 'list', 'Update Events', 16)
     . '</div></div>';
+$categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments', 'admin-organizations', 'admin-venues'], true);
 ?>
 <?php /* Scripts are on: event posters below wait until they scroll near (assets/js/ui.js);
          without scripts style.css shows them straight away. */ ?>
@@ -109,9 +111,22 @@ $manageMenu = fn(): string =>
       <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
-      <?= $navLink('/admin/admin-taxonomy.php', 'admin-taxonomy', 'tag', 'Categories &amp; Orgs') ?>
+      <div class="side-nav-item has-submenu">
+        <button type="button" class="submenu-toggle<?= $categoriesOpen ? ' is-current' : '' ?>" aria-expanded="<?= $categoriesOpen ? 'true' : 'false' ?>" aria-controls="categoriesSubmenu" title="Categories">
+          <span class="icon"><?= icon('tag') ?></span>
+          <span class="nav-label">Categories</span>
+          <span class="chevron" aria-hidden="true"><?= icon('chevron-down', 14) ?></span>
+        </button>
+        <div class="event-submenu" id="categoriesSubmenu"<?= $categoriesOpen ? '' : ' hidden' ?>>
+          <?= $navLink('/admin/admin-taxonomy.php?tab=categories', 'admin-categories', 'list', 'Event Categories', 16) ?>
+          <?= $navLink('/admin/admin-taxonomy.php?tab=departments', 'admin-departments', 'campus', 'Departments', 16) ?>
+          <?= $navLink('/admin/admin-taxonomy.php?tab=organizations', 'admin-organizations', 'organizations', 'Organizations', 16) ?>
+          <?= $navLink('/admin/admin-taxonomy.php?tab=venues', 'admin-venues', 'location', 'Venues', 16) ?>
+        </div>
+      </div>
       <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
-      <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users &amp; Roles') ?>
+      <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users') ?>
+      <?= $navLink('/admin/users.php?tab=roles', 'admin-roles', 'certificate', 'Roles') ?>
       <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
     </nav>
   <?php endif; ?>
@@ -125,4 +140,10 @@ $manageMenu = fn(): string =>
 <?php /* The Event Hub Assistant chat box in the bottom-right corner — every page with this sidebar. */ ?>
 <?php /* The site's confirmation pop-up (data-confirm on forms, cehConfirm() / cehAlert()) — every page with this sidebar. */ ?>
 <script src="<?= BASE_URL ?>/assets/js/confirm.js?v=<?= filemtime(__DIR__ . '/../public/assets/js/confirm.js') ?>" defer></script>
+<?php /* The event pop-up: links with data-event-modal show the event's details here instead of opening
+         its page. Logged in only: visitors are asked to log in first, so their clicks open the page as before. */ ?>
+<?php if ($navUser): ?>
+<script src="<?= BASE_URL ?>/assets/js/event-modal.js?v=<?= filemtime(__DIR__ . '/../public/assets/js/event-modal.js') ?>"
+        data-css="<?= BASE_URL ?>/assets/css/event-details.css?v=<?= filemtime(__DIR__ . '/../public/assets/css/event-details.css') ?>" defer></script>
+<?php endif; ?>
 <?php include __DIR__ . '/assistant-widget.php'; ?>

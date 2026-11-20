@@ -1,29 +1,33 @@
 <?php
 /**
- * Super Admins: every account, its details and its role. Roles (profiles.role):
+ * Super Admins: the accounts, and who has which role. Roles (profiles.role):
  *   Student / Faculty (user) — browse, register, evaluate
  *   Admin (moderator)        — runs their own organization's events; new
  *                              events need a Super Admin's approval
  *   Super Admin (admin)      — everything, and approvals
- * The database only lets Super Admins change roles, so this page is how
+ * The database only lets Super Admins change roles, so the Roles page is how
  * someone becomes (or stops being) an Admin or a Super Admin. Each account
  * can also be edited (user-edit.php) or deleted, and a student's School ID
  * corrected or verified. The protected account (profiles.is_super_admin —
  * Arian Abergas) can't be demoted or deleted.
  *
- * Two pages (sidebar: Users & Roles, Approvals):
- *   users.php                 the accounts
+ * Three pages (sidebar: Users, Roles, Approvals):
+ *   users.php                 Users — the accounts and their details (School ID,
+ *                             course, department); Edit / Delete. ?q= &type=
+ *   users.php?tab=roles       Roles — what each role can do, how many have it,
+ *                             and the place to change someone's role. ?q= &role=
  *   users.php?tab=approvals   Approvals — what waits for a Super Admin:
  *       &kind=events     Admins' new events (published once approved)
  *       &kind=profiles   profile edits (saved once approved)
  *       &status=approved|rejected  decided ones (default: waiting)
+ * Users and Roles list 20 accounts per page (&page=).
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
-$tab = get_param('tab') === 'approvals' ? 'approvals' : 'accounts';
+$tab = match (get_param('tab')) { 'approvals' => 'approvals', 'roles' => 'roles', default => 'accounts' };
 // Approvals: Super Admins (everything, and they decide) and Admins (their own
 // organization's events and their own profile edits — the database's rules
-// limit what they see). The accounts list: Super Admins only.
+// limit what they see). Users and Roles: Super Admins only.
 $user = $tab === 'approvals' ? require_staff() : require_admin();
 $isSuper = is_super_admin_user($user);
 
@@ -32,10 +36,15 @@ $decision = in_array(get_param('status'), ['approved', 'rejected'], true) ? get_
 $approvalsUrl = fn(string $k, string $s = 'pending', int $page = 1): string
     => 'users.php?' . http_build_query(['tab' => 'approvals', 'kind' => $k] + ($s !== 'pending' ? ['status' => $s] : []) + ($page > 1 ? ['page' => $page] : []));
 
+// Users: search + student / faculty. Roles: search + role.
 $q = get_param('q');
-$roleFilter = isset(ROLES[get_param('role')]) ? get_param('role') : '';
-$typeFilter = isset(ACCOUNT_TYPES[get_param('type')]) ? get_param('type') : '';
-$back = 'users.php' . (($qs = http_build_query(array_filter(['q' => $q, 'role' => $roleFilter, 'type' => $typeFilter]))) !== '' ? '?' . $qs : '');
+$roleFilter = $tab === 'roles' && isset(ROLES[get_param('role')]) ? get_param('role') : '';
+$typeFilter = $tab === 'accounts' && isset(ACCOUNT_TYPES[get_param('type')]) ? get_param('type') : '';
+$page = max(1, (int) get_param('page', '1'));
+$listUrl = fn(array $changes = []): string => 'users.php' . (($qs = http_build_query(array_filter($changes + [
+    'tab' => $tab === 'roles' ? 'roles' : '', 'q' => $q, 'role' => $roleFilter, 'type' => $typeFilter, 'page' => $page > 1 ? $page : '',
+], fn($v) => $v !== '' && $v !== null))) !== '' ? '?' . $qs : '');
+$back = $listUrl(); // where a change on this list comes back to (same filters, same page)
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post_param('action');
@@ -84,21 +93,28 @@ if ($tab === 'approvals') {
     $pager = paginate($rows, 10, (int) get_param('page', '1'));
     $pageUrl = fn(int $p): string => $approvalsUrl($kind, $decision, $p);
     $here = $approvalsUrl($kind, $decision, $pager['page']);
+} else {
+    $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter) {
+        if ($roleFilter !== '' && $p['role'] !== $roleFilter) return false;
+        if ($typeFilter !== '' && ($p['account_type'] ?? '') !== $typeFilter) return false;
+        return matches_search($q, [$p['full_name'] ?? '', $p['course'] ?? '', $p['organizations']['name'] ?? '', $p['departments']['name'] ?? '', $p['school_ids']['school_id'] ?? '']);
+    }));
+    $listPager = paginate($profiles, 20, $page);
+    $listPageUrl = fn(int $p): string => $listUrl(['page' => $p > 1 ? $p : '']);
 }
-$profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter) {
-    if ($roleFilter !== '' && $p['role'] !== $roleFilter) return false;
-    if ($typeFilter !== '' && ($p['account_type'] ?? '') !== $typeFilter) return false;
-    if ($q === '') return true;
-    foreach ([$p['full_name'] ?? '', $p['course'] ?? '', $p['organizations']['name'] ?? '', $p['departments']['name'] ?? '', $p['school_ids']['school_id'] ?? ''] as $text) {
-        if (stripos($text, $q) !== false) return true;
-    }
-    return false;
-}));
 $roleCounts = array_count_values(array_column($all, 'role'));
+$typeCounts = array_count_values(array_filter(array_column($all, 'account_type')));
 $editSchoolId = get_param('school_id_for');
 
-$activeNav = $tab === 'approvals' ? 'admin-approvals' : 'admin-users';
-$pageTitle = $tab === 'approvals' ? 'Approvals' : 'Users & Roles';
+// Roles page: each role in three lines (the full comparison is folded under the cards).
+$roleSummaries = [
+    'user' => ['Browse the Event Calendar and register', 'Evaluate the events they attended', 'Profile changes wait for a Super Admin'],
+    'moderator' => ['Run their own organization\'s events', 'Schedules, registrations, attendance, officers', 'New events wait for a Super Admin\'s approval'],
+    'admin' => ['Everything, for every organization', 'Reports, users, roles, categories, school calendar', 'Approves Admins\' events and profile edits'],
+];
+
+$activeNav = ['approvals' => 'admin-approvals', 'roles' => 'admin-roles', 'accounts' => 'admin-users'][$tab];
+$pageTitle = ['approvals' => 'Approvals', 'roles' => 'Roles', 'accounts' => 'Users'][$tab];
 $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], [$pageTitle, null]];
 ?>
 <!DOCTYPE html>
@@ -124,26 +140,28 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
         <h1 class="page-title"><?= htmlspecialchars($pageTitle) ?></h1>
         <?php if ($tab === 'approvals'): ?>
           <p class="page-sub"><?= $isSuper ? 'Admins\' new events and profile edits waiting for a Super Admin' : 'Your organization\'s events and your profile edits, and what the Super Admins decided' ?></p>
+        <?php elseif ($tab === 'roles'): ?>
+          <p class="page-sub">What each role can do, and who has it</p>
         <?php else: ?>
-          <p class="page-sub"><?= count($all) ?> accounts · <?= (int) ($roleCounts['admin'] ?? 0) ?> Super Admin<?= ($roleCounts['admin'] ?? 0) == 1 ? '' : 's' ?> · <?= (int) ($roleCounts['moderator'] ?? 0) ?> Admin<?= ($roleCounts['moderator'] ?? 0) == 1 ? '' : 's' ?></p>
+          <p class="page-sub"><?= count($all) ?> accounts · <?= (int) ($typeCounts['student'] ?? 0) ?> student<?= ($typeCounts['student'] ?? 0) == 1 ? '' : 's' ?> · <?= (int) ($typeCounts['faculty'] ?? 0) ?> faculty</p>
         <?php endif; ?>
       </div>
-      <?php if ($tab === 'accounts'): ?>
+      <?php if ($tab !== 'approvals'): ?>
       <form method="get" class="admin-search users-filter" role="search">
-        <input type="search" name="q" class="admin-input" placeholder="Name, School ID, course, org or department" value="<?= htmlspecialchars($q) ?>" aria-label="Search users">
-        <select name="role" class="admin-input" aria-label="Role">
-          <option value="">Every role</option>
-          <?php foreach (ROLES as $key => $label): ?>
-            <option value="<?= $key ?>" <?= $roleFilter === $key ? 'selected' : '' ?>><?= $label ?></option>
-          <?php endforeach; ?>
-        </select>
-        <select name="type" class="admin-input" aria-label="Account type">
-          <option value="">Students &amp; faculty</option>
-          <?php foreach (ACCOUNT_TYPES as $key => $label): ?>
-            <option value="<?= $key ?>" <?= $typeFilter === $key ? 'selected' : '' ?>><?= $label ?>s</option>
-          <?php endforeach; ?>
-        </select>
-        <button type="submit" class="btn btn-outline">Filter</button>
+        <?php if ($tab === 'roles'): ?>
+          <input type="hidden" name="tab" value="roles">
+          <?php if ($roleFilter !== ''): ?><input type="hidden" name="role" value="<?= htmlspecialchars($roleFilter) ?>"><?php endif; ?>
+        <?php endif; ?>
+        <input type="search" name="q" class="admin-input" placeholder="<?= $tab === 'roles' ? 'Find someone by name, org or department' : 'Name, School ID, course, org or department' ?>" value="<?= htmlspecialchars($q) ?>" aria-label="Search accounts">
+        <?php if ($tab === 'accounts'): ?>
+          <select name="type" class="admin-input" aria-label="Account type">
+            <option value="">Students &amp; faculty</option>
+            <?php foreach (ACCOUNT_TYPES as $key => $label): ?>
+              <option value="<?= $key ?>" <?= $typeFilter === $key ? 'selected' : '' ?>><?= $label ?>s</option>
+            <?php endforeach; ?>
+          </select>
+        <?php endif; ?>
+        <button type="submit" class="btn btn-outline">Search</button>
       </form>
       <?php endif; ?>
     </div>
@@ -152,10 +170,27 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
 
     <?php if ($tab === 'approvals'): ?>
       <?php include __DIR__ . '/../../includes/approvals.php'; ?>
-    <?php else: ?>
+
+    <?php elseif ($tab === 'roles'): ?>
+
+    <?php /* The three roles: how many have each, what it can do. A card filters the list below to that role. */ ?>
+    <div class="role-cards">
+      <?php foreach (ROLES as $key => $label): $on = $roleFilter === $key; ?>
+        <a href="<?= htmlspecialchars($listUrl(['role' => $on ? '' : $key, 'page' => ''])) ?>" class="role-card role-card-<?= $key ?><?= $on ? ' is-active' : '' ?>"<?= $on ? ' aria-current="true"' : '' ?>>
+          <span class="role-card-head">
+            <strong><?= htmlspecialchars($label) ?></strong>
+            <span class="role-card-count"><?= (int) ($roleCounts[$key] ?? 0) ?></span>
+          </span>
+          <ul>
+            <?php foreach ($roleSummaries[$key] as $line): ?><li><?= htmlspecialchars($line) ?></li><?php endforeach; ?>
+          </ul>
+          <span class="role-card-filter"><?= $on ? 'Showing only these · show everyone' : 'Show only ' . htmlspecialchars($label === 'Student / Faculty' ? 'students & faculty' : $label . 's') ?></span>
+        </a>
+      <?php endforeach; ?>
+    </div>
 
     <details class="admin-panel roles-panel">
-      <summary><strong>What each role can do</strong> <span class="admin-muted">— click to show</span></summary>
+      <summary><strong>Compare every permission</strong> <span class="admin-muted">— click to show</span></summary>
       <div class="admin-table-wrap">
         <table class="admin-table admin-table-compact roles-table">
           <thead><tr><th>Can…</th><th>Student / Faculty</th><th>Admin</th><th>Super Admin</th></tr></thead>
@@ -187,19 +222,69 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
           </tbody>
         </table>
       </div>
-      <p class="admin-hint">An Admin needs an organization — their events, officers and attendance imports are limited to it, and they can't move themselves to another organization. Their new events are published once a Super Admin approves them, and profile edits (except a Super Admin's own) wait for a Super Admin too. <?= $protected ? htmlspecialchars(implode(', ', array_intersect_key($names, $protected))) . '\'s account is protected: it can\'t be demoted or deleted. ' : '' ?>The database enforces all of this, not just these pages.</p>
+      <p class="admin-hint">An Admin needs an organization — their events, officers and attendance imports are limited to it, and they can't move themselves to another organization. <?= $protected ? htmlspecialchars(implode(', ', array_intersect_key($names, $protected))) . '\'s account is protected: it can\'t be demoted or deleted. ' : '' ?>The database enforces all of this, not just these pages.</p>
     </details>
 
     <div class="admin-table-wrap">
       <table class="admin-table">
         <thead>
-          <tr><th>Name</th><th>School ID</th><th>Year &amp; Course</th><th>Department / Organization</th><th>Joined</th><th>Role</th><th><span class="visually-hidden">Actions</span></th></tr>
+          <tr><th>Name</th><th>Department / Organization</th><th>Role</th><th>Change role</th></tr>
         </thead>
         <tbody>
-          <?php if (empty($profiles)): ?>
-            <tr><td colspan="7" class="admin-table-empty">No accounts found.</td></tr>
+          <?php if (empty($listPager['rows'])): ?>
+            <tr><td colspan="4" class="admin-table-empty">No accounts found.</td></tr>
           <?php endif; ?>
-          <?php foreach ($profiles as $p):
+          <?php foreach ($listPager['rows'] as $p): $isMe = $p['id'] === $user['id']; ?>
+            <tr>
+              <td>
+                <strong><?= htmlspecialchars($p['full_name']) ?></strong><?= $isMe ? ' <span class="admin-table-sub">(you)</span>' : '' ?>
+                <?php if (!schema_outdated()): ?><div class="admin-table-sub"><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $p['account_type'] ?? null, 'Type not set')) ?></div><?php endif; ?>
+              </td>
+              <td>
+                <?= htmlspecialchars($p['departments']['name'] ?? '—') ?>
+                <div class="admin-table-sub"><?= htmlspecialchars($p['organizations']['name'] ?? 'No organization') ?></div>
+              </td>
+              <td>
+                <span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span>
+              </td>
+              <td class="admin-row-actions">
+                <?php if ($isMe): ?>
+                  <span class="admin-table-sub">You can't change your own role</span>
+                <?php elseif (isset($protected[$p['id']])): ?>
+                  <span class="admin-table-sub">Protected</span>
+                <?php else: ?>
+                  <form method="POST" action="<?= htmlspecialchars($back) ?>" class="role-form"
+                        data-confirm="Change <?= htmlspecialchars($p['full_name']) ?> to {select:role}?" data-confirm-title="Change role" data-confirm-ok="Change role">
+                    <input type="hidden" name="action" value="set_role">
+                    <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
+                    <select name="role" class="admin-input role-select" aria-label="Role of <?= htmlspecialchars($p['full_name']) ?>">
+                      <?php foreach (ROLES as $key => $label): ?>
+                        <option value="<?= $key ?>" <?= $p['role'] === $key ? 'selected' : '' ?> <?= $key === 'moderator' && empty($p['organization_id']) ? 'disabled' : '' ?>><?= $key === 'user' ? role_display('user', $p['account_type'] ?? null) : $label ?><?= $key === 'moderator' && empty($p['organization_id']) ? ' (needs an organization)' : '' ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn-sm btn-sm-accent">Save</button>
+                  </form>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <?= render_pagination($listPager, $listPageUrl, 'account', 'accounts') ?>
+
+    <?php else: ?>
+
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Name</th><th>School ID</th><th>Year &amp; Course</th><th>Department / Organization</th><th>Role</th><th><span class="visually-hidden">Actions</span></th></tr>
+        </thead>
+        <tbody>
+          <?php if (empty($listPager['rows'])): ?>
+            <tr><td colspan="6" class="admin-table-empty">No accounts found.</td></tr>
+          <?php endif; ?>
+          <?php foreach ($listPager['rows'] as $p):
             $isMe = $p['id'] === $user['id'];
             $sid = $p['school_ids'] ?? null;
             $isStudent = ($p['account_type'] ?? '') === 'student';
@@ -208,7 +293,9 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
             <tr>
               <td>
                 <strong><?= htmlspecialchars($p['full_name']) ?></strong><?= $isMe ? ' <span class="admin-table-sub">(you)</span>' : '' ?>
-                <?php if (!schema_outdated()): ?><div class="admin-table-sub"><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $p['account_type'] ?? null, 'Type not set')) ?><?= $incomplete ? ' · <span class="text-warn">Profile incomplete</span>' : '' ?></div><?php endif; ?>
+                <div class="admin-table-sub">
+                  <?php if (!schema_outdated()): ?><?= htmlspecialchars(label_of(ACCOUNT_TYPES, $p['account_type'] ?? null, 'Type not set')) ?><?= $incomplete ? ' · <span class="text-warn">Profile incomplete</span>' : '' ?> · <?php endif; ?>Joined <?= htmlspecialchars(format_event_date($p['created_at'] ?? null)) ?>
+                </div>
               </td>
               <td class="nowrap">
                 <?php if ($editSchoolId === $p['id']): ?>
@@ -233,25 +320,9 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
                 <?= htmlspecialchars($p['departments']['name'] ?? '—') ?>
                 <div class="admin-table-sub"><?= htmlspecialchars($p['organizations']['name'] ?? 'No organization') ?></div>
               </td>
-              <td class="nowrap"><?= htmlspecialchars(format_event_date($p['created_at'] ?? null)) ?></td>
-              <td>
-                <span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span>
-                <?php if (isset($protected[$p['id']])): ?><div class="admin-table-sub">Protected</div><?php endif; ?>
-              </td>
+              <?php /* Read-only here: roles are changed on the Roles page. */ ?>
+              <td><span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span></td>
               <td class="admin-row-actions user-actions">
-                <?php if (!$isMe && !isset($protected[$p['id']])): ?>
-                  <form method="POST" action="<?= htmlspecialchars($back) ?>" class="role-form"
-                        data-confirm="Change <?= htmlspecialchars($p['full_name']) ?> to {select:role}?" data-confirm-title="Change role" data-confirm-ok="Change role">
-                    <input type="hidden" name="action" value="set_role">
-                    <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
-                    <select name="role" class="admin-input role-select" aria-label="Role of <?= htmlspecialchars($p['full_name']) ?>">
-                      <?php foreach (ROLES as $key => $label): ?>
-                        <option value="<?= $key ?>" <?= $p['role'] === $key ? 'selected' : '' ?> <?= $key === 'moderator' && empty($p['organization_id']) ? 'disabled' : '' ?>><?= $key === 'user' ? role_display('user', $p['account_type'] ?? null) : $label ?><?= $key === 'moderator' && empty($p['organization_id']) ? ' (needs an organization)' : '' ?></option>
-                      <?php endforeach; ?>
-                    </select>
-                    <button type="submit" class="btn-sm btn-sm-accent">Save</button>
-                  </form>
-                <?php endif; ?>
                 <a href="user-edit.php?id=<?= urlencode($p['id']) ?>&amp;back=<?= urlencode($back) ?>" class="btn-sm">Edit</a>
                 <?php if (!$isMe && !isset($protected[$p['id']])): ?>
                   <form method="POST" action="<?= htmlspecialchars($back) ?>"
@@ -267,6 +338,8 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
         </tbody>
       </table>
     </div>
+    <?= render_pagination($listPager, $listPageUrl, 'account', 'accounts') ?>
+    <p class="admin-hint">To make someone an Admin or a Super Admin, use <a href="users.php?tab=roles">Roles</a>.</p>
     <?php endif; ?>
   </main>
 

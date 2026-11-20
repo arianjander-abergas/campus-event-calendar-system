@@ -23,6 +23,7 @@ config/supabase.php     All Supabase access + helpers (auth, events, registratio
 config/assistant.local.example.php  Settings of the AI chat box — copy to assistant.local.php + API key
 config/mail.local.example.php       Email settings for notifications — copy to mail.local.php + a Gmail App Password
 includes/               Shared page parts: nav (the sidebar on EVERY page) + topbar, footer, event-card,
+                        event-detail.php + event-program-flow.php (one event's details: the event page AND its pop-up),
                         account-fields.php (student/faculty fields + irregular pop-up of sign-up and Edit my profile),
                         approvals.php (the Approvals page: Admins' events and profile edits for a Super Admin),
                         spreadsheet.php (reads .xlsx / .csv for Import & Verify), charts.php, evaluation-fields.php,
@@ -32,11 +33,13 @@ public/                 Everything the browser can reach
   events.php            Event Calendar: month view, one filter bar, click a date for all its events;
                         My Events (?mine=1)
   organizations.php     Organizations with department, officers and upcoming events
-  event-details.php     One event: register/cancel, schedule, "Evaluate this event", other events
+  event-details.php     One event: register/cancel, schedule, "Evaluate this event"; ?modal=1 is the same
+                        details for the pop-up that opens when an event is clicked
   enduser/              Student pages: dashboard.php, profile.php (My Profile), edit-profile.php, evaluate.php
   admin/                Admin pages:
     dashboard.php         Admin Dashboard: events this week / month / semester / school year
-    reports.php           Reports: filters, per month / week / semester / department / organization, print, CSV
+    reports.php           Reports: filters, 4 totals, a graph, one breakdown at a time (month / week / semester /
+                          department / organization / events), print, Excel
     event-organizer.php   Create / edit / publish events (audience, year levels, venue type) — admins and moderators
     import.php            Import & Verify: Excel/CSV student list vs. accounts, attendance sheet vs. registrations
     database-update.php   Shows the SQL this version needs (copy → Supabase SQL Editor) and checks it's applied
@@ -45,9 +48,10 @@ public/                 Everything the browser can reach
     attendance-print.php  Printable attendance sheet (for signing) / attendance report (A4)
     event-evaluations.php Evaluation results of one event (print, CSV, remind attendees)
     evaluation-form.php   The one evaluation form used for every event
-    admin-taxonomy.php    Categories, departments, organizations
-    users.php             Users & Roles: roles (Student / Faculty, Admin, Super Admin), School IDs, verification,
-                          Edit / Delete accounts; ?tab=approvals is the Approvals page
+    admin-taxonomy.php    Categories: event categories, departments, organizations, venues
+    users.php             Users: every account, School IDs, verification, Edit / Delete accounts;
+                          ?tab=roles is the Roles page (what each role can do, change someone's role);
+                          ?tab=approvals is the Approvals page
     user-edit.php         Edit one account (Super Admins)
     organization-officers.php, school-calendar.php
   auth/                 login, register, forgot-password, callback (Google, email-confirmation and reset links),
@@ -60,7 +64,8 @@ public/                 Everything the browser can reach
                         assistant.css
   assets/js             main.js, sidebar.js, calendar.js, account.js, forms.js, notifications.js,
                         presence.js, auth.js, charts.js, assistant.js, app.js (install on phones),
-                        email-outbox.js (sends notification emails in the background)
+                        email-outbox.js (sends notification emails in the background),
+                        event-modal.js (the event pop-up), back-link.js ("Back" to the page you came from)
   assets/images         school-logo.png, login/ and event-details/ hold numbered placeholder images (see
                         the IMAGE SLOT comments in the PHP/CSS) — replace a file, keep its name;
                         app/ holds the phone app icons (192, 512 and 180 px for iPhone)
@@ -70,7 +75,7 @@ supabase/migrations/    SQL of database changes made from this repo, oldest firs
 
 ### Replace the placeholder school logo
 
-`public/assets/images/school-logo.png` is a grey "SCHOOL LOGO" placeholder. Replace it with the real LCUP logo (square PNG, transparent background works best, keep the file name). It appears in the header, sidebar, footer, login pages, reports and every printout. Organization logos are uploaded per organization in **Admin → Categories & Orgs → Organizations**.
+`public/assets/images/school-logo.png` is a grey "SCHOOL LOGO" placeholder. Replace it with the real LCUP logo (square PNG, transparent background works best, keep the file name). It appears in the header, sidebar, footer, login pages, reports and every printout. Organization logos are uploaded per organization in **Admin → Categories → Organizations**.
 
 ## Supabase
 
@@ -118,7 +123,7 @@ Roles can only be changed by an admin, so the very first one is set in the Supab
 update public.profiles set role = 'admin' where full_name = 'Your Name';
 ```
 
-After that, admins promote others (to moderator or admin) from **Admin → Users & Roles**.
+After that, admins promote others (to moderator or admin) from **Super Admin → Roles**.
 
 ### Role names and the protected Super Admin
 
@@ -180,20 +185,22 @@ The Google button then works. Google is asked to show only school / work account
   - **Headers on every page:** `X-Content-Type-Options`, `X-Frame-Options` / `frame-ancestors` (no framing by other sites), `Referrer-Policy`, `Permissions-Policy`, and `Strict-Transport-Security` on HTTPS. The PHP version isn't advertised.
   - **No error details online:** PHP errors are shown on the page only on `localhost`; elsewhere they go to the error log.
   - **Private profiles:** with `20261105120000_private_profiles.sql`, people can read only their own profile; Admins and Super Admins can read everyone's. Visitors can't read any.
-- **Event categories:** every event has an **audience** (Students, Faculty, or Students & Faculty) and a **venue type** (On-campus, Off-campus, or Online/Webinar), and can be limited to some **year levels** (none picked = every year level). Online events need the webinar link; on- and off-campus events need a venue. They show on event cards and pages and can be filtered on the Event Calendar (filtering "For students" also shows events for students & faculty).
+- **Event categories:** every event has an **audience** (Students, Faculty, or Students & Faculty) and a **venue type** (On-campus, Off-campus, or Online/Webinar), and can be limited to some **year levels** (none picked = every year level). The **Venue** is a dropdown: on-campus places and online platforms come from the venues list (Admin → Categories → Venues, where Super Admins add and delete them; migration `20261120120000_venues.sql`), and **Off-campus** is typed in. Online events need the webinar link; on- and off-campus events need a venue. They show on event cards and pages and can be filtered on the Event Calendar (filtering "For students" also shows events for students & faculty).
+- **Event pop-up:** clicking an event (cards, the Event Calendar's day list, dashboard and organization lists) opens its details in a pop-up on the same page — when, where, who it's for, the organizers, Register / Cancel / Evaluate, and the program flow folded under it — instead of leaving the page. Cards themselves only show the date, the venue, the organizer and "N going". *Open the full page* (or Ctrl-click) opens `event-details.php`. After registering or cancelling in the pop-up, closing it refreshes the page. On the event page, **Back** goes to the page you came from (not always the calendar); the Program Flow column says "No program flow posted yet" until one is added, and the event page's admin links are folded into **Manage event**.
+- **Login:** one login form for everyone (the Admin Login button is gone — admins use the same form). The card no longer slides left / right, and moving between login and sign-up doesn't swing the photo strip across.
 - **Event Calendar (one view):** `events.php` is a month calendar with a single filter bar (keyword, category, organization, audience, venue). Clicking a date lists every event on it beside the calendar (no reload); ‹ › change month. Searching jumps to the month of the next match. The dashboard's small calendar lists a clicked day's events too and links to the full calendar. The old dashboard Filters box and the Events page's extra filters (type, when, sort) were removed.
 - **Same sidebar everywhere:** home, calendar, organizations, student, moderator and admin pages all use the same sidebar and top bar (`includes/nav.php`, `includes/topbar.php`); visitors who aren't logged in see Log in / Sign up there. Only the login / sign-up screens and printouts are full-screen.
 - **Accounts:** sign-up asks *student or faculty*, **department** and **organization** (required; the organization list shows the chosen department's organizations). Students also give their **School ID** (unique; the format 23-3170-870 — 2 digits, 4 digits, 3 digits — with the dashes added as it's typed; IDs saved before this format stay valid until changed), **course**, **highest year level**, and **regular or irregular**. Choosing *Irregular* opens a pop-up to pick every year level they have subjects in, with the registration rules for irregular students. Accounts missing any of this (older accounts, Google sign-ins) are sent to the profile form to complete it before anything else; filling in empty details is saved right away. Admins are exempt.
 - **My Profile and approvals:** My Profile shows the account's details with **Edit my profile** (a separate page) and **Change password** (a pop-up). Changes to saved details are sent to the Super Admins; My Profile shows them as *waiting for approval* (they can be changed or withdrawn) and then whether they were approved or not, with the Super Admin's note. A Super Admin's own changes are saved directly.
 - **Event approvals:** a new event created by an Admin says **Send for Approval** instead of Publish. It stays a draft, marked *Awaiting approval* in Update Events, until a Super Admin approves it on the **Approvals** page — then it's published (and announced, if *Send Notification* was picked). A rejected event shows the reason and can be changed and sent again; saving it as a draft takes a request back. Super Admins' events don't need approval.
-- **Roles:** *Student / Faculty* (browse, register, evaluate), *Admin* (their organization's events: create, edit, cancel — published once a Super Admin approves — schedules, registrations, attendance, printouts, evaluation results, attendance imports, officers), *Super Admin* (everything, including deleting events, reports, the evaluation form, categories / departments / organizations, the school calendar, users and School IDs, and approvals). Super Admins change roles, and edit or delete accounts, on **Users & Roles**, which also shows a table of what each role can do. An Admin needs an organization. Arian Abergas's Super Admin account is protected: it can't be demoted or deleted.
+- **Roles:** *Student / Faculty* (browse, register, evaluate), *Admin* (their organization's events: create, edit, cancel — published once a Super Admin approves — schedules, registrations, attendance, printouts, evaluation results, attendance imports, officers), *Super Admin* (everything, including deleting events, reports, the evaluation form, categories / departments / organizations, the school calendar, users and School IDs, and approvals). Super Admins edit or delete accounts on **Users**, and change roles on **Roles** (separate sidebar pages); Roles also sums up what each role can do, with the full comparison folded under it. An Admin needs an organization. Arian Abergas's Super Admin account is protected: it can't be demoted or deleted.
 - **No duplicates:** saving an event with the same title on the same date as another, or at a venue already booked at that time, is refused with the other event's name. While filling in the form, the other events on the chosen dates are listed under the date fields. School-calendar terms can't overlap either.
 - **Forms start clean:** a published / saved event goes back to a blank form. After an error, the form shows what was typed once; refreshing, or leaving and coming back, clears it (`remember_form()` / `recall_form()`, `assets/js/forms.js`).
 - **Completed automatically:** events are marked **Completed** once they end (a student's participation shows **Completed** once they attended and evaluated). *Mark Completed* can still close an event early.
 - **Import & Verify (Excel):** upload an .xlsx or .csv file (first sheet; a header row naming the columns — templates are downloadable). *Student list → accounts* (admins) compares the registrar's list with the accounts by School ID (or name): matched, details that differ, no account yet, accounts not on the list, duplicates; matched accounts can be marked **Verified** in one click. *Attendance sheet → registrations* (admins and the event's moderators) marks everyone registered who's on the sheet as Attended, lists walk-ins, and can mark registered people who aren't on the sheet as No-show. Results download as CSV.
-- **Departments:** each organization belongs to a department (Admin → Categories & Orgs → Departments), so reports can be filtered by department; accounts belong to a department too, and the Organizations page is grouped by department.
+- **Departments:** each organization belongs to a department (Admin → Categories → Departments), so reports can be filtered by department; accounts belong to a department too, and the Organizations page is grouped by department.
 - **School calendar:** an event counts in the school year and semester its **start date** falls in. Admin → School Calendar sets each term's dates; any date outside every term follows the default calendar (1st semester Aug–Dec, 2nd semester Jan–May, summer Jun–Jul).
-- **Admin Dashboard and Reports:** counts of events this week (Mon–Sun), this month, this semester and this school year, split by venue type and audience. Reports filter by school year, semester, department, organization, audience and venue type and break the numbers down per month, week, semester, department and organization, with the full event list. Cancelled events are counted separately and left out of every other number. *Registered* = everyone who signed up and didn't cancel; *attendance rate* = attended ÷ registered, for events that have ended. Reports print on A4 (with the school header and signature lines) and download as CSV.
+- **Admin Dashboard and Reports:** counts of events this week (Mon–Sun), this month, this semester and this school year, split by venue type and audience. Reports filter by school year, semester and month (department, organization, audience and venue type are under *More filters*) and show, so it reads at a glance, four totals (events held, registrations, attendance rate, average rating), the events-per-month graph, and one breakdown table at a time — per month (months with events only), week, semester, department or organization, or the event list. Every column is in the Excel download. Cancelled events are counted separately and left out of every other number. *Registered* = everyone who signed up and didn't cancel; *attendance rate* = attended ÷ registered, for events that have ended. Reports print on A4 (with the school header, every breakdown and signature lines) and download as Excel.
 - **Attendance:** on an event's Registrations page, mark people Attended / No-show one by one or pick several rows. **Print attendance** gives an A4 sheet: an *attendance sheet* to sign at the event (registered people + blank rows for walk-ins) or an *attendance report* afterwards (attendees with their time in, plus totals).
 - **Event evaluation:** one standard form is used for every event (Admin → Evaluation Form; replace the default questions with the school's official form). When someone is marked Attended they get a notification, and the event page and their dashboard show **Evaluate this event**. Ratings use 5 Excellent · 4 Very Satisfactory · 3 Satisfactory · 2 Fair · 1 Poor; results show each statement's mean and verbal interpretation (4.21–5.00 Excellent, 3.41–4.20 Very Satisfactory, 2.61–3.40 Satisfactory, 1.81–2.60 Fair, 1.00–1.80 Poor) and the written answers, without names. Results print and download as CSV; **Remind attendees** notifies anyone who hasn't answered yet.
 

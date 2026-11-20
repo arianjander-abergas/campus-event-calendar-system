@@ -50,7 +50,7 @@ $topbarSearch = true;
             $mine = $requiredStatus[$ev['id']] ?? null;
             $action = in_array($mine, ['registered', 'attended'], true) ? 'Registered ✓' : (!empty($ev['enable_registration']) ? 'Register ›' : 'View ›');
           ?>
-            <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="eval-callout-item">
+            <a href="../event-details.php?id=<?= urlencode($ev['id']) ?>" class="eval-callout-item" data-event-modal>
               <span><?= htmlspecialchars($ev['title']) ?><small><?= htmlspecialchars(event_date_range($ev)) ?> · <?= htmlspecialchars(event_place($ev)) ?></small></span>
               <strong><?= $action ?></strong>
             </a>
@@ -106,7 +106,7 @@ $topbarSearch = true;
           $toEvaluate = $reg['status'] === 'attended' && !has_evaluated($ev['id']);
           $rowHref = $toEvaluate ? 'evaluate.php?event=' . urlencode($ev['id']) : '../event-details.php?id=' . urlencode($ev['id']);
         ?>
-          <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>">
+          <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>"<?= $toEvaluate ? '' : ' data-event-modal' ?>>
             <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
@@ -137,7 +137,7 @@ $topbarSearch = true;
           <p class="mini-meta">No upcoming events yet.</p>
         <?php endif; ?>
         <?php foreach ($trending as $ev): ?>
-          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>">
+          <a class="mini-row" href="../event-details.php?id=<?= urlencode($ev['id']) ?>" data-event-modal>
             <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
             <div class="mini-info">
               <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>
@@ -176,7 +176,7 @@ $topbarSearch = true;
       <?php endif; ?>
       <?php foreach (array_slice($notifications, 0, 5) as $n): ?>
         <?php $annHref = !empty($n['event_id']) ? '../event-details.php?id=' . urlencode($n['event_id']) : null; ?>
-        <<?= $annHref ? 'a href="' . htmlspecialchars($annHref) . '"' : 'div' ?> class="announcement-item<?= ($n['status'] ?? '') !== 'read' ? ' unread' : '' ?>">
+        <<?= $annHref ? 'a href="' . htmlspecialchars($annHref) . '" data-event-modal' : 'div' ?> class="announcement-item<?= ($n['status'] ?? '') !== 'read' ? ' unread' : '' ?>">
           <span class="ann-icon info" aria-hidden="true"><?= icon('megaphone', 18) ?></span>
           <div>
             <div class="ann-title"><?= htmlspecialchars($n['title']) ?></div>

@@ -21,6 +21,7 @@ $categories = get_categories();
 $organizations = get_event_organizations_for($user); // who may be the main organizer
 $allOrganizations = $isAdmin ? $organizations : get_organizations(); // who may co-organize
 $departments = get_departments(); // the clickable headings in the Organization picker
+$venueOptions = get_venue_options(); // section 5's dropdown: On-campus places, Online platforms
 
 $editId = get_param('edit');
 $editEvent = is_uuid($editId) ? get_event_admin($editId) : null;
@@ -82,8 +83,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // events.audience keeps the older single value for the reports.
     $audiences = array_values(array_intersect(array_keys(AUDIENCE_GROUPS), array_filter((array) ($_POST['audiences'] ?? []), 'is_string')));
     $audience = audience_value($audiences);
-    $venueType = post_param('venue_type', 'on_campus');
-    $venueType = isset(VENUE_TYPES[$venueType]) ? $venueType : 'on_campus';
+    // Venue (section 5's dropdown): "<type>|<name>" is a place from the venues list;
+    // "<type>|*" is typed in the box under it (off-campus always, or a list that's still empty).
+    [$venueType, $venuePick] = explode('|', post_param('venue_pick'), 2) + ['', ''];
+    if (!isset(VENUE_TYPES[$venueType])) $venueType = '';
+    $venueTyped = $venueType === 'off_campus' || $venuePick === '*';
+    $venueName = $venueTyped ? post_param('venue_other') : trim($venuePick);
     // Year levels that may register (none or all picked = every year level; only for events open to students).
     $yearLevels = in_array('students', $audiences, true) ? parse_year_levels($_POST['year_levels'] ?? []) : [];
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
@@ -124,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'start_time' => post_param('start_time') ?: null,
         'end_date' => post_param('end_date'),
         'end_time' => post_param('end_time') ?: null,
-        'venue' => post_param('venue') ?: null,
+        'venue' => $venueName !== '' ? $venueName : null,
         'is_online' => $venueType === 'online',
         'online_event_link' => $onlineLink ?: null,
         'address' => post_param('address') ?: null,
@@ -192,8 +197,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && $fields['end_time'] <= $fields['start_time']) {
         $fail('end_time', 'End time must be after the start time.');
     }
+    // Venue: one from the list (or the event's own, if it has since left the list);
+    // typed only for off-campus places, or when that list is still empty.
+    $venueListed = in_array($venueName, $venueOptions[$venueType] ?? [], true)
+        || ($previous && $venueType === ($previous['venue_type'] ?? '') && $venueName === trim((string) ($previous['venue'] ?? '')));
+    if ($venueType === '') $fail('venue', 'Choose where the event happens: an on-campus venue, an online platform, or Off-campus.');
+    elseif ($venueTyped && $venueType !== 'off_campus' && $venueOptions[$venueType]) $fail('venue', 'Choose a venue from the list.');
+    elseif ($venueTyped && $venueType !== 'online' && $venueName === '') $fail('venue_other', 'Type where the event will be held.');
+    elseif (!$venueTyped && !$venueListed) $fail('venue', 'Choose a venue from the list.');
+    if (mb_strlen($venueName) > 120) $fail($venueTyped ? 'venue_other' : 'venue', 'The venue must be 120 characters or fewer.');
     if ($venueType === 'online' && $onlineLink === '') $fail('online_event_link', 'Online events need the webinar / meeting link.');
-    if ($venueType !== 'online' && !$fields['venue']) $fail('venue', 'On-campus and off-campus events need a venue.');
     if ($onlineLink !== '' && !preg_match('~^https?://~i', $onlineLink)) $fail('online_event_link', 'The online event link must start with http:// or https://.');
     if ($registrationLimit !== '' && (int) $registrationLimit < 1) $fail('registration_limit', 'Registration limit must be at least 1 (or leave it empty for no limit).');
     if ($fields['registration_deadline'] && $fields['end_date'] !== '' && $fields['registration_deadline'] > $fields['end_date']) {
@@ -215,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         }
         if ($clash['venue_conflict']) {
             $c = $clash['venue_conflict'];
-            $fail('venue', $fields['venue'] . ' is already booked for "' . $c['title'] . '" (' . event_when($c) . '). Choose another venue, date or time.');
+            $fail($venueTyped ? 'venue_other' : 'venue', $fields['venue'] . ' is already booked for "' . $c['title'] . '" (' . event_when($c) . '). Choose another venue, date or time.');
         }
     }
 
@@ -372,7 +385,7 @@ $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0,
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 // Fields the last save rejected: red border + the reason under the field.
 // Errors without a field of their own (e.g. the database said no) show as banners.
-$fieldKeys = ['title', 'category_id', 'category_other', 'description', 'start_date', 'end_date', 'end_time', 'venue', 'online_event_link',
+$fieldKeys = ['title', 'category_id', 'category_other', 'description', 'start_date', 'end_date', 'end_time', 'venue', 'venue_other', 'online_event_link',
     'poster_file', 'registration_limit', 'registration_deadline', 'contact_email', 'audiences', 'organizations', 'programs'];
 $bad = fn(string $key) => isset($errors[$key]) ? ' is-invalid" aria-invalid="true" aria-describedby="' . $key . '-error' : '';
 $why = fn(string $key) => isset($errors[$key]) ? '<p class="field-error" id="' . $key . '-error">' . htmlspecialchars($errors[$key]) . '</p>' : '';
@@ -468,7 +481,7 @@ $breadcrumbs[] = [$pageTitle, null];
 
         <details class="form-section form-fold"<?= $openIf('organizations') ?>>
           <summary><h2 class="form-section-head" id="sec-org"><span class="form-section-num">2</span><span>Organizers<small>The organization holding the event, and any co-organizers</small></span><?= $fold ?></h2></summary>
-          <?php /* Organization picker: departments from Categories & Orgs (e.g. CITE) are
+          <?php /* Organization picker: departments from Categories › Departments (e.g. CITE) are
                    clickable and open to show their organizations (JPSSITE, SIES, ACpES…).
                    One organization, or two or more with "Multi-organization event". */
           $pickedIds = array_values(array_filter(array_merge([(string) ($f['organization_id'] ?? '')], $f['partner_ids'] ?? [])));
@@ -593,26 +606,57 @@ $breadcrumbs[] = [$pageTitle, null];
           <div class="schedule-hint" data-schedule-hint hidden></div>
         </details>
 
-        <details class="form-section form-fold"<?= $openIf('venue', 'online_event_link') ?>>
+        <details class="form-section form-fold"<?= $openIf('venue', 'venue_other', 'online_event_link') ?>>
           <summary><h2 class="form-section-head" id="sec-venue"><span class="form-section-num">5</span><span>Venue<small>Where it happens: on campus, off campus or online</small></span><?= $fold ?></h2></summary>
-          <span class="admin-label">Venue Type <span class="req">*</span></span>
-          <div class="admin-radio-row">
-            <?php foreach (VENUE_TYPES as $key => $label): ?>
-              <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($f['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $label ?></label>
-            <?php endforeach; ?>
-          </div>
-
+          <?php
+          // The dropdown's choice: "<type>|<name>" from the venues list, or "<type>|*" when the
+          // place is typed in the box under it (off-campus; or a list that's still empty).
+          $vType = (string) ($f['venue_type'] ?? '');
+          $vName = trim((string) ($f['venue'] ?? ''));
+          if ($vType === '' && $vName !== '') $vType = 'on_campus';
+          $vPick = '';
+          $vOwn = null; // this event's own venue that isn't on the list (any more): still offered
+          if ($vType === 'off_campus') {
+              $vPick = 'off_campus|*';
+          } elseif (isset(VENUE_LISTS[$vType])) {
+              if (in_array($vName, $venueOptions[$vType], true)) $vPick = $vType . '|' . $vName;
+              elseif (!$venueOptions[$vType]) $vPick = $vType . '|*';
+              elseif ($vName !== '' || ($vType === 'online' && !empty($f['id']))) $vPick = $vOwn = $vType . '|' . $vName;
+          }
+          $vTyped = str_ends_with($vPick, '|*');
+          $vOption = fn(string $value, string $label): string =>
+              '<option value="' . htmlspecialchars($value) . '"' . ($value === $vPick ? ' selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+          ?>
           <div class="admin-two-col">
             <div>
-              <label class="admin-label" for="venue">Venue <span class="req" data-venue-req>*</span></label>
-              <input type="text" id="venue" name="venue" class="admin-input<?= $bad('venue') ?>" placeholder="e.g. AVR 1, CITE Building" value="<?= $val('venue') ?>"><?= $why('venue') ?>
+              <label class="admin-label" for="venue">Venue <span class="req">*</span></label>
+              <select id="venue" name="venue_pick" class="admin-input<?= $bad('venue') ?>" required>
+                <option value="">Choose where it happens…</option>
+                <?php foreach (VENUE_LISTS as $type => $group): ?>
+                  <optgroup label="<?= $group ?>">
+                    <?php foreach ($venueOptions[$type] as $name): ?><?= $vOption($type . '|' . $name, $name) ?><?php endforeach; ?>
+                    <?php if ($vOwn !== null && str_starts_with($vOwn, $type . '|')): ?>
+                      <?= $vOption($vOwn, $vName !== '' ? $vName . ' (not on the list)' : 'Online (no platform named)') ?>
+                    <?php endif; ?>
+                    <?php if (!$venueOptions[$type]): ?><?= $vOption($type . '|*', $type === 'online' ? 'Online: type the platform…' : 'On-campus: type the place…') ?><?php endif; ?>
+                  </optgroup>
+                <?php endforeach; ?>
+                <optgroup label="Off-campus">
+                  <?= $vOption('off_campus|*', 'Off-campus: type the place…') ?>
+                </optgroup>
+              </select><?= $why('venue') ?>
+              <div class="venue-other" data-venue-other<?= $vTyped ? '' : ' hidden' ?>>
+                <label class="admin-label" for="venue_other"><span data-venue-other-label><?= $vType === 'online' ? 'Platform' : ($vType === 'off_campus' ? 'Off-campus place' : 'Place') ?></span> <span class="req" data-venue-other-req<?= $vType === 'online' ? ' hidden' : '' ?>>*</span></label>
+                <input type="text" id="venue_other" name="venue_other" class="admin-input<?= $bad('venue_other') ?>" maxlength="120" placeholder="e.g. Baliwag Star Arena, Function Hall" value="<?= $vTyped ? htmlspecialchars($vName) : '' ?>"><?= $why('venue_other') ?>
+              </div>
             </div>
             <div>
               <label class="admin-label" for="online_event_link">Online Event Link <span class="req" data-link-req hidden>*</span></label>
               <input type="url" id="online_event_link" name="online_event_link" class="admin-input<?= $bad('online_event_link') ?>" placeholder="https://…" value="<?= $val('online_event_link') ?>"><?= $why('online_event_link') ?>
             </div>
           </div>
-          <p class="admin-hint">On-campus and off-campus events need a venue (a livestream link is optional). Online events need the webinar link.</p>
+          <p class="admin-hint">Pick an on-campus venue or an online platform from the list; for an off-campus event choose <strong>Off-campus</strong> and type the place. Online events need the webinar link (for the others a livestream link is optional).
+            <?= $isAdmin ? 'Missing a venue? <a href="admin-taxonomy.php?tab=venues">Add it under Categories › Venues</a>.' : 'Missing a venue? Ask a Super Admin to add it.' ?></p>
 
           <label class="admin-label" for="address">Address (if applicable)</label>
           <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
@@ -892,17 +936,32 @@ $breadcrumbs[] = [$pageTitle, null];
   startDate.addEventListener('change', syncEndMin);
   syncEndMin();
 
-  // Venue type decides which field is required: the venue (on/off-campus) or the link (online).
+  // Venue: the dropdown's choice is "<type>|<name>"; "<type>|*" means the place is
+  // typed in the box under it (Off-campus). Online events need the link instead.
   var venue = document.getElementById('venue');
+  var venueOther = document.getElementById('venue_other');
+  var venueOtherBox = form.querySelector('[data-venue-other]');
   var link = document.getElementById('online_event_link');
+  function venueChoice() {
+    var v = venue.value, i = v.indexOf('|');
+    var name = i < 0 ? '' : v.slice(i + 1);
+    var typed = name === '*';
+    return { type: i < 0 ? '' : v.slice(0, i), typed: typed, name: typed ? venueOther.value.trim() : name };
+  }
   function syncVenue() {
-    var checked = document.querySelector('input[name="venue_type"]:checked');
-    var online = checked && checked.value === 'online';
-    venue.required = !online;
+    var choice = venueChoice();
+    var online = choice.type === 'online';
+    venueOtherBox.hidden = !choice.typed;
+    venueOther.required = choice.typed && !online;
+    venueOtherBox.querySelector('[data-venue-other-req]').hidden = online;
+    venueOtherBox.querySelector('[data-venue-other-label]').textContent = online ? 'Platform' : (choice.type === 'off_campus' ? 'Off-campus place' : 'Place');
     link.required = online;
-    document.querySelector('[data-venue-req]').hidden = online;
     document.querySelector('[data-link-req]').hidden = !online;
   }
+  venue.addEventListener('change', function () {
+    syncVenue();
+    if (venueChoice().typed) venueOther.focus();
+  });
 
   // Organization picker. Single: one organization (picking one unpicks the
   // rest). Multi: two or more, and admins choose which one is the main organizer.
@@ -995,7 +1054,10 @@ $breadcrumbs[] = [$pageTitle, null];
       var data = new FormData(form);
       if (!data.get('start_date')) { hint.hidden = true; return; }
       var params = new URLSearchParams();
-      ['title', 'start_date', 'end_date', 'start_time', 'end_time', 'venue', 'venue_type', 'id'].forEach(function (k) { params.set(k, data.get(k) || ''); });
+      ['title', 'start_date', 'end_date', 'start_time', 'end_time', 'id'].forEach(function (k) { params.set(k, data.get(k) || ''); });
+      var place = venueChoice();
+      params.set('venue', place.name);
+      params.set('venue_type', place.type);
       fetch('../api/schedule-check.php?' + params.toString(), { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (res) {
@@ -1017,7 +1079,7 @@ $breadcrumbs[] = [$pageTitle, null];
   }
 
   form.addEventListener('change', function () { syncCategory(); syncVenue(); syncAudience(); checkSchedule(); });
-  ['title', 'venue'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
+  ['title', 'venue_other'].forEach(function (id) { document.getElementById(id).addEventListener('input', checkSchedule); });
 
   // ---- Sections 1–9 fold open and shut ----
   // A field that needs fixing opens the section it's in.
@@ -1113,11 +1175,12 @@ $breadcrumbs[] = [$pageTitle, null];
     if (v('start_date') && v('start_date') === v('end_date') && v('start_time') && v('end_time') && v('end_time') <= v('start_time')) {
       add('end_time', 'End time must be after the start time.');
     }
-    var type = document.querySelector('input[name="venue_type"]:checked');
-    if (type && type.value === 'online') {
+    var place = venueChoice();
+    if (!place.type) add('venue', 'Choose where the event will be held.');
+    else if (place.type === 'online') {
       if (empty('online_event_link')) add('online_event_link', 'Online events need the webinar / meeting link.');
-    } else if (empty('venue')) {
-      add('venue', 'Enter where the event will be held.');
+    } else if (place.typed && empty('venue_other')) {
+      add('venue_other', 'Type where the event will be held.');
     }
     if (v('online_event_link') && !/^https?:\/\//i.test(v('online_event_link'))) add('online_event_link', 'The link must start with http:// or https://.');
     if (v('registration_limit') && !(parseInt(v('registration_limit'), 10) >= 1)) add('registration_limit', 'Must be at least 1 (or leave it empty for no limit).');
@@ -1175,8 +1238,8 @@ $breadcrumbs[] = [$pageTitle, null];
     var title = (data.get('title') || '').trim();
     var start = data.get('start_date');
     var when = start ? new Date(start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-    var venueType = data.get('venue_type');
-    var place = venueType === 'online' ? 'Online' : (data.get('venue') || '').trim();
+    var venuePicked = venueChoice();
+    var place = venuePicked.type === 'online' ? 'Online' + (venuePicked.name ? ' (' + venuePicked.name + ')' : '') : venuePicked.name;
     var needsApproval = form.hasAttribute('data-needs-approval');
     var what = intent === 'draft'
       ? 'It\'s saved as a draft — only admins can see it until it\'s published.'
@@ -1209,6 +1272,7 @@ $breadcrumbs[] = [$pageTitle, null];
           form.reset();
           keep.value = intent; // a reset doesn't touch hidden fields' values, but be sure
           hint.hidden = true;
+          syncVenue();
         }, 0);
       }
     });

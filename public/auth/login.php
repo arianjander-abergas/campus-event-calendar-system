@@ -44,20 +44,13 @@ if ($googleEnabled) {
     $_SESSION['after_login'] = $redirectTo; // auth/callback.php sends them here
 }
 
+// One login for everyone: admins use the same form and land on the page they
+// asked for (an admin page's address keeps its ?redirect=).
 $notices = [
     'google' => "Google sign-in isn't switched on yet. Please log in with your email and password.",
     'admin'  => 'Log in with your admin account to open the admin pages.',
 ];
-$adminTarget = BASE_URL . '/admin/dashboard.php';
-$adminLoginUrl = 'login.php?notice=admin&redirect=' . urlencode($adminTarget);
-// Admin mode = the card with the panel slid to the right (see auth.js). The
-// Admin Login button toggles it in place; it is also on when the page is
-// opened for an admin page (?notice=admin, or a redirect into /admin/).
-$adminMode = get_param('notice') === 'admin' || strpos($redirectTo, BASE_URL . '/admin/') === 0;
-$notice = get_param('notice') === 'admin' ? null : ($notices[get_param('notice')] ?? null);
-// Where the form sends you after logging in: the admin dashboard in admin
-// mode (unless a specific admin page was asked for), otherwise $redirectTo.
-$formRedirect = ($adminMode && strpos($redirectTo, BASE_URL . '/admin/') !== 0) ? $adminTarget : $redirectTo;
+$notice = $notices[get_param('notice')] ?? null;
 $flashes = render_flashes();
 ?>
 <!DOCTYPE html>
@@ -86,15 +79,13 @@ $flashes = render_flashes();
   </div>
 </div>
 
-<main class="login-card signin-card<?= $adminMode ? ' is-admin' : '' ?>"
-      data-admin-redirect="<?= htmlspecialchars($adminTarget) ?>"
-      data-user-redirect="<?= htmlspecialchars($adminMode ? $defaultTarget : $redirectTo) ?>">
+<main class="login-card signin-card">
   <a href="../index.php" class="login-close" aria-label="Close and go back home">
     <!-- IMAGE SLOT 2: Close (✕) button, top-right of the card | file: assets/images/login/icon-close.svg | 26×26 -->
     <img src="../assets/images/login/icon-close.svg" alt="" width="26" height="26">
   </a>
 
-  <!-- Solid panel: left = normal login, right = admin login (see auth.css / auth.js). -->
+  <!-- The photo strip on the left of the card (see auth.css); it stays put. -->
   <div class="login-slide-panel" aria-hidden="true"></div>
 
   <div class="login-pane">
@@ -123,11 +114,10 @@ $flashes = render_flashes();
   <?php elseif ($notice): ?>
     <div class="login-notice"><?= htmlspecialchars($notice) ?></div>
   <?php endif; ?>
-  <div class="login-notice login-admin-notice"<?= $adminMode ? '' : ' hidden' ?>><?= htmlspecialchars($notices['admin']) ?></div>
   <div class="login-notice login-google-notice" hidden><?= htmlspecialchars($notices['google']) ?></div>
 
   <form method="POST" class="login-form">
-    <input type="hidden" name="redirect" value="<?= htmlspecialchars($formRedirect) ?>">
+    <input type="hidden" name="redirect" value="<?= htmlspecialchars($redirectTo) ?>">
 
     <label for="email">Email Address</label>
     <div class="login-field">
@@ -168,11 +158,6 @@ $flashes = render_flashes();
       <!-- IMAGE SLOT 6: Google button icon | file: assets/images/login/icon-google.svg | 34×34 -->
       <img src="../assets/images/login/icon-google.svg" alt="" width="34" height="34">
       Google
-    </a>
-    <a href="<?= htmlspecialchars($adminLoginUrl) ?>" class="login-btn" data-toggle-admin aria-pressed="<?= $adminMode ? 'true' : 'false' ?>">
-      <!-- IMAGE SLOT 7: Admin Login button icon | file: assets/images/login/icon-admin.svg | 34×34 -->
-      <img src="../assets/images/login/icon-admin.svg" alt="" width="34" height="34">
-      Admin Login
     </a>
   </div>
 

@@ -216,7 +216,7 @@ function calendar_time_line(array $ev): string
       <?php
         // The first few are shown; the rest open with "Show N more" (no script needed).
         $ongoingShown = 6;
-        $ongoingItem = fn(array $ev): string => '<a class="cal-ongoing-item" href="event-details.php?id=' . urlencode($ev['id']) . '">'
+        $ongoingItem = fn(array $ev): string => '<a class="cal-ongoing-item" href="event-details.php?id=' . urlencode($ev['id']) . '" data-event-modal>'
             . '<strong>' . htmlspecialchars($ev['title']) . '</strong>'
             . '<span>' . htmlspecialchars(event_date_range($ev)) . ' · ' . htmlspecialchars(event_place($ev)) . '</span></a>';
         $ongoingList = array_values($ongoing);
@@ -303,7 +303,7 @@ function calendar_time_line(array $ev): string
             $phase = event_phase($ev);
             $levels = year_levels_label($ev['year_levels'] ?? []);
           ?>
-            <a class="cal-event cal-event-<?= $phase ?>" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+            <a class="cal-event cal-event-<?= $phase ?>" href="event-details.php?id=<?= urlencode($ev['id']) ?>" data-event-modal>
               <span class="cal-event-time"><?= htmlspecialchars(calendar_time_line($ev)) ?></span>
               <strong class="cal-event-title"><?= htmlspecialchars($ev['title']) ?></strong>
               <span class="cal-event-meta"><?= icon(($ev['venue_type'] ?? '') === 'online' ? 'online' : 'location', 13) ?> <?= htmlspecialchars(event_place($ev)) ?></span>

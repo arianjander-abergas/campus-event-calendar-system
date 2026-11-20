@@ -10,7 +10,7 @@
      SLOT 4  Eye (pw hidden) ...... images/login/icon-eye-off.svg 28×28
      SLOT 5  Eye (pw visible) ..... images/login/icon-eye.svg    28×28
      SLOT 6  Google button icon ... images/login/icon-google.svg 34×34
-     SLOT 7  Admin button icon .... images/login/icon-admin.svg  34×34
+     SLOT 7  (unused — the Admin Login button was removed; admins use the same form)
      SLOT 8  Password field icon .. images/login/icon-lock.png   28×28
    The login page uses the glassmorphism look at the bottom of this file
    (body.login-glass); sign-up / forgot-password keep the plain grey style.
@@ -261,10 +261,10 @@ button.login-field-icon { cursor: pointer; }
 .login-alert ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; }
 
 /* ============================================================
-   LOGIN — dark glass card with sliding panel
+   LOGIN — dark glass card with a photo panel
    (body.login-page.login-glass, auth/login.php)
-   A solid purple-blue panel rests as a glowing strip on the left, with the
-   form on the right. Google / Admin Login slide it left / right (see below).
+   A solid panel rests as a glowing photo strip on the left, with the form
+   on the right. Nothing slides: the strip stays where it is.
    Tweak: --panel-rest (strip position) and the 38fr/62fr split.
    ============================================================ */
 .login-glass {
@@ -358,10 +358,8 @@ button.login-field-icon { cursor: pointer; }
     inset -1px 0 0 rgba(var(--p-line-rgb), 0.35),
     18px 0 60px rgba(var(--p-hi-rgb), 0.32);
   transform: translateX(var(--panel-rest));
-  /* Only the visible strip is drawn (the glow on its edge is kept), so when it
-     moves between sides it travels as one solid block. */
+  /* Only the visible strip is drawn (the glow on its edge is kept). */
   clip-path: var(--panel-clip);
-  transition: transform 0.6s ease-in-out;
   pointer-events: none;
 }
 
@@ -370,7 +368,6 @@ button.login-field-icon { cursor: pointer; }
   position: relative;
   z-index: 1;
   padding: 44px 48px 30px;
-  transition: transform 0.6s ease-in-out;
 }
 
 .login-glass .login-close {
@@ -507,7 +504,7 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .login-divider::before,
 .login-glass .login-divider::after { background: rgba(var(--p-line-rgb), 0.18); }
 
-.login-glass .login-socials { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.login-glass .login-socials { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .login-glass .login-socials .login-btn {
   width: auto;
   gap: 10px;
@@ -515,33 +512,19 @@ button.login-field-icon { cursor: pointer; }
   border: 1px solid rgba(var(--p-hi-rgb), 0.55);
 }
 .login-glass .login-socials .login-btn:hover { background: rgba(var(--p-accent-rgb), 0.24); transform: translateY(-1px); }
-/* IMAGE SLOTS 6, 7 — Google + Admin icons */
+/* IMAGE SLOT 6 — Google icon */
 .login-glass .login-socials .login-btn img { width: 22px; height: 22px; }
-/* Admin Login stays lit while admin mode is on (fades in/out with the slide). */
-.login-glass .login-socials .login-btn[aria-pressed="true"] {
-  background: rgba(var(--p-hi-rgb), 0.12);
-  border-color: var(--glass-gold);
-  box-shadow: 0 0 0 3px var(--glass-gold-ring);
-}
 
 .login-glass .login-signup { margin: 24px 0 0; text-align: center; color: var(--glass-muted); }
 .login-glass .login-signup a { color: var(--glass-link); }
 
-/* ---- Sign in / admin toggle (auth.js) — same mechanics as
-   github.com/BOSS0exe/Sign-in-and-Sign-up-page: a solid panel and the form
-   swap sides with a 0.6s ease-in-out transition.
-   Admin Login: adds .is-admin    → panel slides RIGHT, form slides LEFT; stays.
-   Google:      removes .is-admin → panel slides back LEFT, form slides RIGHT; stays. */
+/* ---- The photo strip: the panel's visible 38% ---- */
 .login-glass .login-card {
   --panel-clip: inset(0 -120px 0 62%); /* draw only the 38% strip (+ its glow) */
-  --panel-admin: 0%;                   /* panel's strip on the right side */
-  --pane-admin: -61.3%;                /* form moves left by the strip width (38/62 of itself) */
 }
 /* IMAGE SLOT 10 — LCUP campus photo in the login panel strip | file:
-   assets/images/login/lcup.jpg. The strip is the panel's right 38% (in every
-   position: resting left, Admin Login right, sliding), so the photo sits there
-   and moves with it — the same photo in both views. An even espresso tint
-   keeps the text on it readable. */
+   assets/images/login/lcup.jpg. The strip is the panel's right 38%, so the
+   photo sits there. An even espresso tint keeps the text on it readable. */
 .signin-card .login-slide-panel::before {
   content: "";
   position: absolute;
@@ -555,32 +538,23 @@ button.login-field-icon { cursor: pointer; }
     linear-gradient(rgba(var(--p-dark-rgb), 0.35), rgba(var(--p-dark-rgb), 0.35)),
     url("../images/login/lcup.jpg") 16% center / cover no-repeat; /* framed on the cross */
 }
-.login-card.is-admin .login-slide-panel { transform: translateX(var(--panel-admin)); }
-.login-card.is-admin .login-pane        { transform: translateX(var(--pane-admin)); }
 
 @media (max-width: 860px) {
   .glass-backdrop { grid-template-columns: 1fr; }
   .gb-sidebar { display: none; }
   .gb-cards { grid-template-columns: repeat(2, 1fr); }
 }
-/* Phones/tablets: no side strip — the panel slides all the way out. */
+/* Phones/tablets: no side strip — the panel sits off the card. */
 @media (max-width: 760px) {
   .login-glass .login-card {
     --panel-rest: -101%;
     --panel-clip: none;
-    --panel-admin: 101%;  /* admin toggle: panel wipes across the form to the right */
-    --pane-admin: 0%;     /* form stays full width */
     grid-template-columns: 1fr;
     max-width: 480px;
   }
   .login-pane { grid-column: 1; padding: 40px 24px 28px; }
 }
-@media (max-width: 520px) {
-  .login-glass .login-socials { grid-template-columns: 1fr; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .login-slide-panel,
-  .login-pane { animation: none; transition: none; }
   .login-glass .login-btn,
   .login-glass .login-field { transition: none; }
   .login-glass .login-btn:hover { transform: none; }
@@ -588,8 +562,8 @@ button.login-field-icon { cursor: pointer; }
 
 /* ============================================================
    SIGN-UP — same glass card, mirrored: form on the LEFT, panel strip
-   on the RIGHT. Moving to / from the login page uses the cross-page
-   view transition below (the card morphs, no waiting).
+   on the RIGHT. Moving to / from the login page just opens the page
+   (no sliding between the two layouts).
    ============================================================ */
 .login-glass .register-card {
   --panel-rest: 62%;                         /* panel shifted right: its left 38% shows */
@@ -621,13 +595,11 @@ button.login-field-icon { cursor: pointer; }
   box-shadow: inset 1px 0 0 rgba(var(--p-line-rgb), 0.35);
 }
 /* Close (✕) sits on the photo here: darker backing so it stays visible. */
-.login-glass .register-card .login-close,
-.login-glass .signin-card.is-admin .login-close {
+.login-glass .register-card .login-close {
   background: rgba(var(--p-dark-rgb), 0.6);
   border-color: rgba(255, 255, 255, 0.35);
 }
-.login-glass .register-card .login-close img,
-.login-glass .signin-card.is-admin .login-close img { filter: brightness(1.9); }
+.login-glass .register-card .login-close img { filter: brightness(1.9); }
 
 /* ---- Sign-up fields on dark glass ---- */
 .login-glass { color-scheme: dark; } /* dark native select arrows, radios, dropdown lists */
@@ -698,27 +670,9 @@ button.login-field-icon { cursor: pointer; }
 .login-glass .acct-modal { color-scheme: light; background: #fff; }
 .login-glass .register-form .login-submit { margin-top: 8px; }
 
-/* ---- Smooth page change between login, sign-up and forgot password ----
-   The link opens the next page immediately (no waiting animation first);
-   browsers with cross-page view transitions then morph the card from one
-   size/layout to the other while its contents cross-fade. */
-@view-transition { navigation: auto; }
-.login-glass .login-card { view-transition-name: auth-card; }
-::view-transition-group(auth-card) {
-  animation-duration: 0.38s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); /* quick start, soft landing */
-}
-::view-transition-old(auth-card),
-::view-transition-new(auth-card) {
-  animation-duration: 0.3s;
-  animation-timing-function: ease-out;
-  height: 100%;              /* stretch snapshots with the morph instead of letterboxing */
-  object-fit: cover;
-}
-::view-transition-old(root),
-::view-transition-new(root) { animation-duration: 0.25s; }
+/* Login, sign-up and forgot password open like any other page: no card
+   morph between them (the photo strip used to swing left ↔ right). */
 @media (prefers-reduced-motion: reduce) {
-  @view-transition { navigation: none; }
   .login-glass .register-form .acct-option span { transition: none; }
 }
 
@@ -736,7 +690,7 @@ button.login-field-icon { cursor: pointer; }
    - the email icon pops slightly when the field is in use
    - "Send reset link" shows a spinner while the email is being sent
    - the success / error message slides in after sending
-   Moving to / from the login page cross-fades (view transition above).
+   Moving to / from the login page is the site's plain page fade (style.css).
    ============================================================ */
 .login-glass .forgot-card { max-width: 820px; }
 
