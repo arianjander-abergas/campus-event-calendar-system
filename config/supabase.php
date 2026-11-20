@@ -259,6 +259,12 @@ function supabase_http(string $method, string $url, array $headers, $body = null
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => $timeout,
     ]);
+    // Also trust the certificates Windows trusts: antivirus HTTPS scanning (e.g. AVG
+    // Web Shield) re-signs Supabase's certificate with its own root, which only
+    // Windows knows — without this every request fails and pages show no data.
+    if (defined('CURLSSLOPT_NATIVE_CA')) {
+        curl_setopt($ch, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+    }
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($body) ? $body : json_encode($body));
     }
@@ -643,6 +649,7 @@ const DB_UPDATES = [
     '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
     '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
     '20261112120000_security_hardening.sql' => ['Security: registrations start as "registered" (only event admins mark attendance), and image uploads are limited to 5 MB', 'rpc', 'registrations_are_guarded', []],
+    '20261120120000_venues.sql' => ['The venues list (On-campus places and Online platforms) for the event form\'s Venue dropdown', 'venues', 'select=id&limit=1'],
 ];
 
 /**
@@ -776,6 +783,9 @@ function audiences_ready(): bool
 
 /** Where an event happens (events.venue_type). Online = webinar. */
 const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', 'online' => 'Online (Webinar)'];
+
+/** The venue types with a list to choose from (the venues table); off-campus places are typed in on the event form. */
+const VENUE_LISTS = ['on_campus' => 'On-campus', 'online' => 'Online'];
 
 /** Semesters of a school year (academic_terms.semester). */
 const SEMESTERS = ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer'];
@@ -1953,7 +1963,7 @@ function withdraw_profile_request(string $requestId): array
         : ['ok' => false, 'message' => friendly_error('That request was already handled or withdrawn.')];
 }
 
-/** Change requests with that status, with the account's current details (Users & Roles › Approvals). */
+/** Change requests with that status, with the account's current details (Approvals). */
 function get_profile_requests_admin(string $status = 'pending'): array
 {
     return supabase_user_request('profile_change_requests',
@@ -2066,7 +2076,7 @@ function set_user_role_admin(string $userId, string $role): array
     return ['ok' => true, 'message' => $rows[0]['full_name'] . ' is now ' . $as . '.'];
 }
 
-/** One account with its details and School ID (Super Admin: Users & Roles › Edit), or null. */
+/** One account with its details and School ID (Super Admin: Users › Edit), or null. */
 function get_profile_admin(string $userId): ?array
 {
     if (!is_uuid($userId)) return null;
@@ -3172,7 +3182,7 @@ function event_needs_approval(?array $event, array $user): bool
     return $event === null || in_array($event['approval_status'] ?? null, ['needed', 'pending', 'rejected'], true);
 }
 
-/** Admins' events with that approval status (Users & Roles › Approvals). */
+/** Admins' events with that approval status (Approvals). */
 function get_event_approvals_admin(string $status = 'pending'): array
 {
     return supabase_user_request('events', 'select=id,title,status,start_date,end_date,start_time,end_time,venue,venue_type,is_online,'
@@ -3796,6 +3806,58 @@ function delete_department_admin(string $departmentId): array
     return empty($rows)
         ? ['ok' => false, 'message' => friendly_error('Could not delete this department.')]
         : ['ok' => true, 'message' => 'Department deleted.'];
+}
+
+// =============================================================================
+// VENUES (admin/admin-taxonomy.php?tab=venues) — the event form's Venue dropdown
+// =============================================================================
+// events.venue keeps the place's name as text, so deleting a venue from the
+// list never changes an event that already uses it.
+
+/** The venues list for the event form: ['on_campus' => ['AVR 1', …], 'online' => ['Zoom', …]] (A–Z; empty before the venues update is run). */
+function get_venue_options(): array
+{
+    $out = array_fill_keys(array_keys(VENUE_LISTS), []);
+    foreach (supabase_request('venues', 'select=name,venue_type&order=name.asc') as $v) {
+        if (isset($out[$v['venue_type'] ?? ''])) $out[$v['venue_type']][] = $v['name'];
+    }
+    return $out;
+}
+
+/** Every venue on the list, with how many events (any status) are held there. */
+function get_all_venues_admin(): array
+{
+    $venues = supabase_user_request('venues', 'select=*&order=name.asc');
+    if (!$venues) return [];
+    $used = [];
+    foreach (supabase_user_request('events', 'select=venue,venue_type&venue=not.is.null') as $ev) {
+        $key = ($ev['venue_type'] ?? '') . '|' . mb_strtolower(trim((string) $ev['venue']));
+        $used[$key] = ($used[$key] ?? 0) + 1;
+    }
+    foreach ($venues as &$v) {
+        $v['events'] = $used[$v['venue_type'] . '|' . mb_strtolower(trim($v['name']))] ?? 0;
+    }
+    return $venues;
+}
+
+function create_venue_admin(array $fields): array
+{
+    $rows = supabase_user_request('venues', '', 'POST', $fields);
+    if (empty($rows)) {
+        return ['ok' => false, 'message' => constraint_error([
+            'venues_type_name_key' => '"' . $fields['name'] . '" is already on the ' . label_of(VENUE_LISTS, $fields['venue_type'], '') . ' list.',
+        ], 'Could not add the venue.')];
+    }
+    return ['ok' => true, 'message' => 'Venue added: ' . $fields['name'] . '.'];
+}
+
+function delete_venue_admin(string $venueId): array
+{
+    if (!is_uuid($venueId)) return ['ok' => false, 'message' => 'That venue doesn\'t exist anymore.'];
+    $rows = supabase_user_request('venues', 'id=eq.' . urlencode($venueId), 'DELETE');
+    return empty($rows)
+        ? ['ok' => false, 'message' => friendly_error('Could not delete this venue.')]
+        : ['ok' => true, 'message' => 'Venue deleted. Events already held there keep it.'];
 }
 
 // =============================================================================

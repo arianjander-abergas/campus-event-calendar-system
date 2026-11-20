@@ -410,7 +410,7 @@ function assistant_guide(?array $user): array
         $org = assistant_org_name($user['organization_id'] ?? null) ?: 'their organization';
         $guide[] = "As an Admin, the user runs $org's events: Manage Events → Create Event, and Update Events (edit, cancel; new events are published once a Super Admin approves them — the button says Send for Approval; only Super Admins delete). From Update Events, each event has its Schedule, Registrations (mark Attended / No-show, print the attendance sheet) and Evaluation results. Import & Verify marks attendance from an Excel sheet. Our Officers lists $org's officers.";
     } elseif ($role === 'admin') {
-        $guide[] = "Super Admins manage everything: every organization's events (including deleting them), the Admin Dashboard and Reports, Import & Verify (attendance sheets, and the registrar's student list to verify School IDs), the Evaluation Form, Categories & Orgs (categories, departments, organizations), the School Calendar, Users & Roles (roles: Student / Faculty, Admin, Super Admin; edit and delete accounts), and Approvals (Admins' new events and profile edits, which Super Admins approve or reject).";
+        $guide[] = "Super Admins manage everything: every organization's events (including deleting them), the Admin Dashboard and Reports, Import & Verify (attendance sheets, and the registrar's student list to verify School IDs), the Evaluation Form, Categories (event categories, departments, organizations, and the venues offered on the event form), the School Calendar, Users (every account: edit, delete, School IDs), Roles (what Student / Faculty, Admin and Super Admin can do, and changing someone's role), and Approvals (Admins' new events and profile edits, which Super Admins approve or reject).";
     }
     return $guide;
 }
@@ -464,10 +464,11 @@ function assistant_pages(?array $user): array
         $pages += [
             'reports' => ['Reports', '/admin/reports.php', 'event numbers per month, week, semester, department and organization; print or download Excel'],
             'evaluation_form' => ['Evaluation Form', '/admin/evaluation-form.php', 'the one evaluation form used for every event'],
-            'categories_orgs' => ['Categories & Orgs', '/admin/admin-taxonomy.php', 'the categories, departments and organizations (give tab)'],
+            'categories_orgs' => ['Categories', '/admin/admin-taxonomy.php', 'the event categories, departments, organizations and venues (give tab)'],
             'organization_officers' => ['Organization officers', '/admin/organization-officers.php', "one organization's officers (give organization)"],
             'school_calendar' => ['School Calendar', '/admin/school-calendar.php', 'the school years and semester dates'],
-            'users_roles' => ['Users & Roles', '/admin/users.php', 'accounts, roles (Student / Faculty, Admin, Super Admin) and School IDs; each account can be edited or deleted'],
+            'users' => ['Users', '/admin/users.php', 'every account with its School ID, course and department; each account can be edited or deleted'],
+            'roles' => ['Roles', '/admin/users.php?tab=roles', 'what each role (Student / Faculty, Admin, Super Admin) can do, and where a Super Admin changes someone\'s role'],
             'approvals' => ['Approvals', '/admin/users.php?tab=approvals', 'Admins\' new events and profile edits waiting for a Super Admin to approve or reject'],
         ];
     }
@@ -544,7 +545,7 @@ function assistant_tools(?array $user): array
         'organization' => ['type' => 'string', 'description' => 'organizations' . (isset($pages['organization_officers']) ? ' / organization_officers' : '') . ': organization name or acronym, to go straight to it; event_calendar: only its events.'],
     ];
     if (isset($pages['categories_orgs'])) {
-        $pageInput['tab'] = ['type' => 'string', 'enum' => ['categories', 'departments', 'organizations'], 'description' => 'categories_orgs: which tab.'];
+        $pageInput['tab'] = ['type' => 'string', 'enum' => ['categories', 'departments', 'organizations', 'venues'], 'description' => 'categories_orgs: which tab.'];
     }
     $tools[] = [
         'name' => 'open_page',
@@ -862,7 +863,7 @@ function assistant_tool_open_page(array $in, ?array $user, ?array &$nav): array
     } elseif ($key === 'organization_officers') {
         return ['error' => 'Say which organization (organization).'];
     }
-    if ($key === 'categories_orgs' && in_array($in['tab'] ?? '', ['departments', 'organizations'], true)) {
+    if ($key === 'categories_orgs' && in_array($in['tab'] ?? '', ['departments', 'organizations', 'venues'], true)) {
         $params['tab'] = $in['tab'];
     }
 

@@ -1,13 +1,17 @@
 <?php
 /**
- * Admin: categories, departments and organizations (with logos, their
- * department and a link to each org's officers).
+ * Admin: Categories (sidebar: Categories ▾) — four lists, one per tab:
+ *   ?tab=categories     event categories (Seminar, Workshop…)
+ *   ?tab=departments    departments
+ *   ?tab=organizations  organizations (with logos, their department and a link to each org's officers)
+ *   ?tab=venues         the event form's Venue dropdown: On-campus places and Online platforms
+ *                       (off-campus places are typed in on the form)
  */
 require_once __DIR__ . '/../../config/supabase.php';
 
 $user = require_admin();
 
-$tab = in_array(get_param('tab'), ['departments', 'organizations'], true) ? get_param('tab') : 'categories';
+$tab = in_array(get_param('tab'), ['departments', 'organizations', 'venues'], true) ? get_param('tab') : 'categories';
 $editCategoryId = get_param('edit_category');
 $editDeptId = get_param('edit_department');
 $editOrgId = get_param('edit_org');
@@ -136,34 +140,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete_or
     exit;
 }
 
+// ---- Venue add (On-campus place or Online platform) ----
+$venuesReady = !isset(pending_db_updates()['20261120120000_venues.sql']);
+$venueForm = [];
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_venue') {
+    $venueForm = ['name' => preg_replace('/\s+/', ' ', post_param('name')), 'venue_type' => post_param('venue_type')];
+    if ($venueForm['name'] === '') {
+        $errors[] = 'Venue name is required.';
+    } elseif (mb_strlen($venueForm['name']) > 120) {
+        $errors[] = 'Keep the venue name to 120 characters or fewer.';
+    } elseif (!isset(VENUE_LISTS[$venueForm['venue_type']])) {
+        $errors[] = 'Choose whether it\'s an on-campus place or an online platform.';
+    } else {
+        $result = create_venue_admin($venueForm);
+        if ($result['ok']) {
+            flash('success', $result['message']);
+            header('Location: admin-taxonomy.php?tab=venues');
+            exit;
+        }
+        $errors[] = $result['message'];
+    }
+    $tab = 'venues';
+}
+
+// ---- Venue delete (events already held there keep it: events.venue is text) ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'delete_venue') {
+    $result = delete_venue_admin(post_param('id'));
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    header('Location: ' . $returnTo('venues'));
+    exit;
+}
+
 $categories = get_all_categories_admin();
 $allDepartments = get_all_departments_admin();
 $organizations = get_all_organizations_admin();
+$venues = $venuesReady ? get_all_venues_admin() : [];
 $count = fn(array $row, string $rel): int => (int) ($row[$rel][0]['count'] ?? 0);
 
-// ---- The list on each tab: search, department filter (Organizations), 10 rows per page ----
+// ---- The list on each tab: search, department filter (Organizations), type filter (Venues), 10 rows per page ----
 $q = get_param('q');
 $deptFilter = $tab === 'organizations' ? get_param('dept') : '';
 if ($deptFilter !== 'none' && !in_array($deptFilter, array_column($departments, 'id'), true)) $deptFilter = '';
-$listFilters = array_filter(['q' => $q, 'dept' => $deptFilter], 'strlen');
+$kindFilter = $tab === 'venues' && isset(VENUE_LISTS[get_param('kind')]) ? get_param('kind') : '';
+$listFilters = array_filter(['q' => $q, 'dept' => $deptFilter, 'kind' => $kindFilter], 'strlen');
 $tabUrl = 'admin-taxonomy.php?tab=' . $tab;
 $pageUrl = fn(int $p): string => $tabUrl . (($qs = http_build_query($listFilters + ($p > 1 ? ['page' => $p] : []))) !== '' ? '&' . $qs : '');
 $listRows = match ($tab) {
     'categories' => array_filter($categories, fn($c) => matches_search($q, [$c['name'], $c['description'] ?? ''])),
     'departments' => array_filter($allDepartments, fn($d) => matches_search($q, [$d['name'], $d['code'] ?? '', $d['description'] ?? ''])),
+    'venues' => array_filter($venues, fn($v) => ($kindFilter === '' || $v['venue_type'] === $kindFilter) && matches_search($q, [$v['name']])),
     default => array_filter($organizations, fn($o) =>
         ($deptFilter === '' || ($deptFilter === 'none' ? empty($o['department_id']) : ($o['department_id'] ?? '') === $deptFilter))
         && matches_search($q, [$o['name'], $o['description'] ?? '', $o['departments']['name'] ?? '', $o['departments']['code'] ?? ''])),
 };
 $pager = paginate($listRows, 10, (int) get_param('page'));
 $back = $pageUrl($pager['page']); // Edit / Cancel / Delete come back to the same search and page
-$noun = ['categories' => ['category', 'categories'], 'departments' => ['department', 'departments'], 'organizations' => ['organization', 'organizations']][$tab];
+$noun = ['categories' => ['category', 'categories'], 'departments' => ['department', 'departments'], 'organizations' => ['organization', 'organizations'], 'venues' => ['venue', 'venues']][$tab];
 $emptyText = $listFilters
     ? 'No ' . $noun[1] . ' match your search. <a href="' . $tabUrl . '">Clear the search</a>.'
     : 'No ' . $noun[1] . ' yet — add your first one.';
 
 /** The search bar above a tab's table (plus the department filter on Organizations). */
-$searchBar = function (string $placeholder) use ($tab, $q, $deptFilter, $departments, $listFilters, $tabUrl): string {
+$searchBar = function (string $placeholder) use ($tab, $q, $deptFilter, $kindFilter, $departments, $listFilters, $tabUrl): string {
     $html = '<form method="get" action="admin-taxonomy.php" class="admin-search taxonomy-filter" role="search">'
         . '<input type="hidden" name="tab" value="' . $tab . '">'
         . '<input type="search" name="q" class="admin-input" placeholder="' . htmlspecialchars($placeholder) . '" value="' . htmlspecialchars($q) . '" aria-label="Search">';
@@ -173,6 +211,13 @@ $searchBar = function (string $placeholder) use ($tab, $q, $deptFilter, $departm
             $html .= '<option value="' . htmlspecialchars($d['id']) . '"' . ($deptFilter === $d['id'] ? ' selected' : '') . '>' . htmlspecialchars(department_label($d)) . '</option>';
         }
         $html .= '<option value="none"' . ($deptFilter === 'none' ? ' selected' : '') . '>No department</option></select>';
+    }
+    if ($tab === 'venues') {
+        $html .= '<select name="kind" class="admin-input" aria-label="Type"><option value="">On-campus &amp; Online</option>';
+        foreach (VENUE_LISTS as $key => $label) {
+            $html .= '<option value="' . $key . '"' . ($kindFilter === $key ? ' selected' : '') . '>' . $label . '</option>';
+        }
+        $html .= '</select>';
     }
     $html .= '<button type="submit" class="btn btn-outline">Search</button>';
     if ($listFilters) $html .= '<a href="' . $tabUrl . '" class="btn btn-muted">Clear</a>';
@@ -194,8 +239,10 @@ $editVal = fn(?array $row, string $key) => htmlspecialchars((string) ($row[$key]
 /** What an Edit button fills its pop-up with. */
 $editData = fn(array $fields) => htmlspecialchars(json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-$activeNav = 'admin-taxonomy';
-$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizations', null]];
+// Sidebar: Categories ▾ Event Categories / Departments / Organizations / Venues.
+$activeNav = 'admin-' . $tab;
+$tabTitle = ['categories' => 'Event Categories', 'departments' => 'Departments', 'organizations' => 'Organizations', 'venues' => 'Venues'][$tab];
+$breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$tabTitle, null]];
 ?>
 <!DOCTYPE html>
 <html lang="en"<?= theme_attr() ?>>
@@ -203,7 +250,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <?= app_head_tags() ?>
-<title>Categories, Departments &amp; Organizations — Campus Event Hub</title>
+<title><?= $tabTitle ?> — Categories — Campus Event Hub</title>
 <link rel="stylesheet" href="../assets/css/style.css?v=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
 <link rel="stylesheet" href="../assets/css/admin.css?v=<?= filemtime(__DIR__ . '/../assets/css/admin.css') ?>">
 </head>
@@ -215,15 +262,16 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
   <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
   <main class="dash-main">
-    <h1 class="page-title">Categories, Departments &amp; Organizations</h1>
+    <h1 class="page-title">Categories</h1>
 
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
 
     <div class="admin-tabs" role="tablist">
-      <a href="admin-taxonomy.php?tab=categories" class="admin-tab<?= $tab === 'categories' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'categories' ? 'true' : 'false' ?>">Categories (<?= count($categories) ?>)</a>
+      <a href="admin-taxonomy.php?tab=categories" class="admin-tab<?= $tab === 'categories' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'categories' ? 'true' : 'false' ?>">Event Categories (<?= count($categories) ?>)</a>
       <a href="admin-taxonomy.php?tab=departments" class="admin-tab<?= $tab === 'departments' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'departments' ? 'true' : 'false' ?>">Departments (<?= count($allDepartments) ?>)</a>
       <a href="admin-taxonomy.php?tab=organizations" class="admin-tab<?= $tab === 'organizations' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'organizations' ? 'true' : 'false' ?>">Organizations (<?= count($organizations) ?>)</a>
+      <a href="admin-taxonomy.php?tab=venues" class="admin-tab<?= $tab === 'venues' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'venues' ? 'true' : 'false' ?>">Venues (<?= count($venues) ?>)</a>
     </div>
 
     <?php if ($tab === 'categories'): ?>
@@ -365,7 +413,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
           </div>
         </form>
       </dialog>
-    <?php else: ?>
+    <?php elseif ($tab === 'organizations'): ?>
       <div class="admin-split">
         <form method="POST" action="admin-taxonomy.php?tab=organizations" class="admin-card" data-autoreset enctype="multipart/form-data">
           <input type="hidden" name="action" value="save_organization">
@@ -501,6 +549,64 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories & Organizatio
           </div>
         </form>
       </dialog>
+    <?php else: /* venues */ ?>
+      <?php if (!$venuesReady): ?>
+        <div class="flash flash-info" role="status">The venues list needs a database update first: open <a href="database-update.php">Database update</a>, run <strong>20261120120000_venues.sql</strong>, then come back. Until then, the event form lets you type the venue.</div>
+      <?php endif; ?>
+      <div class="admin-split">
+        <form method="POST" action="admin-taxonomy.php?tab=venues" class="admin-card" data-autoreset>
+          <input type="hidden" name="action" value="save_venue">
+          <h2 class="admin-card-title">Add Venue</h2>
+
+          <span class="admin-label">Type <span class="req">*</span></span>
+          <div class="admin-radio-row">
+            <?php foreach (VENUE_LISTS as $key => $label): ?>
+              <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($venueForm['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $key === 'online' ? 'Online platform' : 'On-campus place' ?></label>
+            <?php endforeach; ?>
+          </div>
+
+          <label class="admin-label" for="venue_name">Name <span class="req">*</span></label>
+          <input type="text" id="venue_name" name="name" class="admin-input" maxlength="120" placeholder="e.g. AVR 1, Gymnasium, Zoom" value="<?= htmlspecialchars($venueForm['name'] ?? '') ?>" required>
+
+          <div class="admin-actions admin-actions-start">
+            <button type="submit" class="btn btn-primary"<?= $venuesReady ? '' : ' disabled' ?>>Add Venue</button>
+          </div>
+          <p class="admin-hint">These are the choices in the event form's Venue dropdown. Off-campus places aren't listed: they're typed in on the form.</p>
+        </form>
+
+        <div class="taxonomy-list">
+        <?= $searchBar('Search venues by name') ?>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Name</th><th>Type</th><th>Events</th><th><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              <?php if (empty($pager['rows'])): ?>
+                <tr><td colspan="4" class="admin-table-empty"><?= $emptyText ?></td></tr>
+              <?php endif; ?>
+              <?php foreach ($pager['rows'] as $v): ?>
+                <tr>
+                  <td><strong><?= htmlspecialchars($v['name']) ?></strong></td>
+                  <td><?= icon($v['venue_type'] === 'online' ? 'online' : 'location', 14) ?> <?= label_of(VENUE_LISTS, $v['venue_type']) ?></td>
+                  <td><?= (int) $v['events'] ?></td>
+                  <td class="admin-row-actions">
+                    <form method="POST" action="admin-taxonomy.php?tab=venues" data-confirm="Delete the venue “<?= htmlspecialchars($v['name']) ?>”? It won't be offered on the event form anymore<?= $v['events'] ? '; the ' . (int) $v['events'] . ' event' . ($v['events'] === 1 ? '' : 's') . ' already there keep' . ($v['events'] === 1 ? 's' : '') . ' it' : '' ?>." data-confirm-title="Delete venue" data-confirm-ok="Delete" data-confirm-tone="danger">
+                      <input type="hidden" name="action" value="delete_venue">
+                      <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
+                      <input type="hidden" name="id" value="<?= htmlspecialchars($v['id']) ?>">
+                      <button type="submit" class="btn-sm btn-sm-danger">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+          <p class="admin-hint admin-table-note">Deleting a venue only takes it off the dropdown: events already held there keep their venue.</p>
+        </div>
+        <?= render_pagination($pager, $pageUrl, ...$noun) ?>
+        </div>
+      </div>
     <?php endif; ?>
   </main>
 

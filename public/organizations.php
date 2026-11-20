@@ -96,7 +96,7 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
             <p class="org-empty">No upcoming events.</p>
           <?php else: ?>
             <?php foreach (array_slice($org['upcoming_events'], 0, 4) as $ev): ?>
-              <a class="mini-row" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+              <a class="mini-row" href="event-details.php?id=<?= urlencode($ev['id']) ?>" data-event-modal>
                 <div class="mini-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
                 <div class="mini-info">
                   <div class="mini-title"><?= htmlspecialchars($ev['title']) ?></div>

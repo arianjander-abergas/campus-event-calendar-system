@@ -4,19 +4,19 @@
  * event row selected with EVENT_CARD_SELECT. Shows one pill: $ev['my_label']
  * on My Events (e.g. "Registered", "Completed"), else "Required" when the
  * logged-in person must attend (the database's my_required_events()), else
- * "Completed" / "Today" / "Ended" when it applies. Also where and for whom the
- * event is (with its year levels), the live "N going" count and the
- * organizing organization.
+ * "Completed" / "Today" / "Ended" when it applies. Below: just when and
+ * where, then the organizing organization and the live "N going" count.
+ * Who it's for, the description and the registration are one click away:
+ * the card opens the event pop-up (data-event-modal, assets/js/event-modal.js).
  */
 /** @var array $ev set by the page that includes this card */
 $cardToday = date('Y-m-d');
 $cardLive = ($ev['start_date'] ?? '') <= $cardToday && ($ev['end_date'] ?? '') >= $cardToday;
 $cardEnded = ($ev['end_date'] ?? $cardToday) < $cardToday || ($ev['status'] ?? '') === 'completed';
-$cardLevels = year_levels_label($ev['year_levels'] ?? []);
 $cardOnline = ($ev['venue_type'] ?? '') === 'online';
 $cardOrg = $ev['organizations'] ?? null;
 ?>
-<a class="event-card" href="<?= BASE_URL ?>/event-details.php?id=<?= urlencode((string) $ev['id']) ?>">
+<a class="event-card" href="<?= BASE_URL ?>/event-details.php?id=<?= urlencode((string) $ev['id']) ?>" data-event-modal>
   <div class="event-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')">
     <span class="event-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
     <?php if (!empty($ev['my_label'])): ?>
@@ -39,19 +39,18 @@ $cardOrg = $ev['organizations'] ?? null;
     <?php else: ?>
       <div class="event-meta"><?= icon('location', 14) ?> <?= htmlspecialchars(event_place($ev)) ?><?= !empty($ev['venue_type']) ? ' · ' . htmlspecialchars(label_of(VENUE_TYPES, $ev['venue_type'], '')) : '' ?></div>
     <?php endif; ?>
-    <?php if (!empty($ev['audience'])): ?>
-      <div class="event-meta"><?= icon('audience', 14) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $cardLevels !== '' ? ' · ' . htmlspecialchars($cardLevels) : '' ?></div>
-    <?php endif; ?>
-    <div class="event-meta"><?= icon('people', 14) ?> <?= get_registration_count((string) $ev['id']) ?> going</div>
-    <?php if (!empty($cardOrg['name'])): ?>
-      <div class="event-org">
-        <?php if (!empty($cardOrg['logo_url'])): ?>
-          <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($cardOrg['logo_url'])) ?>" alt="" class="event-org-logo" width="22" height="22">
-        <?php else: ?>
-          <span class="event-org-logo event-org-initials" aria-hidden="true"><?= htmlspecialchars(initials($cardOrg['name'])) ?></span>
-        <?php endif; ?>
-        <span><?= htmlspecialchars($cardOrg['name']) ?></span>
-      </div>
-    <?php endif; ?>
+    <div class="event-foot">
+      <?php if (!empty($cardOrg['name'])): ?>
+        <span class="event-org">
+          <?php if (!empty($cardOrg['logo_url'])): ?>
+            <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($cardOrg['logo_url'])) ?>" alt="" class="event-org-logo" width="22" height="22">
+          <?php else: ?>
+            <span class="event-org-logo event-org-initials" aria-hidden="true"><?= htmlspecialchars(initials($cardOrg['name'])) ?></span>
+          <?php endif; ?>
+          <span><?= htmlspecialchars($cardOrg['name']) ?></span>
+        </span>
+      <?php endif; ?>
+      <span class="event-going"><?= icon('people', 14) ?> <?= get_registration_count((string) $ev['id']) ?> going</span>
+    </div>
   </div>
 </a>

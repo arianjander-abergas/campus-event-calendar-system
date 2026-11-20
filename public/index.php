@@ -111,7 +111,7 @@ $topbarSearch = true;
         <p class="u-meta">No events happening today.</p>
       <?php endif; ?>
       <?php foreach ($todayEvents as $ev): ?>
-        <a class="upcoming-item" href="event-details.php?id=<?= urlencode($ev['id']) ?>">
+        <a class="upcoming-item" href="event-details.php?id=<?= urlencode($ev['id']) ?>" data-event-modal>
           <div class="upcoming-thumb lazy-bg" style="--bg:url('<?= css_url(event_poster_url($ev['poster_url'] ?? null)) ?>')"></div>
           <div class="upcoming-info">
             <div class="u-title"><?= htmlspecialchars($ev['title']) ?></div>

@@ -45,7 +45,8 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
 <body>
 
 <nav class="print-toolbar" aria-label="Print options">
-  <a href="event-registrations.php?event=<?= urlencode($eventId) ?>" class="tb-back">‹ Back to registrations</a>
+  <?php /* Back to the page it was opened from (event page or Registrations — assets/js/back-link.js). */ ?>
+  <a href="event-registrations.php?event=<?= urlencode($eventId) ?>" class="tb-back" data-back>‹ Back</a>
   <div class="tb-modes" role="tablist">
     <a href="<?= htmlspecialchars($self) ?>&amp;mode=sheet" class="<?= $mode === 'sheet' ? 'active' : '' ?>" role="tab" aria-selected="<?= $mode === 'sheet' ? 'true' : 'false' ?>">Attendance sheet (for signing)</a>
     <a href="<?= htmlspecialchars($self) ?>&amp;mode=report" class="<?= $mode === 'report' ? 'active' : '' ?>" role="tab" aria-selected="<?= $mode === 'report' ? 'true' : 'false' ?>">Attendance report</a>
@@ -132,5 +133,6 @@ $self = 'attendance-print.php?event=' . urlencode($eventId);
   <p class="sheet-foot">Campus Event Hub · Printed <?= date('F j, Y g:i A') ?></p>
 </main>
 
+<script src="../assets/js/back-link.js?v=<?= filemtime(__DIR__ . '/../assets/js/back-link.js') ?>"></script>
 </body>
 </html>

@@ -93,8 +93,8 @@ foreach ($officers as $o) {
 }
 krsort($byYear);
 
-$activeNav = $isAdmin ? 'admin-taxonomy' : 'my-officers';
-$breadcrumbs = [$isAdmin ? ['Categories & Orgs', 'admin-taxonomy.php?tab=organizations'] : ['Dashboard', '../enduser/dashboard.php'], [$org['name'], null], ['Officers', null]];
+$activeNav = $isAdmin ? 'admin-organizations' : 'my-officers';
+$breadcrumbs = [$isAdmin ? ['Organizations', 'admin-taxonomy.php?tab=organizations'] :['Dashboard', '../enduser/dashboard.php'], [$org['name'], null], ['Officers', null]];
 ?>
 <!DOCTYPE html>
 <html lang="en"<?= theme_attr() ?>>
