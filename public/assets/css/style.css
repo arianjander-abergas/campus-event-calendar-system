@@ -2463,6 +2463,8 @@ body .admin-input { padding: clamp(9px, 0.4rem + 0.4vw, 11px) clamp(12px, 0.6rem
   .ed-not-found p, .ed-eval-note, .header-user-name
 ) { color: var(--text-main); }
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(.ed-meta-row, .ed-org-text, .ed-program-sub) { color: var(--text-muted); }
+/* The organizer's name: the dark accent is unreadable on the dark card, so the light one (like the Manage event links). */
+:root:is([data-theme="dark"], [data-theme="dim"]) .ed-org-text a { color: var(--blue-accent); }
 
 /* Borders that were light grey. */
 :root:is([data-theme="dark"], [data-theme="dim"]) :is(.admin-input, .btn-sm, .admin-tab, .org-dept, .cal-day, .filter-bar input, .filter-bar select) { border-color: var(--border); }

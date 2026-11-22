@@ -109,7 +109,9 @@
 .ed-org-logo { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .ed-org-text { display: flex; flex-direction: column; gap: 4px; font-size: 0.88rem; color: #333; letter-spacing: 0.3px; }
 
-.ed-register { margin-top: auto; align-self: flex-end; padding-top: 16px; }
+/* Register / Manage event: one right-aligned column, so opening "Manage event"
+   (a wider row of links) doesn't shift the Register button. */
+.ed-register { margin-top: auto; align-self: flex-end; padding-top: 16px; display: flex; flex-direction: column; align-items: flex-end; }
 .ed-btn {
   padding: 6px 12px;
   border: none;
@@ -363,7 +365,7 @@ a.ed-btn { display: inline-block; text-decoration: none; }
 .event-modal .ed-organizer { margin: 14px 0 0; }
 .event-modal .ed-org-logo { width: 40px; height: 40px; box-shadow: none; }
 .event-modal .ed-org-text { flex-direction: row; flex-wrap: wrap; gap: 4px; font-size: 0.84rem; }
-.event-modal .ed-register { align-self: stretch; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.event-modal .ed-register { display: block; align-self: stretch; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
 .event-modal .ed-reg-note,
 .event-modal .ed-eval-note { text-align: left; }
 .event-modal .ed-reg-actions,

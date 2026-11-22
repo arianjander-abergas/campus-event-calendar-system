@@ -36,13 +36,21 @@ $decision = in_array(get_param('status'), ['approved', 'rejected'], true) ? get_
 $approvalsUrl = fn(string $k, string $s = 'pending', int $page = 1): string
     => 'users.php?' . http_build_query(['tab' => 'approvals', 'kind' => $k] + ($s !== 'pending' ? ['status' => $s] : []) + ($page > 1 ? ['page' => $page] : []));
 
-// Users: search + student / faculty. Roles: search + role.
+// Users: search + student / faculty. Roles: search + role. Both: department,
+// organization ('none' = without one), year level and course.
 $q = get_param('q');
 $roleFilter = $tab === 'roles' && isset(ROLES[get_param('role')]) ? get_param('role') : '';
 $typeFilter = $tab === 'accounts' && isset(ACCOUNT_TYPES[get_param('type')]) ? get_param('type') : '';
+$idOrNone = fn(string $v): string => $v === 'none' || is_uuid($v) ? $v : '';
+$deptFilter = $tab !== 'approvals' ? $idOrNone(get_param('dept')) : '';
+$orgFilter = $tab !== 'approvals' ? $idOrNone(get_param('org')) : '';
+$yearFilter = $tab !== 'approvals' && isset(YEAR_LEVELS[(int) get_param('year')]) ? (string) (int) get_param('year') : '';
+$courseFilter = $tab !== 'approvals' ? mb_substr(trim(get_param('course')), 0, 60) : '';
+$hasFilters = ($q . $roleFilter . $typeFilter . $deptFilter . $orgFilter . $yearFilter . $courseFilter) !== '';
 $page = max(1, (int) get_param('page', '1'));
 $listUrl = fn(array $changes = []): string => 'users.php' . (($qs = http_build_query(array_filter($changes + [
-    'tab' => $tab === 'roles' ? 'roles' : '', 'q' => $q, 'role' => $roleFilter, 'type' => $typeFilter, 'page' => $page > 1 ? $page : '',
+    'tab' => $tab === 'roles' ? 'roles' : '', 'q' => $q, 'role' => $roleFilter, 'type' => $typeFilter,
+    'dept' => $deptFilter, 'org' => $orgFilter, 'year' => $yearFilter, 'course' => $courseFilter, 'page' => $page > 1 ? $page : '',
 ], fn($v) => $v !== '' && $v !== null))) !== '' ? '?' . $qs : '');
 $back = $listUrl(); // where a change on this list comes back to (same filters, same page)
 
@@ -94,9 +102,23 @@ if ($tab === 'approvals') {
     $pageUrl = fn(int $p): string => $approvalsUrl($kind, $decision, $p);
     $here = $approvalsUrl($kind, $decision, $pager['page']);
 } else {
-    $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter) {
+    // The filters' choices: departments, organizations, and the courses people have typed (once each, any capitalisation).
+    $departments = get_departments();
+    $organizations = get_organizations();
+    $courseKey = fn(?string $c): string => mb_strtoupper(preg_replace('/\s+/', ' ', trim((string) $c)));
+    $courses = [];
+    foreach ($all as $p) {
+        if (($k = $courseKey($p['course'] ?? '')) !== '') $courses[$k] ??= trim($p['course']);
+    }
+    ksort($courses, SORT_NATURAL);
+    $matchesId = fn(string $filter, $id): bool => $filter === '' || ($filter === 'none' ? empty($id) : (string) $id === $filter);
+
+    $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter, $deptFilter, $orgFilter, $yearFilter, $courseFilter, $courseKey, $matchesId) {
         if ($roleFilter !== '' && $p['role'] !== $roleFilter) return false;
         if ($typeFilter !== '' && ($p['account_type'] ?? '') !== $typeFilter) return false;
+        if (!$matchesId($deptFilter, $p['department_id'] ?? null) || !$matchesId($orgFilter, $p['organization_id'] ?? null)) return false;
+        if ($yearFilter !== '' && (string) ($p['year_level'] ?? '') !== $yearFilter) return false;
+        if ($courseFilter !== '' && $courseKey($p['course'] ?? '') !== $courseKey($courseFilter)) return false;
         return matches_search($q, [$p['full_name'] ?? '', $p['course'] ?? '', $p['organizations']['name'] ?? '', $p['departments']['name'] ?? '', $p['school_ids']['school_id'] ?? '']);
     }));
     $listPager = paginate($profiles, 20, $page);
@@ -146,7 +168,10 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
           <p class="page-sub"><?= count($all) ?> accounts · <?= (int) ($typeCounts['student'] ?? 0) ?> student<?= ($typeCounts['student'] ?? 0) == 1 ? '' : 's' ?> · <?= (int) ($typeCounts['faculty'] ?? 0) ?> faculty</p>
         <?php endif; ?>
       </div>
-      <?php if ($tab !== 'approvals'): ?>
+    </div>
+
+    <?php if ($tab !== 'approvals'): ?>
+      <?php /* Search and filters: department, organization, year level, course (and the account type on Users). */ ?>
       <form method="get" class="admin-search users-filter" role="search">
         <?php if ($tab === 'roles'): ?>
           <input type="hidden" name="tab" value="roles">
@@ -161,10 +186,36 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
             <?php endforeach; ?>
           </select>
         <?php endif; ?>
-        <button type="submit" class="btn btn-outline">Search</button>
+        <select name="dept" class="admin-input" aria-label="Department">
+          <option value="">Every department</option>
+          <?php foreach ($departments as $d): ?>
+            <option value="<?= htmlspecialchars($d['id']) ?>" <?= $deptFilter === $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars(department_label($d)) ?></option>
+          <?php endforeach; ?>
+          <option value="none" <?= $deptFilter === 'none' ? 'selected' : '' ?>>No department</option>
+        </select>
+        <select name="org" class="admin-input" aria-label="Organization">
+          <option value="">Every organization</option>
+          <?php foreach ($organizations as $o): ?>
+            <option value="<?= htmlspecialchars($o['id']) ?>" <?= $orgFilter === $o['id'] ? 'selected' : '' ?>><?= htmlspecialchars(organization_label($o)) ?></option>
+          <?php endforeach; ?>
+          <option value="none" <?= $orgFilter === 'none' ? 'selected' : '' ?>>No organization</option>
+        </select>
+        <select name="year" class="admin-input" aria-label="Year level">
+          <option value="">Every year level</option>
+          <?php foreach (YEAR_LEVELS as $y => $label): ?>
+            <option value="<?= $y ?>" <?= $yearFilter === (string) $y ? 'selected' : '' ?>><?= $label ?></option>
+          <?php endforeach; ?>
+        </select>
+        <select name="course" class="admin-input" aria-label="Course">
+          <option value="">Every course</option>
+          <?php foreach ($courses as $key => $course): ?>
+            <option value="<?= htmlspecialchars($course) ?>" <?= $courseFilter !== '' && $courseKey($courseFilter) === $key ? 'selected' : '' ?>><?= htmlspecialchars($course) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <button type="submit" class="btn btn-outline">Filter</button>
+        <?php if ($hasFilters): ?><a href="<?= $tab === 'roles' ? 'users.php?tab=roles' : 'users.php' ?>" class="btn btn-muted">Clear</a><?php endif; ?>
       </form>
-      <?php endif; ?>
-    </div>
+    <?php endif; ?>
 
     <?= render_flashes() ?>
 

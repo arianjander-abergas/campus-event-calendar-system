@@ -570,7 +570,8 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
 .schedule-ok { color: #166534; font-weight: 600; }
 
 /* Users (users.php) and Roles (users.php?tab=roles) */
-.users-filter { flex-wrap: wrap; }
+.users-filter { flex-wrap: wrap; margin: 0 0 16px; }
+.users-filter input[type="search"] { flex: 1 1 240px; width: auto; }
 /* Roles: one card per role — how many have it, three lines on what it can
    do; a click shows only the people with that role in the list below. */
 .role-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
@@ -679,6 +680,8 @@ td.admin-row-actions > form { gap: 6px; }
 
 /* Search + filters and the pager: Update Events (5 per page), Categories & Orgs (10 per page). */
 .taxonomy-list { min-width: 0; }
+/* Categories: "+ Add …" at the end of the search row; it opens the Add pop-up. */
+.taxonomy-filter .taxonomy-add { margin-left: auto; white-space: nowrap; }
 .taxonomy-filter .admin-input[type="search"] { flex: 1 1 220px; }
 .events-filter, .taxonomy-filter { flex-wrap: wrap; margin-bottom: 8px; }
 .events-filter select.admin-input, .taxonomy-filter select.admin-input { width: auto; }

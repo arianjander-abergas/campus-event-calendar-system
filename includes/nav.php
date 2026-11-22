@@ -7,7 +7,7 @@
  *   'manage-create' | 'manage-update' | 'import' | 'my-officers'  (moderators and admins)
  *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-calendar'
  *   'admin-categories' | 'admin-departments' | 'admin-organizations' | 'admin-venues'  (Categories ▾)
- *   'admin-users' | 'admin-roles'  (admins)
+ *   'admin-users' | 'admin-roles'  (Users & Roles ▾, admins)
  *   'admin-approvals-events' | 'admin-approvals-profiles'  (Approvals ▾, staff)
  * Logged-out visitors see the public links (Log in / Sign up are in the top
  * bar; on phones they're also at the bottom of this menu).
@@ -56,6 +56,7 @@ $approvalsMenu = function () use ($approvalsOpen, $navLink): string {
         . '</div></div>';
 };
 $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments', 'admin-organizations', 'admin-venues'], true);
+$usersOpen = in_array($activeNav, ['admin-users', 'admin-roles'], true); // "Users & Roles" dropdown (Super Admins)
 ?>
 <?php /* Scripts are on: event posters below wait until they scroll near (assets/js/ui.js);
          without scripts style.css shows them straight away. */ ?>
@@ -127,6 +128,7 @@ $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments',
       <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
+      <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
       <div class="side-nav-item has-submenu">
         <button type="button" class="submenu-toggle<?= $categoriesOpen ? ' is-current' : '' ?>" aria-expanded="<?= $categoriesOpen ? 'true' : 'false' ?>" aria-controls="categoriesSubmenu" title="Categories">
           <span class="icon"><?= icon('tag') ?></span>
@@ -140,9 +142,17 @@ $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments',
           <?= $navLink('/admin/admin-taxonomy.php?tab=venues', 'admin-venues', 'location', 'Venues', 16) ?>
         </div>
       </div>
-      <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
-      <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users') ?>
-      <?= $navLink('/admin/users.php?tab=roles', 'admin-roles', 'certificate', 'Roles') ?>
+      <div class="side-nav-item has-submenu">
+        <button type="button" class="submenu-toggle<?= $usersOpen ? ' is-current' : '' ?>" aria-expanded="<?= $usersOpen ? 'true' : 'false' ?>" aria-controls="usersSubmenu" title="Users &amp; Roles">
+          <span class="icon"><?= icon('people') ?></span>
+          <span class="nav-label">Users &amp; Roles</span>
+          <span class="chevron" aria-hidden="true"><?= icon('chevron-down', 14) ?></span>
+        </button>
+        <div class="event-submenu" id="usersSubmenu"<?= $usersOpen ? '' : ' hidden' ?>>
+          <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users', 16) ?>
+          <?= $navLink('/admin/users.php?tab=roles', 'admin-roles', 'certificate', 'Roles', 16) ?>
+        </div>
+      </div>
       <?= $approvalsMenu() ?>
     </nav>
   <?php endif; ?>

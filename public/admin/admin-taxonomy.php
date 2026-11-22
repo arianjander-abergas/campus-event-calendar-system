@@ -201,7 +201,7 @@ $emptyText = $listFilters
     : 'No ' . $noun[1] . ' yet — add your first one.';
 
 /** The search bar above a tab's table (plus the department filter on Organizations). */
-$searchBar = function (string $placeholder) use ($tab, $q, $deptFilter, $kindFilter, $departments, $listFilters, $tabUrl): string {
+$searchBar = function (string $placeholder, string $extra = '') use ($tab, $q, $deptFilter, $kindFilter, $departments, $listFilters, $tabUrl): string {
     $html = '<form method="get" action="admin-taxonomy.php" class="admin-search taxonomy-filter" role="search">'
         . '<input type="hidden" name="tab" value="' . $tab . '">'
         . '<input type="search" name="q" class="admin-input" placeholder="' . htmlspecialchars($placeholder) . '" value="' . htmlspecialchars($q) . '" aria-label="Search">';
@@ -221,20 +221,31 @@ $searchBar = function (string $placeholder) use ($tab, $q, $deptFilter, $kindFil
     }
     $html .= '<button type="submit" class="btn btn-outline">Search</button>';
     if ($listFilters) $html .= '<a href="' . $tabUrl . '" class="btn btn-muted">Clear</a>';
-    return $html . '</form>';
+    return $html . $extra . '</form>'; // $extra: the tab's "+ Add …" button
 };
 
-$cf = $editCategory ?? [];
-$catVal = fn(string $key) => htmlspecialchars((string) ($cf[$key] ?? ''));
-// Departments and organizations are edited in a pop-up; the card on the left only adds.
-// $deptEdit / $orgEdit: the one to open the pop-up with right away (an ?edit_… link,
-// or a save that failed).
+// Adding and editing both happen in pop-ups, so each tab's table uses the whole width.
+// …Edit: the row to open the Edit pop-up with right away (an ?edit_… link, or a save
+// that failed). …New: what was typed into an Add pop-up whose save failed (it opens
+// again with it); null = the Add pop-up starts empty.
+$catEdit = !empty($editCategory['id']) ? $editCategory : null;
+$catNew = $editCategory !== null && !$catEdit ? $editCategory : null;
 $deptEdit = !empty($editDept['id']) ? $editDept : null;
-$df = $deptEdit ? [] : ($editDept ?? []);
-$deptVal = fn(string $key) => htmlspecialchars((string) ($df[$key] ?? ''));
+$deptNew = $editDept !== null && !$deptEdit ? $editDept : null;
 $orgEdit = !empty($editOrg['id']) ? $editOrg : null;
-$of = $orgEdit ? [] : ($editOrg ?? []);
-$orgVal = fn(string $key) => htmlspecialchars((string) ($of[$key] ?? ''));
+$orgNew = $editOrg !== null && !$orgEdit ? $editOrg : null;
+$venueNew = $venueForm ?: null;
+/** Open an Add pop-up on load: a save that needs fixing, or an "&add=1" link. */
+$addRetry = ['cat' => $catNew, 'dept' => $deptNew, 'org' => $orgNew, 'venue' => $venueNew];
+$addOpen = fn(string $kind): bool => $addRetry[$kind] !== null || (get_param('add') === '1' && !$errors);
+/** The "+ Add …" button beside the search (a link to "&add=1" without scripts). */
+$addButton = fn(string $modal, string $label, bool $enabled = true): string => $enabled
+    ? '<a href="' . htmlspecialchars($tabUrl) . '&amp;add=1" class="btn btn-primary taxonomy-add" data-modal-open="' . $modal . '">+ ' . $label . '</a>'
+    : '<button type="button" class="btn btn-primary taxonomy-add" disabled>+ ' . $label . '</button>';
+/** The errors shown inside a pop-up the server opened after a failed save. */
+$modalErrors = fn(bool $show): string => $show
+    ? implode('', array_map(fn($e) => '<p class="acct-modal-error" role="alert">' . htmlspecialchars($e) . '</p>', $errors))
+    : '';
 $editVal = fn(?array $row, string $key) => htmlspecialchars((string) ($row[$key] ?? ''));
 /** What an Edit button fills its pop-up with. */
 $editData = fn(array $fields) => htmlspecialchars(json_encode($fields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -275,26 +286,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
     </div>
 
     <?php if ($tab === 'categories'): ?>
-      <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=categories" class="admin-card" data-autoreset>
-          <input type="hidden" name="action" value="save_category">
-          <?php if (!empty($cf['id'])): ?><input type="hidden" name="id" value="<?= $catVal('id') ?>"><?php endif; ?>
-          <h2 class="admin-card-title"><?= !empty($cf['id']) ? 'Edit Category' : 'Add Category' ?></h2>
-
-          <label class="admin-label" for="cat_name">Name <span class="req">*</span></label>
-          <input type="text" id="cat_name" name="name" class="admin-input" placeholder="e.g. Seminar" value="<?= $catVal('name') ?>" required>
-
-          <label class="admin-label" for="cat_description">Description</label>
-          <textarea id="cat_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $catVal('description') ?></textarea>
-
-          <div class="admin-actions admin-actions-start">
-            <button type="submit" class="btn btn-primary"><?= !empty($cf['id']) ? 'Save Changes' : 'Add Category' ?></button>
-            <?php if (!empty($cf['id'])): ?><a href="<?= htmlspecialchars($back) ?>" class="btn btn-outline">Cancel</a><?php endif; ?>
-          </div>
-        </form>
-
-        <div class="taxonomy-list">
-        <?= $searchBar('Search categories by name or description') ?>
+      <div class="taxonomy-list">
+        <?= $searchBar('Search categories by name or description', $addButton('cat-add-modal', 'Add Category')) ?>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -310,7 +303,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
                   <td><?= htmlspecialchars($c['description'] ?? '—') ?></td>
                   <td><a href="../events.php?category=<?= urlencode($c['id']) ?>"><?= $used ?></a></td>
                   <td class="admin-row-actions">
-                    <a href="<?= htmlspecialchars($back) ?>&amp;edit_category=<?= urlencode($c['id']) ?>" class="btn-sm">Edit</a>
+                    <a href="<?= htmlspecialchars($back) ?>&amp;edit_category=<?= urlencode($c['id']) ?>" class="btn-sm" data-edit-open="cat-modal"
+                       data-edit="<?= $editData(['id' => $c['id'], 'name' => $c['name'], 'description' => $c['description'] ?? '']) ?>">Edit</a>
                     <form method="POST" action="admin-taxonomy.php?tab=categories" data-confirm="Delete the category “<?= htmlspecialchars($c['name']) ?>”?" data-confirm-title="Delete category" data-confirm-ok="Delete" data-confirm-tone="danger">
                       <input type="hidden" name="action" value="delete_category">
                       <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
@@ -325,30 +319,57 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
           <p class="admin-hint admin-table-note">A category can only be deleted when no event uses it.</p>
         </div>
         <?= render_pagination($pager, $pageUrl, ...$noun) ?>
-        </div>
       </div>
-    <?php elseif ($tab === 'departments'): ?>
-      <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=departments" class="admin-card" data-autoreset>
-          <input type="hidden" name="action" value="save_department">
-          <h2 class="admin-card-title">Add Department</h2>
 
-          <label class="admin-label" for="dept_name">Name <span class="req">*</span></label>
-          <input type="text" id="dept_name" name="name" class="admin-input" placeholder="e.g. College of Information Technology" value="<?= $deptVal('name') ?>" required>
+      <!-- Add a category: pop-up, opened by "+ Add Category" -->
+      <dialog class="acct-modal admin-modal" id="cat-add-modal" aria-labelledby="cat-add-modal-title"<?= $addOpen('cat') ? ' data-open' : '' ?>>
+        <form method="POST" action="admin-taxonomy.php?tab=categories" autocomplete="off" data-autoreset>
+          <input type="hidden" name="action" value="save_category">
+          <div class="admin-modal-head">
+            <h2 id="cat-add-modal-title">Add Category</h2>
+            <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
+          </div>
+          <?= $modalErrors($catNew !== null) ?>
 
-          <label class="admin-label" for="dept_code">Short code</label>
-          <input type="text" id="dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. CIT" value="<?= $deptVal('code') ?>">
+          <label class="admin-label" for="cat_name">Name <span class="req">*</span></label>
+          <input type="text" id="cat_name" name="name" class="admin-input" placeholder="e.g. Seminar" value="<?= $editVal($catNew, 'name') ?>" required>
 
-          <label class="admin-label" for="dept_description">Description</label>
-          <textarea id="dept_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $deptVal('description') ?></textarea>
+          <label class="admin-label" for="cat_description">Description</label>
+          <textarea id="cat_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $editVal($catNew, 'description') ?></textarea>
 
-          <div class="admin-actions admin-actions-start">
-            <button type="submit" class="btn btn-primary">Add Department</button>
+          <div class="acct-modal-actions">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Category</button>
           </div>
         </form>
+      </dialog>
 
-        <div class="taxonomy-list">
-        <?= $searchBar('Search departments by name or code') ?>
+      <!-- Edit a category: pop-up, filled by the row's Edit button -->
+      <dialog class="acct-modal admin-modal" id="cat-modal" aria-labelledby="cat-modal-title"<?= $catEdit ? ' data-open' : '' ?>>
+        <form method="POST" action="admin-taxonomy.php?tab=categories" autocomplete="off">
+          <input type="hidden" name="action" value="save_category">
+          <input type="hidden" name="id" value="<?= $editVal($catEdit, 'id') ?>">
+          <div class="admin-modal-head">
+            <h2 id="cat-modal-title">Edit Category</h2>
+            <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
+          </div>
+          <?= $modalErrors($catEdit !== null) ?>
+
+          <label class="admin-label" for="edit_cat_name">Name <span class="req">*</span></label>
+          <input type="text" id="edit_cat_name" name="name" class="admin-input" value="<?= $editVal($catEdit, 'name') ?>" required>
+
+          <label class="admin-label" for="edit_cat_description">Description</label>
+          <textarea id="edit_cat_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $editVal($catEdit, 'description') ?></textarea>
+
+          <div class="acct-modal-actions">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </dialog>
+    <?php elseif ($tab === 'departments'): ?>
+      <div class="taxonomy-list">
+        <?= $searchBar('Search departments by name or code', $addButton('dept-add-modal', 'Add Department')) ?>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -383,8 +404,33 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
           <p class="admin-hint admin-table-note">Each organization belongs to a department, so reports can be filtered by department. A department can only be deleted when no organization belongs to it.</p>
         </div>
         <?= render_pagination($pager, $pageUrl, ...$noun) ?>
-        </div>
       </div>
+
+      <!-- Add a department: pop-up, opened by "+ Add Department" -->
+      <dialog class="acct-modal admin-modal" id="dept-add-modal" aria-labelledby="dept-add-modal-title"<?= $addOpen('dept') ? ' data-open' : '' ?>>
+        <form method="POST" action="admin-taxonomy.php?tab=departments" autocomplete="off" data-autoreset>
+          <input type="hidden" name="action" value="save_department">
+          <div class="admin-modal-head">
+            <h2 id="dept-add-modal-title">Add Department</h2>
+            <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
+          </div>
+          <?= $modalErrors($deptNew !== null) ?>
+
+          <label class="admin-label" for="dept_name">Name <span class="req">*</span></label>
+          <input type="text" id="dept_name" name="name" class="admin-input" placeholder="e.g. College of Information Technology" value="<?= $editVal($deptNew, 'name') ?>" required>
+
+          <label class="admin-label" for="dept_code">Short code</label>
+          <input type="text" id="dept_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. CIT" value="<?= $editVal($deptNew, 'code') ?>">
+
+          <label class="admin-label" for="dept_description">Description</label>
+          <textarea id="dept_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $editVal($deptNew, 'description') ?></textarea>
+
+          <div class="acct-modal-actions">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Department</button>
+          </div>
+        </form>
+      </dialog>
 
       <!-- Edit a department: pop-up, filled by the row's Edit button -->
       <dialog class="acct-modal admin-modal" id="dept-modal" aria-labelledby="dept-modal-title"<?= $deptEdit ? ' data-open' : '' ?>>
@@ -396,7 +442,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
             <h2 id="dept-modal-title">Edit Department</h2>
             <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
           </div>
-          <?php if ($deptEdit): foreach ($errors as $err): ?><p class="acct-modal-error" role="alert"><?= htmlspecialchars($err) ?></p><?php endforeach; endif; ?>
+          <?= $modalErrors($deptEdit !== null) ?>
 
           <label class="admin-label" for="edit_dept_name">Name <span class="req">*</span></label>
           <input type="text" id="edit_dept_name" name="name" class="admin-input" value="<?= $editVal($deptEdit, 'name') ?>" required>
@@ -414,48 +460,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
         </form>
       </dialog>
     <?php elseif ($tab === 'organizations'): ?>
-      <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=organizations" class="admin-card" data-autoreset enctype="multipart/form-data">
-          <input type="hidden" name="action" value="save_organization">
-          <h2 class="admin-card-title">Add Organization</h2>
-
-          <label class="admin-label" for="org_name">Name <span class="req">*</span></label>
-          <input type="text" id="org_name" name="name" class="admin-input" placeholder="<?= $orgCodes ? 'Full name, e.g. University Ambassadors Organization' : 'e.g. JPSSITE' ?>" value="<?= $orgVal('name') ?>" required>
-
-          <?php if ($orgCodes): ?>
-            <label class="admin-label" for="org_code">Short code</label>
-            <input type="text" id="org_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. UAO" value="<?= $orgVal('code') ?>">
-          <?php endif; ?>
-
-          <label class="admin-label" for="org_department">Department</label>
-          <select id="org_department" name="department_id" class="admin-input">
-            <option value="">No department</option>
-            <?php foreach ($departments as $d): ?>
-              <option value="<?= htmlspecialchars($d['id']) ?>" <?= ($of['department_id'] ?? '') === $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars(department_label($d)) ?></option>
-            <?php endforeach; ?>
-          </select>
-          <?php if (empty($departments)): ?>
-            <p class="admin-hint">No departments yet — <a href="admin-taxonomy.php?tab=departments">add one</a> first.</p>
-          <?php endif; ?>
-
-          <label class="admin-label" for="org_description">Description</label>
-          <textarea id="org_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $orgVal('description') ?></textarea>
-
-          <?php if (!empty($of['logo_url'])): ?>
-            <img src="<?= htmlspecialchars(asset_url($of['logo_url'])) ?>" alt="Current logo" class="admin-logo-preview">
-          <?php endif; ?>
-          <label class="admin-label" for="logo_file">Logo image</label>
-          <input type="file" id="logo_file" name="logo_file" class="admin-input" accept="image/jpeg,image/png,image/webp,image/gif">
-          <label class="admin-label" for="logo_url">…or paste a logo URL</label>
-          <input type="text" id="logo_url" name="logo_url" class="admin-input" placeholder="https://…" value="<?= $orgVal('logo_url') ?>">
-
-          <div class="admin-actions admin-actions-start">
-            <button type="submit" class="btn btn-primary">Add Organization</button>
-          </div>
-        </form>
-
-        <div class="taxonomy-list">
-        <?= $searchBar('Search organizations by name, description or department') ?>
+      <div class="taxonomy-list">
+        <?= $searchBar('Search organizations by name, description or department', $addButton('org-add-modal', 'Add Organization')) ?>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -499,8 +505,51 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
           <p class="admin-hint admin-table-note">An organization can only be deleted when no event uses it. Deleting it also removes its officer list.</p>
         </div>
         <?= render_pagination($pager, $pageUrl, ...$noun) ?>
-        </div>
       </div>
+
+      <!-- Add an organization: pop-up, opened by "+ Add Organization" -->
+      <dialog class="acct-modal admin-modal" id="org-add-modal" aria-labelledby="org-add-modal-title"<?= $addOpen('org') ? ' data-open' : '' ?>>
+        <form method="POST" action="admin-taxonomy.php?tab=organizations" enctype="multipart/form-data" autocomplete="off" data-autoreset>
+          <input type="hidden" name="action" value="save_organization">
+          <div class="admin-modal-head">
+            <h2 id="org-add-modal-title">Add Organization</h2>
+            <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
+          </div>
+          <?= $modalErrors($orgNew !== null) ?>
+
+          <label class="admin-label" for="org_name">Name <span class="req">*</span></label>
+          <input type="text" id="org_name" name="name" class="admin-input" placeholder="<?= $orgCodes ? 'Full name, e.g. University Ambassadors Organization' : 'e.g. JPSSITE' ?>" value="<?= $editVal($orgNew, 'name') ?>" required>
+
+          <?php if ($orgCodes): ?>
+            <label class="admin-label" for="org_code">Short code</label>
+            <input type="text" id="org_code" name="code" class="admin-input" maxlength="12" placeholder="e.g. UAO" value="<?= $editVal($orgNew, 'code') ?>">
+          <?php endif; ?>
+
+          <label class="admin-label" for="org_department">Department</label>
+          <select id="org_department" name="department_id" class="admin-input">
+            <option value="">No department</option>
+            <?php foreach ($departments as $d): ?>
+              <option value="<?= htmlspecialchars($d['id']) ?>" <?= ($orgNew['department_id'] ?? '') === $d['id'] ? 'selected' : '' ?>><?= htmlspecialchars(department_label($d)) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <?php if (empty($departments)): ?>
+            <p class="admin-hint">No departments yet — <a href="admin-taxonomy.php?tab=departments">add one</a> first.</p>
+          <?php endif; ?>
+
+          <label class="admin-label" for="org_description">Description</label>
+          <textarea id="org_description" name="description" class="admin-input" rows="3" placeholder="Optional short description"><?= $editVal($orgNew, 'description') ?></textarea>
+
+          <label class="admin-label" for="logo_file">Logo image</label>
+          <input type="file" id="logo_file" name="logo_file" class="admin-input" accept="image/jpeg,image/png,image/webp,image/gif">
+          <label class="admin-label" for="logo_url">…or paste a logo URL</label>
+          <input type="text" id="logo_url" name="logo_url" class="admin-input" placeholder="https://…" value="<?= $editVal($orgNew, 'logo_url') ?>">
+
+          <div class="acct-modal-actions">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Organization</button>
+          </div>
+        </form>
+      </dialog>
 
       <!-- Edit an organization: pop-up, filled by the row's Edit button -->
       <dialog class="acct-modal admin-modal" id="org-modal" aria-labelledby="org-modal-title"<?= $orgEdit ? ' data-open' : '' ?>>
@@ -512,7 +561,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
             <h2 id="org-modal-title">Edit Organization</h2>
             <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
           </div>
-          <?php if ($orgEdit): foreach ($errors as $err): ?><p class="acct-modal-error" role="alert"><?= htmlspecialchars($err) ?></p><?php endforeach; endif; ?>
+          <?= $modalErrors($orgEdit !== null) ?>
 
           <label class="admin-label" for="edit_org_name">Name <span class="req">*</span></label>
           <input type="text" id="edit_org_name" name="name" class="admin-input" value="<?= $editVal($orgEdit, 'name') ?>" required>
@@ -553,29 +602,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
       <?php if (!$venuesReady): ?>
         <div class="flash flash-info" role="status">The venues list needs a database update first: open <a href="database-update.php">Database update</a>, run <strong>20261120120000_venues.sql</strong>, then come back. Until then, the event form lets you type the venue.</div>
       <?php endif; ?>
-      <div class="admin-split">
-        <form method="POST" action="admin-taxonomy.php?tab=venues" class="admin-card" data-autoreset>
-          <input type="hidden" name="action" value="save_venue">
-          <h2 class="admin-card-title">Add Venue</h2>
-
-          <span class="admin-label">Type <span class="req">*</span></span>
-          <div class="admin-radio-row">
-            <?php foreach (VENUE_LISTS as $key => $label): ?>
-              <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($venueForm['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $key === 'online' ? 'Online platform' : 'On-campus place' ?></label>
-            <?php endforeach; ?>
-          </div>
-
-          <label class="admin-label" for="venue_name">Name <span class="req">*</span></label>
-          <input type="text" id="venue_name" name="name" class="admin-input" maxlength="120" placeholder="e.g. AVR 1, Gymnasium, Zoom" value="<?= htmlspecialchars($venueForm['name'] ?? '') ?>" required>
-
-          <div class="admin-actions admin-actions-start">
-            <button type="submit" class="btn btn-primary"<?= $venuesReady ? '' : ' disabled' ?>>Add Venue</button>
-          </div>
-          <p class="admin-hint">These are the choices in the event form's Venue dropdown. Off-campus places aren't listed: they're typed in on the form.</p>
-        </form>
-
-        <div class="taxonomy-list">
-        <?= $searchBar('Search venues by name') ?>
+      <div class="taxonomy-list">
+        <?= $searchBar('Search venues by name', $addButton('venue-add-modal', 'Add Venue', $venuesReady)) ?>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -602,21 +630,61 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
               <?php endforeach; ?>
             </tbody>
           </table>
-          <p class="admin-hint admin-table-note">Deleting a venue only takes it off the dropdown: events already held there keep their venue.</p>
+          <p class="admin-hint admin-table-note">These are the choices in the event form's Venue dropdown. Off-campus places aren't listed: they're typed in on the form. Deleting a venue only takes it off the dropdown: events already held there keep their venue.</p>
         </div>
         <?= render_pagination($pager, $pageUrl, ...$noun) ?>
-        </div>
       </div>
+
+      <?php if ($venuesReady): ?>
+      <!-- Add a venue: pop-up, opened by "+ Add Venue" -->
+      <dialog class="acct-modal admin-modal" id="venue-add-modal" aria-labelledby="venue-add-modal-title"<?= $addOpen('venue') ? ' data-open' : '' ?>>
+        <form method="POST" action="admin-taxonomy.php?tab=venues" autocomplete="off" data-autoreset>
+          <input type="hidden" name="action" value="save_venue">
+          <div class="admin-modal-head">
+            <h2 id="venue-add-modal-title">Add Venue</h2>
+            <button type="button" class="admin-modal-close" data-modal-close aria-label="Close"><?= icon('close', 18) ?></button>
+          </div>
+          <?= $modalErrors($venueNew !== null) ?>
+
+          <span class="admin-label">Type <span class="req">*</span></span>
+          <div class="admin-radio-row">
+            <?php foreach (VENUE_LISTS as $key => $label): ?>
+              <label class="admin-radio"><input type="radio" name="venue_type" value="<?= $key ?>" <?= ($venueNew['venue_type'] ?? 'on_campus') === $key ? 'checked' : '' ?>> <?= $key === 'online' ? 'Online platform' : 'On-campus place' ?></label>
+            <?php endforeach; ?>
+          </div>
+
+          <label class="admin-label" for="venue_name">Name <span class="req">*</span></label>
+          <input type="text" id="venue_name" name="name" class="admin-input" maxlength="120" placeholder="e.g. AVR 1, Gymnasium, Zoom" value="<?= $editVal($venueNew, 'name') ?>" required>
+          <p class="admin-hint">These are the choices in the event form's Venue dropdown. Off-campus places aren't listed: they're typed in on the form.</p>
+
+          <div class="acct-modal-actions">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary">Add Venue</button>
+          </div>
+        </form>
+      </dialog>
+      <?php endif; ?>
     <?php endif; ?>
   </main>
 
 </div>
 
 <script>
-// Departments / Organizations: Edit opens a pop-up filled from the row (no page load).
+// Every tab: "+ Add …" opens the Add pop-up; Edit opens the Edit pop-up filled from the row (no page load).
 (function () {
   function open(modal) { if (typeof modal.showModal === 'function') modal.showModal(); else modal.setAttribute('open', ''); }
   function close(modal) { if (typeof modal.close === 'function') modal.close(); else modal.removeAttribute('open'); }
+
+  document.querySelectorAll('[data-modal-open]').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      var modal = document.getElementById(btn.getAttribute('data-modal-open'));
+      if (!modal) return; // no pop-up: the link reloads the page with it open
+      e.preventDefault();
+      open(modal);
+      var first = modal.querySelector('input[name="name"]');
+      if (first) first.focus();
+    });
+  });
 
   document.querySelectorAll('[data-edit-open]').forEach(function (btn) {
     btn.addEventListener('click', function (e) {
