@@ -21,7 +21,7 @@
   // the rest fade in as they're scrolled to. Siblings in a grid are staggered.
   const REVEAL = [
     ".event-card", ".list-card", ".rail-card", ".org-card", ".about-section",
-    ".feature-strip", ".upcoming-panel", ".cal-card", ".cal-day-panel", ".cal-ongoing-item",
+    ".feature-strip", ".upcoming-panel", ".cal-card",".cal-ongoing-item",
     ".eval-callout", ".admin-panel", ".admin-card", ".kpi", ".admin-table-wrap",
     ".ed-hero", ".ed-program-card", ".ed-schedule", ".trusted-strip",
   ].join(",");

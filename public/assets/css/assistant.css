@@ -30,12 +30,14 @@
   position: relative;
   width: 58px; height: 58px; border: none; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: var(--p-main); color: var(--p-on-main);
-  box-shadow: 0 10px 26px rgba(var(--p-main-shadow-rgb), 0.45), 0 2px 6px rgba(var(--p-darker-rgb), 0.18);
+  /* Burnt orange with a white icon (same as the Back button and category pills),
+     so it stands out on blue backgrounds. */
+  background: var(--orange-strong); color: #fff;
+  box-shadow: 0 10px 26px rgba(var(--p-accent-rgb), 0.45), 0 2px 6px rgba(var(--p-darker-rgb), 0.18);
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.assistant-launcher:hover { background: var(--p-main-hover); transform: translateY(-2px); }
+.assistant-launcher:hover { background: var(--orange-dark); transform: translateY(-2px); }
 .assistant-launcher:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .assistant-icon-close { display: none; }
 .assistant.is-open .assistant-icon-chat { display: none; }
@@ -44,7 +46,7 @@
 .assistant-dot {
   position: absolute; top: 3px; right: 3px;
   width: 13px; height: 13px; border-radius: 50%;
-  background: var(--red); border: 2px solid var(--p-main);
+  background: var(--red); border: 2px solid var(--orange-strong);
 }
 .assistant-dot[hidden] { display: none; }
 

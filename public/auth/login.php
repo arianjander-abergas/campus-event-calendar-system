@@ -25,14 +25,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($email === '' || $password === '') {
         $error = 'Please enter both email and password.';
+    } elseif (($lockedFor = login_locked_for($email)) > 0) {
+        // Too many wrong passwords lately: don't even ask Supabase (config/supabase.php).
+        http_response_code(429);
+        $error = login_locked_message($lockedFor);
     } else {
         $result = supabase_auth_signin($email, $password);
         if ($result['ok']) {
+            login_clear_failures($email);
             header('Location: ' . $redirectTo);
             exit;
         }
         $error = $result['message'];
         if (!empty($result['unconfirmed'])) $unconfirmedEmail = strtolower($email);
+        // Only a wrong password counts (not an unconfirmed email, a blocked account or an outage).
+        if (!empty($result['wrong_password'])) {
+            login_record_failure($email);
+            if (($lockedFor = login_locked_for($email)) > 0) $error = login_locked_message($lockedFor);
+        }
     }
 }
 
