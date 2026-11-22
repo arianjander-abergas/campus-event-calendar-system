@@ -275,7 +275,8 @@ function calendar_time_line(array $ev): string
                 <span class="cal-num"><?= $d->format('j') ?></span>
                 <?php foreach (array_slice($chipEvents, 0, 3) as $ev): ?>
                   <?php $phase = event_phase($ev); ?>
-                  <span class="cal-chip cal-chip-<?= $phase ?>" title="<?= htmlspecialchars($ev['title'] . ' — ' . ['upcoming' => 'Upcoming', 'ongoing' => 'Happening now', 'done' => 'Completed'][$phase]) ?>"><?= htmlspecialchars($ev['title']) ?></span>
+                  <?php $level = event_level($ev); ?>
+                  <span class="cal-chip cal-level-<?= $level ?> cal-chip-<?= $phase ?>" title="<?= htmlspecialchars($ev['title'] . ' — ' . EVENT_LEVELS[$level] . ' · ' . ['upcoming' => 'Upcoming', 'ongoing' => 'Happening now', 'done' => 'Completed'][$phase]) ?>"><i class="cal-phase-dot" aria-hidden="true"></i><?= htmlspecialchars($ev['title']) ?></span>
                 <?php endforeach; ?>
                 <?php if (count($chipEvents) > 3): ?><span class="cal-more">+<?= count($chipEvents) - 3 ?> more</span><?php endif; ?>
                 <?php if ($chipEvents): ?><span class="cal-dot" aria-hidden="true"><?= count($chipEvents) ?></span><?php endif; ?>
@@ -287,9 +288,12 @@ function calendar_time_line(array $ev): string
       </table>
 
       <div class="cal-legend" aria-hidden="true">
-        <span><i class="cal-chip cal-chip-upcoming"></i> Upcoming</span>
-        <span><i class="cal-chip cal-chip-ongoing"></i> Happening now</span>
-        <span><i class="cal-chip cal-chip-done"></i> Completed</span>
+        <?php foreach (EVENT_LEVELS as $key => $label): ?>
+          <span><i class="cal-chip cal-level-<?= $key ?>"></i> <?= $label ?></span>
+        <?php endforeach; ?>
+        <span class="cal-legend-gap"><i class="cal-phase-dot cal-phase-upcoming"></i> Upcoming</span>
+        <span><i class="cal-phase-dot cal-phase-ongoing"></i> Happening now</span>
+        <span><i class="cal-phase-dot cal-phase-done"></i> Completed</span>
       </div>
     </section>
 
@@ -312,6 +316,7 @@ function calendar_time_line(array $ev): string
               <?php endif; ?>
               <span class="cal-event-meta"><?= icon('audience', 13) ?> For <?= htmlspecialchars(event_audience_label($ev)) ?><?= $levels !== '' ? ' · ' . htmlspecialchars($levels) : '' ?></span>
               <span class="cal-event-tags">
+                <span class="cal-tag cal-tag-level cal-level-<?= event_level($ev) ?>"><?= EVENT_LEVELS[event_level($ev)] ?></span>
                 <span class="cal-tag"><?= htmlspecialchars(event_category_label($ev)) ?></span>
                 <?php if (is_required_for_me($ev['id'])): ?><span class="cal-tag cal-tag-required">Required for you</span><?php endif; ?>
                 <?php if (($ev['status'] ?? '') === 'completed'): ?><span class="cal-tag cal-tag-done">Completed</span>

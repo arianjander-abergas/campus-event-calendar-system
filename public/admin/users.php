@@ -84,7 +84,7 @@ if ($tab === 'approvals') {
     $waitingEvents = get_event_approvals_admin('pending');
     $approvalsReady = supabase_last_error() === '';
     $waitingProfiles = $approvalsReady ? get_profile_requests_admin('pending') : [];
-    $_SESSION['approvals_waiting'] = ['count' => count($waitingEvents) + count($waitingProfiles), 'at' => time()];
+    $_SESSION['approvals_waiting'] = ['events' => count($waitingEvents), 'profiles' => count($waitingProfiles), 'at' => time()];
     $departments = get_departments();
     $organizations = get_organizations();
     $rows = $decision === 'pending'
@@ -113,7 +113,7 @@ $roleSummaries = [
     'admin' => ['Everything, for every organization', 'Reports, users, roles, categories, school calendar', 'Approves Admins\' events and profile edits'],
 ];
 
-$activeNav = ['approvals' => 'admin-approvals', 'roles' => 'admin-roles', 'accounts' => 'admin-users'][$tab];
+$activeNav = ['approvals' => 'admin-approvals-' . $kind, 'roles' => 'admin-roles', 'accounts' => 'admin-users'][$tab];
 $pageTitle = ['approvals' => 'Approvals', 'roles' => 'Roles', 'accounts' => 'Users'][$tab];
 $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], [$pageTitle, null]];
 ?>

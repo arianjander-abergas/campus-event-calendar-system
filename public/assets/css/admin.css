@@ -13,7 +13,7 @@
   gap: 20px;
   align-items: start;
 }
-.admin-side-cards { display: flex; flex-direction: column; gap: 20px; }
+/* Editing an event: the "More for this event" links card sits beside the form. */
 /* Grid children may shrink below their content, so wide tables scroll inside their card. */
 .admin-form > *, .admin-split > *, .admin-grid-2 > *, .admin-grid-halves > * { min-width: 0; }
 
@@ -765,9 +765,11 @@ td.admin-row-actions > form { gap: 6px; }
 .form-fold[open] > summary .form-fold-chevron { transform: rotate(180deg); }
 .form-section.form-fold + .form-section.form-fold { margin-top: 14px; padding-top: 14px; }
 .admin-card-wide { grid-column: 1 / -1; }
+/* Section 8 (Event Poster) spans the form's width: keep the current poster a sensible size. */
+.form-section .admin-image-preview { max-width: 360px; }
 @media (prefers-reduced-motion: reduce) { .form-fold-chevron, .form-fold > summary .form-section-head { transition: none; } }
 
-/* ---- 9. Program Flow: one row per part, in running order ---- */
+/* ---- 6. Program Flow: one row per part, in running order ---- */
 .pf-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .pf-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); }
 .pf-num {
@@ -785,3 +787,23 @@ td.admin-row-actions > form { gap: 6px; }
   .pf-fields { grid-template-columns: 1fr; flex-basis: calc(100% - 40px); }
   .pf-tools { margin-left: 36px; }
 }
+
+/* ---- Manage Events: Event Level choice (2. Organizers) — each shows its calendar colour ---- */
+.level-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 4px; }
+.level-option {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--card-bg);
+}
+.level-option input { margin-top: 3px; accent-color: var(--navy); }
+.level-option strong { display: block; font-size: 0.86rem; }
+.level-option small { display: block; font-size: 0.74rem; color: var(--text-muted); line-height: 1.35; }
+.level-swatch { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; margin-top: 2px; border: 1.5px solid; }
+.level-institutional .level-swatch { background: var(--level-institutional); border-color: var(--level-institutional-edge); }
+.level-departmental .level-swatch { background: var(--level-departmental); border-color: var(--level-departmental-edge); }
+.level-organizational .level-swatch { background: var(--level-organizational); border-color: var(--level-organizational-edge); }
+.level-institutional:has(input:checked) { border-color: var(--level-institutional-edge); background: var(--level-institutional); color: var(--level-institutional-text); }
+.level-departmental:has(input:checked) { border-color: var(--level-departmental-edge); background: var(--level-departmental); color: var(--level-departmental-text); }
+.level-organizational:has(input:checked) { border-color: var(--level-organizational-edge); background: var(--level-organizational); color: var(--level-organizational-text); }
+.level-option:has(input:checked) small { color: inherit; opacity: 0.8; }
+.level-option:has(input:focus-visible) { outline: 2px solid var(--blue-accent); outline-offset: 2px; }

@@ -94,6 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (count($yearLevels) === count(YEAR_LEVELS)) $yearLevels = [];
     // Required attendance: who must attend (among the people it's open to).
     $requiredFor = isset(REQUIRED_FOR[post_param('required_for')]) ? post_param('required_for') : '';
+    // Event level: institutional / departmental / organizational (its colour on the Event Calendar).
+    $eventLevel = isset(EVENT_LEVELS[post_param('event_level')]) ? post_param('event_level') : 'organizational';
 
     // Organizations: one, or two or more for a multi-organization event. The
     // main organizer (events.organization_id) runs the event — a moderator's
@@ -118,6 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'category_id' => post_param('category_id'),
         'category_other' => $categoryOther !== '' ? $categoryOther : null,
         'organization_id' => $leadOrg,
+        'event_level' => $eventLevel,
         'event_type' => isset(EVENT_TYPES[$eventType]) ? $eventType : 'other',
         'audience' => $audience,
         'audiences' => $audiences ?: null,
@@ -144,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'status' => $intent === 'publish' ? 'published' : 'draft',
     ];
 
-    // 9. Program Flow: the parts typed, in order (completely empty rows are skipped).
+    // 6. Program Flow: the parts typed, in order (completely empty rows are skipped).
     $pf = (array) ($_POST['programs'] ?? []);
     $pfText = fn(string $col, $i): string => is_string($pf[$col][$i] ?? null) ? trim($pf[$col][$i]) : '';
     $programs = [];
@@ -165,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     // Same for the "Other" event type and required attendance.
     if (!$fields['category_other'] && empty($previous['category_other'])) unset($fields['category_other']);
     if (!$fields['required_for'] && empty($previous['required_for'])) unset($fields['required_for']);
+    if ($eventLevel === 'organizational' && empty($previous['event_level'])) unset($fields['event_level']);
 
     // Errors are keyed by the field they belong to, so the form can highlight
     // that field and show the reason under it (the first problem per field wins).
@@ -258,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
 
             // What the database couldn't store yet (a database update not run): the event
             // is saved without it, and the message says what's missing.
-            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience', 'required_for' => 'the required attendance'];
+            $labels = ['category_other' => 'the type of event' . ($categoryOther !== '' ? ' ("' . $categoryOther . '")' : ''), 'year_levels' => 'the year levels', 'audiences' => 'Outsiders in the audience', 'required_for' => 'the required attendance', 'event_level' => 'the event level'];
             // Without the audiences column, Students / Faculty still go in the older audience field; only Outsiders is lost.
             $dropped = array_filter($result['dropped'] ?? [], fn($c) => $c !== 'audiences' || in_array('outsiders', $audiences, true));
             $notSaved = array_map(fn($c) => $labels[$c] ?? $c, $dropped);
@@ -266,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
             if (($partnerOrgs || $previous) && !set_event_partner_orgs($eventId, $partnerOrgs) && $partnerOrgs) {
                 $notSaved[] = 'the other organizations';
             }
-            // The program flow (section 9): kept, added, reordered and removed parts.
+            // The program flow (section 6): kept, added, reordered and removed parts.
             if (($programs || $previous) && !save_event_programs($eventId, $programs)) {
                 $notSaved[] = 'the program flow';
             }
@@ -450,7 +454,7 @@ $breadcrumbs[] = [$pageTitle, null];
       <input type="hidden" name="action" value="save">
       <?php if ($editId): ?><input type="hidden" name="id" value="<?= htmlspecialchars($editId) ?>"><?php endif; ?>
 
-      <div class="admin-card">
+      <div class="admin-card<?= $editId ? '' : ' admin-card-wide' ?>">
         <details class="form-section form-fold"<?= $openIf('title', 'category_id', 'category_other', 'description') ?>>
           <summary><h2 class="form-section-head" id="sec-basic"><span class="form-section-num">1</span><span>Basic Information<small>Title, type of event and description</small></span><?= $fold ?></h2></summary>
           <label class="admin-label" for="title">Event Title <span class="req">*</span></label>
@@ -548,6 +552,19 @@ $breadcrumbs[] = [$pageTitle, null];
                 : 'Your organization runs the event. Pick "Multi-organization event" to add the organizations you\'re holding it with — they\'re shown as co-organizers.' ?>
             </p><?= $why('organizations') ?>
           </div>
+
+          <span class="admin-label" id="level-label">Event Level <span class="req">*</span></span>
+          <div class="level-options" role="radiogroup" aria-labelledby="level-label">
+            <?php $formLevel = event_level($f);
+            foreach (EVENT_LEVELS as $key => $label): ?>
+              <label class="level-option level-<?= $key ?>">
+                <input type="radio" name="event_level" value="<?= $key ?>" <?= $formLevel === $key ? 'checked' : '' ?>>
+                <span class="level-swatch" aria-hidden="true"></span>
+                <span><strong><?= $label ?></strong><small><?= htmlspecialchars(EVENT_LEVEL_HINTS[$key]) ?></small></span>
+              </label>
+            <?php endforeach; ?>
+          </div>
+          <p class="admin-hint">The event's colour on the Event Calendar: light blue for institutional, lavender for departmental, light yellow for organizational.</p>
         </details>
 
         <details class="form-section form-fold"<?= $openIf('audiences') ?>>
@@ -662,20 +679,46 @@ $breadcrumbs[] = [$pageTitle, null];
           <input type="text" id="address" name="address" class="admin-input" placeholder="Enter full address" value="<?= $val('address') ?>">
         </details>
 
+        <?php /* 6. Program Flow: the event's parts in running order (event_programs),
+                 saved with the event. Rows are added / moved / removed by the script below. */
+        $programRows = $f['programs'] ?? [];
+        $programRow = fn(array $p): string =>
+            '<li class="pf-row" data-pf-row>'
+            . '<input type="hidden" name="programs[id][]" value="' . htmlspecialchars((string) ($p['id'] ?? '')) . '">'
+            . '<span class="pf-num" aria-hidden="true"></span>'
+            . '<div class="pf-fields">'
+            . '<input type="text" name="programs[title][]" class="admin-input" maxlength="200" placeholder="What happens, e.g. Opening Prayer" aria-label="Part of the program" value="' . htmlspecialchars((string) ($p['title'] ?? '')) . '">'
+            . '<input type="text" name="programs[speaker][]" class="admin-input" maxlength="120" placeholder="Speaker / in charge (optional)" aria-label="Speaker or person in charge" value="' . htmlspecialchars((string) ($p['speaker'] ?? '')) . '">'
+            . '<input type="text" name="programs[description][]" class="admin-input pf-notes" maxlength="500" placeholder="Notes, e.g. time or room (optional)" aria-label="Notes" value="' . htmlspecialchars((string) ($p['description'] ?? '')) . '">'
+            . '</div>'
+            . '<div class="pf-tools">'
+            . '<button type="button" class="btn-sm" data-pf-up aria-label="Move up" title="Move up">↑</button>'
+            . '<button type="button" class="btn-sm" data-pf-down aria-label="Move down" title="Move down">↓</button>'
+            . '<button type="button" class="btn-sm btn-sm-danger" data-pf-remove aria-label="Remove" title="Remove">✕</button>'
+            . '</div></li>';
+        ?>
+        <details class="form-section form-fold"<?= $openIf('programs') ?>>
+          <summary><h2 class="form-section-head" id="sec-program"><span class="form-section-num">6</span><span>Program Flow<small>The parts of the event in order — shown on the event page</small></span><?= $fold ?></h2></summary>
+          <ol class="pf-list" data-pf-list>
+            <?php foreach ($programRows as $p) echo $programRow($p); ?>
+          </ol>
+          <p class="admin-hint" data-pf-empty<?= $programRows ? ' hidden' : '' ?>>No program flow yet. Add the parts of the event in the order they happen.</p>
+          <?= $why('programs') ?>
+          <button type="button" class="btn btn-outline pf-add" data-pf-add>+ Add a part</button>
+          <template data-pf-template><?= $programRow([]) ?></template>
+        </details>
+
         <details class="form-section form-fold">
-          <summary><h2 class="form-section-head" id="sec-options"><span class="form-section-num">6</span><span>Publishing Options<small>Registration and notifications</small></span><?= $fold ?></h2></summary>
+          <summary><h2 class="form-section-head" id="sec-options"><span class="form-section-num">7</span><span>Publishing Options<small>Registration and notifications</small></span><?= $fold ?></h2></summary>
           <div class="admin-checkbox-row">
             <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
             <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
           </div>
           <p class="admin-hint">With "Send Notification" on: publishing a new event notifies everyone it's open to (the audience and year levels above); saving changes to a published event notifies the people registered for it and the required attendees. Notifications show in the site and are emailed too<?= mail_enabled() ? '' : ' (once email is set up — a Super Admin can check Database update › Site setup)' ?>.</p>
         </details>
-      </div>
 
-      <div class="admin-side-cards">
-        <div class="admin-card">
-          <details class="form-fold"<?= $openIf('poster_file') ?>>
-          <summary><h2 class="form-section-head" id="sec-poster"><span class="form-section-num">7</span><span>Event Poster<small>Shown on the event page and the event cards</small></span><?= $fold ?></h2></summary>
+        <details class="form-section form-fold"<?= $openIf('poster_file') ?>>
+          <summary><h2 class="form-section-head" id="sec-poster"><span class="form-section-num">8</span><span>Event Poster<small>Shown on the event page and the event cards</small></span><?= $fold ?></h2></summary>
           <?php if (!empty($f['poster_url'])): ?>
             <img src="<?= htmlspecialchars(asset_url($f['poster_url'])) ?>" alt="Current poster" class="admin-image-preview">
           <?php endif; ?>
@@ -684,12 +727,10 @@ $breadcrumbs[] = [$pageTitle, null];
           <p class="admin-hint">JPG, PNG, WEBP or GIF, up to 5 MB. Replaces the current poster.</p>
           <label class="admin-label" for="poster_url">…or paste an image URL</label>
           <input type="text" id="poster_url" name="poster_url" class="admin-input" placeholder="https://…" value="<?= $val('poster_url') ?>">
-          </details>
-        </div>
+        </details>
 
-        <div class="admin-card">
-          <details class="form-fold"<?= $openIf('registration_limit', 'registration_deadline', 'contact_email') ?>>
-          <summary><h2 class="form-section-head" id="sec-contact"><span class="form-section-num">8</span><span>Registration &amp; Contact<small>Limits, deadline and who to ask</small></span><?= $fold ?></h2></summary>
+        <details class="form-section form-fold"<?= $openIf('registration_limit', 'registration_deadline', 'contact_email') ?>>
+          <summary><h2 class="form-section-head" id="sec-contact"><span class="form-section-num">9</span><span>Registration &amp; Contact<small>Limits, deadline and who to ask</small></span><?= $fold ?></h2></summary>
           <label class="admin-label" for="registration_limit">Registration Limit</label>
           <input type="number" min="1" id="registration_limit" name="registration_limit" class="admin-input<?= $bad('registration_limit') ?>" placeholder="Leave empty for no limit" value="<?= $val('registration_limit') ?>"><?= $why('registration_limit') ?>
 
@@ -701,50 +742,18 @@ $breadcrumbs[] = [$pageTitle, null];
 
           <label class="admin-label" for="contact_number">Contact Number</label>
           <input type="text" id="contact_number" name="contact_number" class="admin-input" placeholder="Enter no." value="<?= $val('contact_number') ?>">
-          </details>
-        </div>
-
-        <?php if ($editId): ?>
-          <div class="admin-card admin-card-links">
-            <h2 class="admin-card-title">More for this event</h2>
-            <a href="event-registrations.php?event=<?= urlencode($editId) ?>"><?= icon('people', 16) ?> See registrations &amp; attendance</a>
-            <a href="attendance-print.php?event=<?= urlencode($editId) ?>"><?= icon('print', 16) ?> Print the attendance sheet</a>
-            <a href="event-evaluations.php?event=<?= urlencode($editId) ?>"><?= icon('evaluation', 16) ?> See evaluation results</a>
-            <a href="../event-details.php?id=<?= urlencode($editId) ?>"><?= icon('view', 16) ?> View the event page</a>
-          </div>
-        <?php endif; ?>
-      </div>
-
-      <?php /* 9. Program Flow: the event's parts in running order (event_programs),
-               saved with the event. Rows are added / moved / removed by the script below. */
-      $programRows = $f['programs'] ?? [];
-      $programRow = fn(array $p): string =>
-          '<li class="pf-row" data-pf-row>'
-          . '<input type="hidden" name="programs[id][]" value="' . htmlspecialchars((string) ($p['id'] ?? '')) . '">'
-          . '<span class="pf-num" aria-hidden="true"></span>'
-          . '<div class="pf-fields">'
-          . '<input type="text" name="programs[title][]" class="admin-input" maxlength="200" placeholder="What happens, e.g. Opening Prayer" aria-label="Part of the program" value="' . htmlspecialchars((string) ($p['title'] ?? '')) . '">'
-          . '<input type="text" name="programs[speaker][]" class="admin-input" maxlength="120" placeholder="Speaker / in charge (optional)" aria-label="Speaker or person in charge" value="' . htmlspecialchars((string) ($p['speaker'] ?? '')) . '">'
-          . '<input type="text" name="programs[description][]" class="admin-input pf-notes" maxlength="500" placeholder="Notes, e.g. time or room (optional)" aria-label="Notes" value="' . htmlspecialchars((string) ($p['description'] ?? '')) . '">'
-          . '</div>'
-          . '<div class="pf-tools">'
-          . '<button type="button" class="btn-sm" data-pf-up aria-label="Move up" title="Move up">↑</button>'
-          . '<button type="button" class="btn-sm" data-pf-down aria-label="Move down" title="Move down">↓</button>'
-          . '<button type="button" class="btn-sm btn-sm-danger" data-pf-remove aria-label="Remove" title="Remove">✕</button>'
-          . '</div></li>';
-      ?>
-      <div class="admin-card admin-card-wide">
-        <details class="form-fold"<?= $openIf('programs') ?>>
-          <summary><h2 class="form-section-head" id="sec-program"><span class="form-section-num">9</span><span>Program Flow<small>The parts of the event in order — shown on the event page</small></span><?= $fold ?></h2></summary>
-          <ol class="pf-list" data-pf-list>
-            <?php foreach ($programRows as $p) echo $programRow($p); ?>
-          </ol>
-          <p class="admin-hint" data-pf-empty<?= $programRows ? ' hidden' : '' ?>>No program flow yet. Add the parts of the event in the order they happen.</p>
-          <?= $why('programs') ?>
-          <button type="button" class="btn btn-outline pf-add" data-pf-add>+ Add a part</button>
-          <template data-pf-template><?= $programRow([]) ?></template>
         </details>
       </div>
+
+      <?php if ($editId): ?>
+        <div class="admin-card admin-card-links">
+          <h2 class="admin-card-title">More for this event</h2>
+          <a href="event-registrations.php?event=<?= urlencode($editId) ?>"><?= icon('people', 16) ?> See registrations &amp; attendance</a>
+          <a href="attendance-print.php?event=<?= urlencode($editId) ?>"><?= icon('print', 16) ?> Print the attendance sheet</a>
+          <a href="event-evaluations.php?event=<?= urlencode($editId) ?>"><?= icon('evaluation', 16) ?> See evaluation results</a>
+          <a href="../event-details.php?id=<?= urlencode($editId) ?>"><?= icon('view', 16) ?> View the event page</a>
+        </div>
+      <?php endif; ?>
 
       <div class="admin-actions">
         <a href="<?= $editId ? $listUrl : 'event-organizer.php' ?>" class="btn btn-outline">Cancel</a>
@@ -1093,7 +1102,7 @@ $breadcrumbs[] = [$pageTitle, null];
     linked.scrollIntoView({ block: 'start' });
   }
 
-  // ---- 9. Program Flow: add, move and remove parts ----
+  // ---- 6. Program Flow: add, move and remove parts ----
   var pfList = form.querySelector('[data-pf-list]');
   var pfTemplate = form.querySelector('[data-pf-template]');
   var pfEmpty = form.querySelector('[data-pf-empty]');

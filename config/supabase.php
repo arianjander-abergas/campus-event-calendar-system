@@ -648,6 +648,7 @@ const DB_UPDATES = [
     '20261105120000_private_profiles.sql' => ['Private profiles: only the person and Admins can read an account\'s details (names, phone numbers…)', 'rpc', 'profiles_are_private', []],
     '20261106120000_registration_notices.sql' => ['"You\'re registered" notices in the bell and by email', 'rpc', 'my_notification_emailed', ['p_id' => '00000000-0000-0000-0000-000000000000']],
     '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
+    '20261109120000_event_levels.sql' => ['Event levels (Institutional / Departmental / Organizational) and their colours on the Event Calendar', 'events', 'select=event_level&limit=1'],
     '20261112120000_security_hardening.sql' => ['Security: registrations start as "registered" (only event admins mark attendance), and image uploads are limited to 5 MB', 'rpc', 'registrations_are_guarded', []],
     '20261120120000_venues.sql' => ['The venues list (On-campus places and Online platforms) for the event form\'s Venue dropdown', 'venues', 'select=id&limit=1'],
 ];
@@ -786,6 +787,28 @@ const VENUE_TYPES = ['on_campus' => 'On-campus', 'off_campus' => 'Off-campus', '
 
 /** The venue types with a list to choose from (the venues table); off-campus places are typed in on the event form. */
 const VENUE_LISTS = ['on_campus' => 'On-campus', 'online' => 'Online'];
+
+/**
+ * How wide an event is (events.event_level): the whole university, one
+ * department, or one organization. Each has its colour on the Event Calendar.
+ */
+const EVENT_LEVELS = [
+    'institutional' => 'Institutional',
+    'departmental' => 'Departmental',
+    'organizational' => 'Organizational',
+];
+const EVENT_LEVEL_HINTS = [
+    'institutional' => 'University-wide, for the whole LCUP community',
+    'departmental' => 'For one department (e.g. CITE)',
+    'organizational' => 'Held by an organization for its members and guests',
+];
+
+/** An event's level; events saved before levels existed count as organizational. */
+function event_level(array $ev): string
+{
+    $level = (string) ($ev['event_level'] ?? '');
+    return isset(EVENT_LEVELS[$level]) ? $level : 'organizational';
+}
 
 /** Semesters of a school year (academic_terms.semester). */
 const SEMESTERS = ['1st' => '1st Semester', '2nd' => '2nd Semester', 'summer' => 'Summer'];
@@ -2030,15 +2053,28 @@ function protected_account_ids(): array
  */
 function approvals_waiting_count(bool $fresh = false): int
 {
+    return array_sum(approvals_waiting_counts($fresh));
+}
+
+/**
+ * What's waiting, per list: ['events' => n, 'profiles' => n] (the sidebar's
+ * Approvals ▾ dropdown shows each). Cached for a minute per session.
+ */
+function approvals_waiting_counts(bool $fresh = false): array
+{
     // Super Admins: everything waiting. Admins: their own organization's events and their own edits (RLS).
-    if (!is_staff_user()) return 0;
+    if (!is_staff_user()) return ['events' => 0, 'profiles' => 0];
     $cache = $_SESSION['approvals_waiting'] ?? null;
-    if (!$fresh && is_array($cache) && $cache['at'] > time() - 60) return $cache['count'];
-    $count = count(supabase_user_request('events', 'select=id&approval_status=eq.pending&status=eq.draft&limit=1000'))
-        + count(supabase_user_request('profile_change_requests', 'select=id&status=eq.pending&limit=1000'));
+    if (!$fresh && is_array($cache) && isset($cache['events'], $cache['profiles']) && $cache['at'] > time() - 60) {
+        return ['events' => $cache['events'], 'profiles' => $cache['profiles']];
+    }
+    $counts = [
+        'events' => count(supabase_user_request('events', 'select=id&approval_status=eq.pending&status=eq.draft&limit=1000')),
+        'profiles' => count(supabase_user_request('profile_change_requests', 'select=id&status=eq.pending&limit=1000')),
+    ];
     $GLOBALS['supabase_last_error'] = '';
-    $_SESSION['approvals_waiting'] = ['count' => $count, 'at' => time()];
-    return $count;
+    $_SESSION['approvals_waiting'] = $counts + ['at' => time()];
+    return $counts;
 }
 
 /** Every account with its details, for the admin Users page. */
@@ -3285,7 +3321,7 @@ function get_organizations(): array
     return supabase_request('organizations', 'select=*&order=name.asc');
 }
 
-// ---- Event programs (the Program Flow) — event form section 9, admin/event-programs.php ---------------
+// ---- Event programs (the Program Flow) — event form section 6, admin/event-programs.php ---------------
 
 function create_program_admin(string $eventId, array $fields): array
 {
@@ -3315,7 +3351,7 @@ function delete_program_admin(string $programId): array
 }
 
 /**
- * Save an event's whole program flow from the event form (section 9), in
+ * Save an event's whole program flow from the event form (section 6), in
  * the order given: parts that are kept are updated (only if they changed),
  * new ones added, and the ones no longer in the list deleted.
  * @param array<array{id:string,title:string,speaker:string,description:string}> $rows

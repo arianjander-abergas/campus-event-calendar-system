@@ -125,12 +125,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Chip colour = where the event is now (event_phase()): orange = upcoming,
-   green = happening now, grey = completed / ended. White text stays readable
-   (4.5:1 or more) on all three, in every theme. */
-.cal-chip-upcoming { background: #c2410c; }
-.cal-chip-ongoing { background: #15803d; }
-.cal-chip-done { background: #6b7280; }
+/* Chip colour = the event's level (event_level()): light blue = institutional,
+   lavender = departmental, light yellow = organizational (colours in style.css).
+   The dot in front = where the event is now (event_phase()): orange = upcoming,
+   green = happening now, grey = completed — and completed chips are faded. */
+.cal-chip { border: 1px solid transparent; }
+.cal-level-institutional { background: var(--level-institutional); border-color: var(--level-institutional-edge); color: var(--level-institutional-text); }
+.cal-level-departmental { background: var(--level-departmental); border-color: var(--level-departmental-edge); color: var(--level-departmental-text); }
+.cal-level-organizational { background: var(--level-organizational); border-color: var(--level-organizational-edge); color: var(--level-organizational-text); }
+.cal-chip.cal-chip-done { opacity: 0.6; }
+.cal-phase-dot {
+  display: inline-block; width: 7px; height: 7px; margin-right: 5px;
+  border-radius: 50%; vertical-align: 1px;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+.cal-chip-upcoming .cal-phase-dot, .cal-phase-dot.cal-phase-upcoming { background: #c2410c; }
+.cal-chip-ongoing .cal-phase-dot, .cal-phase-dot.cal-phase-ongoing { background: #15803d; }
+.cal-chip-done .cal-phase-dot, .cal-phase-dot.cal-phase-done { background: #6b7280; }
 .cal-more { font-size: 0.75rem; font-weight: 700; color: var(--blue-accent); }
 /* Small screens show a count bubble instead of the titles. */
 .cal-dot { display: none; }
@@ -138,6 +149,12 @@
 .cal-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 4px 0; font-size: 0.75rem; color: var(--text-muted); }
 .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .cal-legend .cal-chip { width: 14px; height: 10px; padding: 0; }
+.cal-legend .cal-phase-dot { margin-right: 0; box-shadow: none; }
+.cal-legend .cal-legend-gap { margin-left: 10px; }
+/* The level tag on each event in the day list. */
+body .cal-event-tags .cal-tag.cal-level-institutional { background: var(--level-institutional); color: var(--level-institutional-text); border: 1px solid var(--level-institutional-edge); }
+body .cal-event-tags .cal-tag.cal-level-departmental { background: var(--level-departmental); color: var(--level-departmental-text); border: 1px solid var(--level-departmental-edge); }
+body .cal-event-tags .cal-tag.cal-level-organizational { background: var(--level-organizational); color: var(--level-organizational-text); border: 1px solid var(--level-organizational-edge); }
 
 /* ---- Events on the selected date ---- */
 .cal-day-panel {

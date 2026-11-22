@@ -7,7 +7,8 @@
  *   'manage-create' | 'manage-update' | 'import' | 'my-officers'  (moderators and admins)
  *   'admin-dashboard' | 'admin-reports' | 'admin-evaluation' | 'admin-calendar'
  *   'admin-categories' | 'admin-departments' | 'admin-organizations' | 'admin-venues'  (Categories ▾)
- *   'admin-users' | 'admin-roles' | 'admin-approvals'  (admins)
+ *   'admin-users' | 'admin-roles'  (admins)
+ *   'admin-approvals-events' | 'admin-approvals-profiles'  (Approvals ▾, staff)
  * Logged-out visitors see the public links (Log in / Sign up are in the top
  * bar; on phones they're also at the bottom of this menu).
  *
@@ -39,6 +40,21 @@ $manageMenu = fn(): string =>
     . $navLink('/admin/event-organizer.php', 'manage-create', 'register', 'Create Event', 16)
     . $navLink('/admin/event-organizer.php?view=update', 'manage-update', 'list', 'Update Events', 16)
     . '</div></div>';
+$approvalsOpen = in_array($activeNav, ['admin-approvals-events', 'admin-approvals-profiles'], true);
+/** "Approvals" dropdown (staff): Event approvals, Profile edits — each with what's waiting, and the total on the button. */
+$approvalsMenu = function () use ($approvalsOpen, $navLink): string {
+    $waiting = approvals_waiting_counts();
+    $total = array_sum($waiting);
+    return '<div class="side-nav-item has-submenu">'
+        . '<button type="button" class="submenu-toggle' . ($approvalsOpen ? ' is-current' : '') . '" aria-expanded="' . ($approvalsOpen ? 'true' : 'false') . '" aria-controls="approvalsSubmenu" title="Approvals' . ($total ? ' (' . $total . ' waiting)' : '') . '">'
+        . '<span class="icon">' . icon('check') . '</span><span class="nav-label">Approvals</span>'
+        . ($total ? '<span class="nav-count" aria-label="' . $total . ' waiting">' . ($total > 99 ? '99+' : $total) . '</span>' : '')
+        . '<span class="chevron" aria-hidden="true">' . icon('chevron-down', 14) . '</span></button>'
+        . '<div class="event-submenu" id="approvalsSubmenu"' . ($approvalsOpen ? '' : ' hidden') . '>'
+        . $navLink('/admin/users.php?tab=approvals&amp;kind=events', 'admin-approvals-events', 'ticket', 'Event approvals', 16, $waiting['events'])
+        . $navLink('/admin/users.php?tab=approvals&amp;kind=profiles', 'admin-approvals-profiles', 'profile', 'Profile edits', 16, $waiting['profiles'])
+        . '</div></div>';
+};
 $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments', 'admin-organizations', 'admin-venues'], true);
 ?>
 <?php /* Scripts are on: event posters below wait until they scroll near (assets/js/ui.js);
@@ -99,7 +115,7 @@ $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments',
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?php if (!empty($navUser['organization_id'])): ?>
         <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>
-        <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
+        <?= $approvalsMenu() ?>
         <?= $navLink('/admin/evaluation-form.php', 'admin-evaluation', 'evaluation', 'Evaluation Form') ?>
       <?php endif; ?>
     </nav>
@@ -127,7 +143,7 @@ $categoriesOpen = in_array($activeNav, ['admin-categories', 'admin-departments',
       <?= $navLink('/admin/school-calendar.php', 'admin-calendar', 'schedule', 'School Calendar') ?>
       <?= $navLink('/admin/users.php', 'admin-users', 'people', 'Users') ?>
       <?= $navLink('/admin/users.php?tab=roles', 'admin-roles', 'certificate', 'Roles') ?>
-      <?= $navLink('/admin/users.php?tab=approvals', 'admin-approvals', 'check', 'Approvals', 18, approvals_waiting_count()) ?>
+      <?= $approvalsMenu() ?>
     </nav>
   <?php endif; ?>
 

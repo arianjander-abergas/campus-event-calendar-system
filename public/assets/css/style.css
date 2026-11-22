@@ -54,6 +54,12 @@
 /* The site's own names for the colours, now pointing at the palette roles.
    (--red is the separate "danger / cancelled" red.) */
 :root {
+  /* Event levels (events.event_level) on the Event Calendar and the event form:
+     light fill, matching edge, dark text (7:1 or more on its fill). The same
+     in every theme, so the colours always mean the same thing. */
+  --level-institutional: #dbeafe;  --level-institutional-edge: #60a5fa;  --level-institutional-text: #1e3a8a;
+  --level-departmental: #ede9fe;   --level-departmental-edge: #a78bfa;   --level-departmental-text: #4c1d95;
+  --level-organizational: #fef3c7; --level-organizational-edge: #f59e0b; --level-organizational-text: #78350f;
   --navy: var(--p-dark);              /* dark surfaces, headings */
   --navy-dark: var(--p-darker);
   --orange: var(--p-accent);          /* buttons, active links, selected days */
@@ -821,6 +827,9 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 .submenu-toggle.is-current, .submenu-toggle[aria-expanded="true"] { background: rgba(255,255,255,0.1); color: #fff; }
 .submenu-toggle .chevron { margin-left: auto; transition: transform 0.18s ease; flex-shrink: 0; }
 .submenu-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+/* A dropdown with a count (Approvals ▾): the count on the right, then the chevron. */
+.side-nav .submenu-toggle { position: relative; }
+.submenu-toggle .nav-count + .chevron { margin-left: 8px; }
 
 .event-submenu {
   display: flex;
