@@ -650,6 +650,7 @@ const DB_UPDATES = [
     '20261108120000_organization_codes.sql' => ['Short codes for organizations, shown like the departments\' ("Full Name (CODE)")','organizations', 'select=code&limit=1'],
     '20261112120000_security_hardening.sql' => ['Security: registrations start as "registered" (only event admins mark attendance), and image uploads are limited to 5 MB', 'rpc', 'registrations_are_guarded', []],
     '20261120120000_venues.sql' => ['The venues list (On-campus places and Online platforms) for the event form\'s Venue dropdown', 'venues', 'select=id&limit=1'],
+    '20261122120000_approval_notices.sql' => ['"Your event was approved / not approved" notices to the event\'s author, in the bell and by email', 'rpc', 'approval_notices_ready', []],
 ];
 
 /**
@@ -1065,6 +1066,131 @@ function auth_error_message(array $result, string $fallback): string
 // made straight to Supabase. Older, shorter passwords still log in.
 const PASSWORD_MIN_LENGTH = 8;
 
+// ---- Login throttling (password guessing) ------------------------------------
+// Every login goes from this server to Supabase, so Supabase's own limit sees
+// this server's address, not the guesser's. So the login page counts wrong
+// passwords itself, before asking Supabase:
+//   - per email: LOGIN_MAX_FAILS_EMAIL wrong passwords in LOGIN_WINDOW_SECONDS
+//     lock that account;
+//   - per IP address: LOGIN_MAX_FAILS_IP (one guesser trying many accounts;
+//     higher, since a computer lab shares one address).
+// Each lock is longer than the one before (LOGIN_LOCK_STEPS): 1 minute, then
+// 15 minutes, then 1 hour for the third and every later one. Only the locks
+// of the last LOGIN_STRIKE_RESET seconds (24 hours) count: each lock drops
+// off 24 hours after it happened, so being locked twice on one day doesn't
+// make the next day's first lock an hour long — it's back to 1 minute. A
+// successful login starts the steps over at once. A lock always ends on its
+// own, so nobody can lock another person out for good ("Forgot Password?"
+// works during a lock too).
+const LOGIN_WINDOW_SECONDS = 900; // wrong passwords counted over 15 minutes
+const LOGIN_MAX_FAILS_EMAIL = 5;
+const LOGIN_MAX_FAILS_IP = 30;
+const LOGIN_LOCK_STEPS = [60, 900, 3600]; // 1st lock 1 min, 2nd 15 min, 3rd+ 1 hour
+const LOGIN_STRIKE_RESET = 86400;         // locks older than 24 hours no longer count
+
+/**
+ * Read, change and save one counter's state, under a lock:
+ *   ['fails' => [unix times of recent wrong passwords],
+ *    'locks' => [unix times of the locks in the last 24 hours],
+ *    'locked_until' => unix time]
+ * $change gets the state (old wrong passwords and old locks already dropped)
+ * and returns the new one, or null to delete it. Kept in Redis when the site
+ * runs on several servers (so it holds whichever server answers), else in
+ * this server's temp folder. If it can't be stored, nobody is locked out.
+ */
+function login_state(string $key, callable $change): array
+{
+    $id = md5(SUPABASE_URL . '|' . $key);
+    $now = time();
+    $tidy = function ($s) use ($now): array {
+        $s = is_array($s) ? $s : [];
+        $s['fails'] = array_values(array_filter((array) ($s['fails'] ?? []), fn($t) => is_int($t) && $t > $now - LOGIN_WINDOW_SECONDS));
+        $s['locks'] = array_values(array_filter((array) ($s['locks'] ?? []), fn($t) => is_int($t) && $t > $now - LOGIN_STRIKE_RESET));
+        $s['locked_until'] = (int) ($s['locked_until'] ?? 0);
+        unset($s['strikes'], $s['last_lock']); // the older format
+        return $s;
+    };
+    $keep = LOGIN_STRIKE_RESET + max(LOGIN_LOCK_STEPS);
+
+    if ($redis = shared_redis()) {
+        try {
+            $k = 'ceh:login:' . $id;
+            $new = $change($tidy(json_decode((string) $redis->get($k), true)));
+            if ($new === null) $redis->del($k);
+            else $redis->setex($k, $keep, json_encode($new));
+            return $new ?? $tidy([]);
+        } catch (Throwable $e) {
+            // Redis hiccup: fall back to this server's own count.
+        }
+    }
+    $file = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ceh-login-' . $id . '.json';
+    $fp = @fopen($file, 'c+');
+    if (!$fp) return $tidy([]);
+    flock($fp, LOCK_EX);
+    $new = $change($tidy(json_decode((string) stream_get_contents($fp), true)));
+    ftruncate($fp, 0);
+    rewind($fp);
+    if ($new !== null) fwrite($fp, json_encode($new));
+    flock($fp, LOCK_UN);
+    fclose($fp);
+    if ($new === null) @unlink($file);
+    return $new ?? $tidy([]);
+}
+
+/** The counters a login attempt for $email is checked against: [key, max wrong passwords]. */
+function login_throttle_keys(string $email): array
+{
+    return [
+        ['email:' . strtolower(trim($email)), LOGIN_MAX_FAILS_EMAIL],
+        ['ip:' . ($_SERVER['REMOTE_ADDR'] ?? ''), LOGIN_MAX_FAILS_IP],
+    ];
+}
+
+/** Seconds until $email may be tried again from this address (0 = it may now). */
+function login_locked_for(string $email): int
+{
+    $until = 0;
+    foreach (login_throttle_keys($email) as [$key]) {
+        $until = max($until, login_state($key, fn($s) => $s)['locked_until']);
+    }
+    return max(0, $until - time());
+}
+
+/** Count a wrong password for $email (and this address); enough of them lock it. */
+function login_record_failure(string $email): void
+{
+    foreach (login_throttle_keys($email) as [$key, $max]) {
+        login_state($key, function (array $s) use ($max): array {
+            $now = time();
+            $s['fails'][] = $now;
+            if (count($s['fails']) >= $max) {
+                $s['locks'][] = $now; // this lock, with the others of the last 24 hours
+                $steps = LOGIN_LOCK_STEPS;
+                $s['locked_until'] = $now + $steps[min(count($s['locks']), count($steps)) - 1];
+                $s['fails'] = []; // after the lock, another full set is needed for the next one
+            }
+            return $s;
+        });
+    }
+}
+
+/** A successful login: forget the email's wrong passwords and locks. */
+function login_clear_failures(string $email): void
+{
+    login_state(login_throttle_keys($email)[0][0], fn($s) => null);
+}
+
+/** "Too many failed logins…" for a lock of $seconds. */
+function login_locked_message(int $seconds): string
+{
+    $minutes = max(1, (int) ceil($seconds / 60));
+    $wait = $minutes >= 60 && $minutes % 60 === 0
+        ? ($minutes / 60) . ' hour' . ($minutes === 60 ? '' : 's')
+        : $minutes . ' minute' . ($minutes === 1 ? '' : 's');
+    return 'Too many failed login attempts. Please wait ' . $wait
+        . ' and try again, or use "Forgot Password?" to set a new password.';
+}
+
 /**
  * Eye button that shows / hides the password field with this id. Goes inside
  * a <div class="password-wrap"> next to the field; assets/js/auth.js does the
@@ -1215,7 +1341,13 @@ function supabase_auth_signin(string $email, string $password): array
         if (($data['error_code'] ?? '') === 'email_not_confirmed' || stripos($raw, 'not confirmed') !== false) {
             return ['ok' => false, 'unconfirmed' => true, 'message' => 'Please confirm your email first: open the link we sent to ' . strtolower(trim($email)) . ' (check your spam folder too).'];
         }
-        return ['ok' => false, 'message' => auth_error_message($result, 'Invalid email or password.')];
+        return [
+            'ok' => false,
+            // Supabase answered "wrong email or password" (not an outage or its own rate
+            // limit): the login page counts these to stop password guessing.
+            'wrong_password' => ($data['error_code'] ?? '') === 'invalid_credentials' || (int) $result['status'] === 400,
+            'message' => auth_error_message($result, 'Invalid email or password.'),
+        ];
     }
     $data = $result['data'];
     if (empty($data['user']) || empty($data['access_token'])) {
@@ -2635,12 +2767,12 @@ function notify_event(string $eventId, string $audience, string $title, string $
 // ---- Required attendance ----------------------------------------------------
 /** events.required_for: who must attend (they must also be people the event is open to). */
 const REQUIRED_FOR = [
-    'everyone' => 'Everyone it\'s open to',
-    'members' => 'Members of the organizing organization(s)',
-    'department' => 'Everyone in the organizing organization(s)\' department',
+    'everyone' => 'All eligible attendees',
+    'members' => 'Members of the organizing organization(s) only',
+    'department' => 'Everyone in the organizers\' department(s)',
 ];
 
-/** "Required for members of the organizing organization(s)" ('' when not required). */
+/** "Required for members of the organizing organization(s) only" ('' when not required). */
 function required_for_label(array $ev): string
 {
     $key = $ev['required_for'] ?? null;
@@ -2828,6 +2960,7 @@ function notification_email_content(array $n, ?array $event): array
     // page at its Register button (registering itself stays a click on the site).
     $today = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
     $canRegister = $event && !empty($n['event_id']) && !str_starts_with($title, 'Registered') // already registered: no button
+        && !str_starts_with($title, 'Approved:') && !str_starts_with($title, 'Not approved:') // the author's approval notice
         && !event_has_ended($event)
         && ($event['status'] ?? '') === 'published' && !empty($event['enable_registration'])
         && (string) (($event['end_date'] ?? null) ?: ($event['start_date'] ?? '')) >= $today
@@ -3217,6 +3350,8 @@ function review_event_admin(string $eventId, bool $approve, string $note = ''): 
     if (empty($rows)) {
         return ['ok' => false, 'message' => friendly_error('Could not save your decision. Please try again.')];
     }
+    // The event's author was just notified by the database (20261122120000_approval_notices.sql): email it now.
+    queue_notification_emails();
     if (!$approve) {
         return ['ok' => true, 'message' => 'Rejected — "' . $ev['title'] . '" stays a draft. Its admin can change it and send it again.'];
     }

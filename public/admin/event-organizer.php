@@ -554,32 +554,39 @@ $breadcrumbs[] = [$pageTitle, null];
           <summary><h2 class="form-section-head" id="sec-audience"><span class="form-section-num">3</span><span>Audience<small>Who the event is for</small></span><?= $fold ?></h2></summary>
           <span class="admin-label" id="audience-label">Open to <span class="req">*</span> <span class="admin-muted">— pick everyone it's for</span></span>
           <?php $formAudiences = isset($f['audiences']) || isset($f['audience']) ? event_audiences($f) : ['students']; ?>
-          <div class="admin-radio-row" role="group" aria-labelledby="audience-label" data-audiences>
-            <?php foreach (AUDIENCE_GROUPS as $key => $label): ?>
-              <label class="admin-radio"><input type="checkbox" name="audiences[]" value="<?= $key ?>" <?= in_array($key, $formAudiences, true) ? 'checked' : '' ?>> <?= $label ?></label>
-            <?php endforeach; ?>
-          </div>
+          <?php /* A dropdown of checkboxes (several can be picked); the script below shows the picks on it. */ ?>
+          <details class="ms-select" data-ms data-ms-empty="Pick who it's open to">
+            <summary class="admin-input ms-summary" aria-labelledby="audience-label"><span data-ms-text><?= htmlspecialchars(implode(', ', array_map(fn($k) => AUDIENCE_GROUPS[$k], array_values(array_filter($formAudiences, fn($k) => isset(AUDIENCE_GROUPS[$k])))))) ?: 'Pick who it\'s open to' ?></span></summary>
+            <div class="ms-menu" role="group" aria-labelledby="audience-label" data-audiences>
+              <?php foreach (AUDIENCE_GROUPS as $key => $label): ?>
+                <label class="ms-option"><input type="checkbox" name="audiences[]" value="<?= $key ?>" <?= in_array($key, $formAudiences, true) ? 'checked' : '' ?>> <?= $label ?></label>
+              <?php endforeach; ?>
+            </div>
+          </details>
           <p class="admin-hint">Outsiders: guests from outside LCUP. Students and faculty register on the site; outsiders are shown the event as open to them.</p>
           <p class="admin-hint admin-hint-error" data-audience-error hidden>Pick at least one: Students, Faculty or Outsiders.</p><?= $why('audiences') ?>
 
           <div data-year-levels>
-            <span class="admin-label">Open to Year Levels</span>
-            <div class="admin-radio-row">
-              <?php foreach (YEAR_LEVELS as $y => $label): ?>
-                <label class="admin-radio"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
-              <?php endforeach; ?>
-            </div>
+            <span class="admin-label" id="levels-label">Open to Year Levels</span>
+            <details class="ms-select" data-ms data-ms-empty="All year levels">
+              <summary class="admin-input ms-summary" aria-labelledby="levels-label"><span data-ms-text><?= htmlspecialchars(implode(', ', array_map(fn($y) => YEAR_LEVELS[$y], array_values(array_filter(array_keys(YEAR_LEVELS), fn($y) => in_array($y, $formLevels, true)))))) ?: 'All year levels' ?></span></summary>
+              <div class="ms-menu" role="group" aria-labelledby="levels-label">
+                <?php foreach (YEAR_LEVELS as $y => $label): ?>
+                  <label class="ms-option"><input type="checkbox" name="year_levels[]" value="<?= $y ?>" <?= in_array($y, $formLevels, true) ? 'checked' : '' ?>> <?= $label ?></label>
+                <?php endforeach; ?>
+              </div>
+            </details>
             <p class="admin-hint">Pick none to open the event to every year level. Students outside the picked year levels can't register; irregular students can if any of their subjects' year levels is picked.</p>
           </div>
 
           <label class="admin-label" for="required_for">Required Attendance</label>
           <select id="required_for" name="required_for" class="admin-input">
-            <option value="">Not required — anyone it's open to may join</option>
+            <option value="">Not required (optional for all eligible attendees)</option>
             <?php foreach (REQUIRED_FOR as $key => $label): ?>
               <option value="<?= $key ?>" <?= ($f['required_for'] ?? '') === $key ? 'selected' : '' ?>>Required for <?= htmlspecialchars(lcfirst($label)) ?></option>
             <?php endforeach; ?>
           </select>
-          <p class="admin-hint">Required attendees are always notified when the event is published — in the site and by email — and see it marked <strong>Required</strong>. Only people the event is open to (the audience and year levels above) can be required.</p>
+          <p class="admin-hint">Required attendees are always notified when the event is published — in the site and by email — and see it marked <strong>Required</strong>. "Eligible attendees" means the people the event is open to (the audience and year levels above); only they can be required.</p>
         </details>
 
         <details class="form-section form-fold"<?= $openIf('start_date', 'end_date', 'end_time') ?>>
@@ -1024,6 +1031,29 @@ $breadcrumbs[] = [$pageTitle, null];
     otherInput.required = isOther;
   }
 
+  // Multi-pick dropdowns (Open to, Year Levels): show the picks on the closed
+  // box ("Students, Faculty"), or its placeholder when nothing is picked.
+  // A click outside or Esc closes them.
+  var multiSelects = Array.prototype.slice.call(document.querySelectorAll('[data-ms]'));
+  multiSelects.forEach(function (ms) {
+    var text = ms.querySelector('[data-ms-text]');
+    function show() {
+      var picked = Array.prototype.map.call(ms.querySelectorAll('input:checked'), function (box) {
+        return box.parentNode.textContent.trim();
+      });
+      text.textContent = picked.length ? picked.join(', ') : ms.getAttribute('data-ms-empty');
+      ms.classList.toggle('is-empty', !picked.length);
+    }
+    ms.addEventListener('change', show);
+    ms.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && ms.open) { ms.open = false; ms.querySelector('summary').focus(); }
+    });
+    show();
+  });
+  document.addEventListener('click', function (e) {
+    multiSelects.forEach(function (ms) { if (ms.open && !ms.contains(e.target)) ms.open = false; });
+  });
+
   // Year levels only apply to events students can join.
   var levels = document.querySelector('[data-year-levels]');
   // Year levels only when Students is picked; at least one audience is needed.
@@ -1039,6 +1069,7 @@ $breadcrumbs[] = [$pageTitle, null];
     e.preventDefault();
     audienceError.hidden = false;
     openFold(audienceBoxes[0]);
+    audienceBoxes[0].closest('details.ms-select').open = true; // its dropdown
     audienceBoxes[0].focus();
     audienceBoxes[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, true);
