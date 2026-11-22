@@ -807,3 +807,47 @@ td.admin-row-actions > form { gap: 6px; }
 .level-organizational:has(input:checked) { border-color: var(--level-organizational-edge); background: var(--level-organizational); color: var(--level-organizational-text); }
 .level-option:has(input:checked) small { color: inherit; opacity: 0.8; }
 .level-option:has(input:focus-visible) { outline: 2px solid var(--blue-accent); outline-offset: 2px; }
+
+/* ---- Multi-pick dropdown (Create Event › Open to, Year Levels) ----
+   A <details> that looks like a select: the closed box lists the picks,
+   the open list has a checkbox per option (several can be picked). */
+.ms-select { position: relative; }
+.ms-summary {
+  display: flex; align-items: center; gap: 10px;
+  padding-right: 38px;
+  cursor: pointer; list-style: none; user-select: none;
+  position: relative;
+}
+.ms-summary::-webkit-details-marker { display: none; }
+.ms-summary > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-select.is-empty .ms-summary > span { color: var(--text-muted); }
+/* The ▾ arrow, turned up while open. */
+.ms-summary::after {
+  content: ""; position: absolute; right: 16px; top: 50%;
+  width: 7px; height: 7px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+.ms-select[open] .ms-summary::after { transform: translateY(-30%) rotate(-135deg); }
+.ms-select[open] .ms-summary { border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(var(--p-accent-rgb), 0.15); }
+.ms-summary:focus-visible { border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(var(--p-accent-rgb), 0.15); }
+.ms-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 20;
+  display: flex; flex-direction: column;
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  max-height: 280px; overflow-y: auto;
+}
+.ms-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 7px;
+  font-size: 0.88rem; color: var(--text-main);
+  cursor: pointer;
+}
+.ms-option:hover { background: rgba(var(--p-accent-rgb), 0.08); }
+.ms-option input { width: 16px; height: 16px; margin: 0; accent-color: var(--blue-accent); cursor: pointer; }
+.ms-option:has(input:checked) { font-weight: 700; }

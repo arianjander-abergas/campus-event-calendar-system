@@ -297,12 +297,18 @@ function calendar_time_line(array $ev): string
       </div>
     </section>
 
-    <!-- All events of the selected day. One panel per day that has events; the script shows the clicked one. -->
-    <aside class="cal-day-panel" aria-live="polite">
+    <!-- All events of the clicked day, in a pop-up (assets/js/calendar.js). One section per day
+         that has events; the script shows the clicked one. Open on load when the link chose a date. -->
+    <dialog class="event-modal cal-day-panel" data-day-dialog aria-label="Events on this date"<?= get_param('date') !== '' ? ' open' : '' ?>>
+      <button type="button" class="event-modal-close" data-day-close aria-label="Close">&times;</button>
+      <div class="event-modal-body">
       <?php foreach ($byDate as $iso => $dayEvents): ?>
         <section class="cal-day-events" id="day-<?= $iso ?>"<?= $iso === $selected ? '' : ' hidden' ?>>
-          <h2><?= htmlspecialchars(date('l, F j, Y', strtotime($iso))) ?></h2>
-          <p class="cal-day-count"><?= count($dayEvents) ?> event<?= count($dayEvents) === 1 ? '' : 's' ?><?= $iso === $today ? ' · Today' : '' ?></p>
+          <header class="cal-day-head">
+            <h2><?= htmlspecialchars(date('l, F j, Y', strtotime($iso))) ?></h2>
+            <p class="cal-day-count"><?= count($dayEvents) ?> event<?= count($dayEvents) === 1 ? '' : 's' ?><?= $iso === $today ? ' · Today' : '' ?></p>
+          </header>
+          <div class="cal-day-list-wrap">
           <?php foreach ($dayEvents as $ev):
             $phase = event_phase($ev);
             $levels = year_levels_label($ev['year_levels'] ?? []);
@@ -327,14 +333,20 @@ function calendar_time_line(array $ev): string
               </span>
             </a>
           <?php endforeach; ?>
+          </div>
         </section>
       <?php endforeach; ?>
       <section class="cal-day-events" id="day-empty"<?= isset($byDate[$selected]) ? ' hidden' : '' ?>>
-        <h2 data-empty-date><?= htmlspecialchars(date('l, F j, Y', strtotime($selected))) ?></h2>
-        <p class="cal-day-count">No events on this date<?= $isFiltered ? ' that match your filters' : '' ?>.</p>
-        <p class="cal-day-hint">Dates with events are marked on the calendar. Use ‹ › to see other months.</p>
+        <header class="cal-day-head">
+          <h2 data-empty-date><?= htmlspecialchars(date('l, F j, Y', strtotime($selected))) ?></h2>
+          <p class="cal-day-count">No events on this date<?= $isFiltered ? ' that match your filters' : '' ?>.</p>
+        </header>
+        <div class="cal-day-list-wrap">
+          <p class="cal-day-hint">Dates with events are marked on the calendar. Use ‹ › to see other months.</p>
+        </div>
       </section>
-    </aside>
+      </div>
+    </dialog>
   </div>
   <?php endif; ?>
 

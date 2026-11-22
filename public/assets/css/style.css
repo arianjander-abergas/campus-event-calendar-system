@@ -213,8 +213,18 @@ button { font-family: inherit; cursor: pointer; }
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--card-bg); color: var(--text-main); /* stays visible over a poster (phones) */
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-  font-size: 1.5rem; line-height: 1; cursor: pointer;
+  font-size: 0; line-height: 0; cursor: pointer; /* the "×" text is hidden; */
 }
+/* …the ✕ is two centred lines, so it sits exactly in the middle of the circle
+   (the × character sits low and off-centre in most fonts). */
+.event-modal-close::before,
+.event-modal-close::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 2px; border-radius: 2px;
+  background: currentColor;
+}
+.event-modal-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.event-modal-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
 .event-modal-close:hover { background: var(--p-soft-2); }
 .event-modal-loading { margin: 0; padding: 56px 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 html.event-modal-open { overflow: hidden; } /* the page behind doesn't scroll */
@@ -1837,12 +1847,13 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
   gap: 10px;
   padding: 9px 18px 9px 14px;
   border-radius: 999px;
-  color: var(--neu-link);
+  background: var(--orange-strong);  /* same burnt orange as the category pills */
+  color: #fff;
   box-shadow: var(--neu-out-sm);
-  transition: box-shadow 0.25s ease;
+  transition: box-shadow 0.25s ease, background 0.15s ease;
 }
-.neu .ed-back img { width: 18px; height: 18px; }
-.neu .ed-back:hover { text-decoration: none; box-shadow: var(--neu-out); }
+.neu .ed-back img { width: 18px; height: 18px; filter: brightness(0) invert(1); } /* white arrow */
+.neu .ed-back:hover { text-decoration: none; background: var(--orange-dark); box-shadow: var(--neu-out); }
 .neu .ed-back:active { box-shadow: var(--neu-in); }
 /* Cards. */
 .neu .ed-hero,
