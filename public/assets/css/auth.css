@@ -812,8 +812,8 @@ button.login-field-icon { cursor: pointer; }
   .login-glass .login-forgot { margin: -2px 0 12px auto; font-size: 0.8rem; }
   .login-glass .login-btn { height: 44px; font-size: 0.9rem; border-radius: 12px; }
   .login-glass .login-divider { margin: 14px 0 10px; font-size: 0.75rem; }
-  /* Google + Admin Login side by side again (saves a row). */
-  .login-glass .login-socials { grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* Google (the only one now): a compact button, centred. */
+  .login-glass .login-socials { grid-template-columns: min(100%, 220px); justify-content: center; gap: 10px; }
   .login-glass .login-socials .login-btn { gap: 8px; font-size: 0.85rem; }
   .login-glass .login-socials .login-btn img { width: 18px; height: 18px; }
   .login-glass .login-signup { margin: 12px 0 0; font-size: 0.8rem; }

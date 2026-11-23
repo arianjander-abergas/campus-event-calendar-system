@@ -215,7 +215,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     $venueListed = in_array($venueName, $venueOptions[$venueType] ?? [], true)
         || ($previous && $venueType === ($previous['venue_type'] ?? '') && $venueName === trim((string) ($previous['venue'] ?? '')));
     if ($venueType === '') $fail('venue', 'Choose where the event happens: an on-campus venue, an online platform, or Off-campus.');
-    elseif ($venueTyped && $venueType !== 'off_campus' && $venueOptions[$venueType]) $fail('venue', 'Choose a venue from the list.');
+    // Typed places: off-campus, and On-campus › Others; online platforms come from the list (once it has any).
+    elseif ($venueTyped && $venueType === 'online' && $venueOptions[$venueType]) $fail('venue', 'Choose a venue from the list.');
     elseif ($venueTyped && $venueType !== 'online' && $venueName === '') $fail('venue_other', 'Type where the event will be held.');
     elseif (!$venueTyped && !$venueListed) $fail('venue', 'Choose a venue from the list.');
     if (mb_strlen($venueName) > 120) $fail($venueTyped ? 'venue_other' : 'venue', 'The venue must be 120 characters or fewer.');
@@ -644,7 +645,8 @@ $breadcrumbs[] = [$pageTitle, null];
           <summary><h2 class="form-section-head" id="sec-venue"><span class="form-section-num">5</span><span>Venue<small>Where it happens: on campus, off campus or online</small></span><?= $fold ?></h2></summary>
           <?php
           // The dropdown's choice: "<type>|<name>" from the venues list, or "<type>|*" when the
-          // place is typed in the box under it (off-campus; or a list that's still empty).
+          // place is typed in the box under it (off-campus; On-campus › Others for a place
+          // that isn't on the list; or a list that's still empty).
           $vType = (string) ($f['venue_type'] ?? '');
           $vName = trim((string) ($f['venue'] ?? ''));
           if ($vType === '' && $vName !== '') $vType = 'on_campus';
@@ -655,6 +657,8 @@ $breadcrumbs[] = [$pageTitle, null];
           } elseif (isset(VENUE_LISTS[$vType])) {
               if (in_array($vName, $venueOptions[$vType], true)) $vPick = $vType . '|' . $vName;
               elseif (!$venueOptions[$vType]) $vPick = $vType . '|*';
+              // An on-campus place that isn't on the list: On-campus › Others, with the name typed in.
+              elseif ($vType === 'on_campus' && $vName !== '') $vPick = 'on_campus|*';
               elseif ($vName !== '' || ($vType === 'online' && !empty($f['id']))) $vPick = $vOwn = $vType . '|' . $vName;
           }
           $vTyped = str_ends_with($vPick, '|*');
@@ -672,7 +676,8 @@ $breadcrumbs[] = [$pageTitle, null];
                     <?php if ($vOwn !== null && str_starts_with($vOwn, $type . '|')): ?>
                       <?= $vOption($vOwn, $vName !== '' ? $vName . ' (not on the list)' : 'Online (no platform named)') ?>
                     <?php endif; ?>
-                    <?php if (!$venueOptions[$type]): ?><?= $vOption($type . '|*', $type === 'online' ? 'Online: type the platform…' : 'On-campus: type the place…') ?><?php endif; ?>
+                    <?php if (!$venueOptions[$type]): ?><?= $vOption($type . '|*', $type === 'online' ? 'Online: type the platform…' : 'On-campus: type the place…') ?>
+                    <?php elseif ($type === 'on_campus'): /* a place on campus that isn't on the list */ ?><?= $vOption('on_campus|*', 'Others (type the place)…') ?><?php endif; ?>
                   </optgroup>
                 <?php endforeach; ?>
                 <optgroup label="Off-campus">
@@ -689,7 +694,7 @@ $breadcrumbs[] = [$pageTitle, null];
               <input type="url" id="online_event_link" name="online_event_link" class="admin-input<?= $bad('online_event_link') ?>" placeholder="https://…" value="<?= $val('online_event_link') ?>"><?= $why('online_event_link') ?>
             </div>
           </div>
-          <p class="admin-hint">Pick an on-campus venue or an online platform from the list; for an off-campus event choose <strong>Off-campus</strong> and type the place. Online events need the webinar link (for the others a livestream link is optional).
+          <p class="admin-hint">Pick an on-campus venue or an online platform from the list. For an on-campus place that isn't listed choose <strong>On-campus › Others</strong>, and for an off-campus event choose <strong>Off-campus</strong>, then type the place. Online events need the webinar link (for the others a livestream link is optional).
             <?= $isAdmin ? 'Missing a venue? <a href="admin-taxonomy.php?tab=venues">Add it under Categories › Venues</a>.' : 'Missing a venue? Ask a Super Admin to add it.' ?></p>
 
           <label class="admin-label" for="address">Address (if applicable)</label>
