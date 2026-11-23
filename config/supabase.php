@@ -255,12 +255,25 @@ function detect_base_url(): string
  */
 function supabase_http(string $method, string $url, array $headers, $body = null, int $timeout = 20): array
 {
-    $ch = curl_init($url);
+    // One connection for the whole page: the first call opens it (DNS lookup,
+    // TCP and the HTTPS handshake — three or four trips to Supabase's servers in
+    // Seoul); every later call on the page reuses it (keep-alive), so it costs
+    // one trip. curl_reset() clears the previous call's options but keeps the
+    // open connection.
+    static $ch = null;
+    if ($ch === null) {
+        $ch = curl_init();
+    } else {
+        curl_reset($ch);
+    }
     curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CUSTOMREQUEST => $method,
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
+        CURLOPT_ENCODING => '', // accept compressed (gzip) answers: less to download
     ]);
     // Also trust the certificates Windows trusts: antivirus HTTPS scanning (e.g. AVG
     // Web Shield) re-signs Supabase's certificate with its own root, which only
@@ -271,10 +284,12 @@ function supabase_http(string $method, string $url, array $headers, $body = null
     if ($body !== null) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($body) ? $body : json_encode($body));
     }
+    $started = microtime(true);
     $response = curl_exec($ch);
+    $GLOBALS['supabase_http_calls'][] = microtime(true) - $started; // seconds per call (speed checks)
     $err = curl_error($ch);
     $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    // (No curl_close: the connection stays open for the page's next call.)
 
     if ($err) {
         return ['ok' => false, 'status' => 0, 'data' => ['message' => $err], 'raw' => ''];
@@ -659,13 +674,26 @@ const DB_UPDATES = [
 
 /**
  * The database updates that haven't been run yet (file => what it switches on).
- * Checked at most every 5 minutes per session ($fresh: now).
+ * One check per update (15+ requests to Supabase), so the answer is shared by
+ * every visitor on this server (a file in the temp folder) instead of being
+ * worked out again for each visitor: re-checked every 5 minutes while
+ * something is missing, every hour once everything is in place. A new update
+ * comes with a new version of the site, whose list of updates differs, so it
+ * is checked straight away. ($fresh: check now — Database update page.)
  */
 function pending_db_updates(bool $fresh = false): array
 {
-    session_start_once();
-    $cache = $_SESSION['db_updates_pending'] ?? null;
-    if (!$fresh && is_array($cache) && $cache['at'] > time() - 300) return $cache['pending'];
+    static $memo = null; // the same page asks several times
+    if (!$fresh && $memo !== null) return $memo;
+    $cacheFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ceh-db-updates-'
+        . md5(SUPABASE_URL . '|' . implode(',', array_keys(DB_UPDATES))) . '.json';
+    if (!$fresh && is_file($cacheFile)) {
+        $cache = json_decode((string) @file_get_contents($cacheFile), true);
+        if (is_array($cache) && isset($cache['at']) && is_array($cache['pending'] ?? null)
+            && $cache['at'] > time() - ($cache['pending'] ? 300 : 3600)) {
+            return $memo = $cache['pending'];
+        }
+    }
     $lastError = $GLOBALS['supabase_last_error'] ?? '';
     $pending = [];
     foreach (DB_UPDATES as $file => $update) {
@@ -681,8 +709,8 @@ function pending_db_updates(bool $fresh = false): array
         if ($missing) $pending[$file] = $label;
     }
     $GLOBALS['supabase_last_error'] = $lastError;
-    $_SESSION['db_updates_pending'] = ['pending' => $pending, 'at' => time()];
-    return $pending;
+    @file_put_contents($cacheFile, json_encode(['pending' => $pending, 'at' => time()]), LOCK_EX);
+    return $memo = $pending;
 }
 
 function render_flashes(): string

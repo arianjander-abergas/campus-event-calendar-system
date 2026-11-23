@@ -11,4 +11,19 @@ Options -Indexes
   Header set X-Content-Type-Options "nosniff"
   Header set Referrer-Policy "strict-origin-when-cross-origin"
   Header unset X-Powered-By
+
+  # Browser caching for styles, scripts, images and fonts, so they load once
+  # instead of on every page. Pages themselves are never cached (the PHP sends
+  # no-store). Links with "?v=<file time>" get a new address whenever the file
+  # changes, so those are kept for a year; anything else for a day.
+  <FilesMatch "\.(css|js|png|jpe?g|gif|webp|svg|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=86400"
+    <If "%{QUERY_STRING} =~ /(^|&)v=/">
+      Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+  </FilesMatch>
+  # The installed app's service worker: always checked for a newer version.
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
 </IfModule>

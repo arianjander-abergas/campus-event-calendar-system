@@ -33,6 +33,18 @@ RUN a2enmod rewrite headers \
       echo 'output_buffering = 4096'; } \
       > /usr/local/etc/php/conf.d/campus-event-hub.ini
 
+# OPcache: PHP keeps the compiled pages in memory instead of reading and
+# compiling every file (config/supabase.php alone is 4,000+ lines) on every
+# request. The code only changes with a new deploy (a fresh container), so it
+# never needs to check the files for changes. Compression (mod_deflate) for
+# pages, CSS and JS; Apache's default keeps connections open between requests.
+RUN docker-php-ext-install opcache \
+ && a2enmod deflate \
+ && { echo 'opcache.enable=1'; echo 'opcache.memory_consumption=128'; \
+      echo 'opcache.interned_strings_buffer=16'; echo 'opcache.max_accelerated_files=10000'; \
+      echo 'opcache.validate_timestamps=0'; } \
+      > /usr/local/etc/php/conf.d/opcache-campus-event-hub.ini
+
 COPY . /var/www/html/
 RUN chown -R www-data:www-data /var/www/html
 
