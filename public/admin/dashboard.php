@@ -4,11 +4,15 @@
  * semester and this school year — split by venue type (on-campus,
  * off-campus, online) and by audience (students, faculty) — plus
  * attendance and evaluation totals. Numbers come from the event_report view.
+ * Super Admins see every organization; Admins see only their own
+ * organization's events (get_event_report() limits them).
  */
 require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../includes/charts.php';
 
-$user = require_admin();
+$user = require_staff(); // Super Admins, and Admins with an organization
+$isSuper = is_super_admin_user($user);
+$myOrgName = $isSuper ? '' : organization_label(array_column(get_organizations(), null, 'id')[$user['organization_id']] ?? ['name' => 'your organization']);
 
 $today = date('Y-m-d');
 $period = school_period_of($today);
@@ -103,7 +107,7 @@ $breadcrumbs = [['Admin Dashboard', null]];
     <div class="page-head">
       <div>
         <h1 class="page-title">Admin Dashboard</h1>
-        <p class="page-sub"><?= htmlspecialchars(period_label($schoolYear, $semester)) ?> · Today is <?= date('l, F j, Y') ?></p>
+        <p class="page-sub"><?= $isSuper ? '' : htmlspecialchars($myOrgName) . ' · ' ?><?= htmlspecialchars(period_label($schoolYear, $semester)) ?> · Today is <?= date('l, F j, Y') ?></p>
       </div>
       <div class="page-head-actions">
         <a href="reports.php" class="btn btn-outline">Open Reports</a>
@@ -207,11 +211,11 @@ $breadcrumbs = [['Admin Dashboard', null]];
           </div>
         </div>
         <div class="kpi-grid kpi-grid-wide" style="margin-bottom:0">
-          <div class="kpi" style="box-shadow:none;background:#f8f9fb"><span class="kpi-label">Registrations</span><span class="kpi-value"><?= number_format($year['registered']) ?></span></div>
-          <div class="kpi" style="box-shadow:none;background:#f8f9fb"><span class="kpi-label">Attended</span><span class="kpi-value"><?= number_format($year['attended']) ?></span></div>
-          <div class="kpi" style="box-shadow:none;background:#f8f9fb"><span class="kpi-label">Attendance rate</span><span class="kpi-value"><?= format_percent($year['attendance_rate']) ?></span><span class="kpi-sub">of registrants, ended events</span></div>
-          <div class="kpi" style="box-shadow:none;background:#f8f9fb"><span class="kpi-label">Evaluations</span><span class="kpi-value"><?= number_format($year['evaluations']) ?></span></div>
-          <div class="kpi" style="box-shadow:none;background:#f8f9fb;grid-column:1 / -1">
+          <div class="kpi kpi-flat"><span class="kpi-label">Registrations</span><span class="kpi-value"><?= number_format($year['registered']) ?></span></div>
+          <div class="kpi kpi-flat"><span class="kpi-label">Attended</span><span class="kpi-value"><?= number_format($year['attended']) ?></span></div>
+          <div class="kpi kpi-flat"><span class="kpi-label">Attendance rate</span><span class="kpi-value"><?= format_percent($year['attendance_rate']) ?></span><span class="kpi-sub">of registrants, ended events</span></div>
+          <div class="kpi kpi-flat"><span class="kpi-label">Evaluations</span><span class="kpi-value"><?= number_format($year['evaluations']) ?></span></div>
+          <div class="kpi kpi-flat" style="grid-column:1 / -1">
             <span class="kpi-label">Average rating</span>
             <span class="kpi-value"><?= format_rating($year['average_rating']) ?></span>
             <span class="kpi-sub"><?= $year['average_rating'] !== null ? htmlspecialchars(rating_interpretation($year['average_rating'])) . ' (out of 5)' : 'No evaluations yet' ?></span>

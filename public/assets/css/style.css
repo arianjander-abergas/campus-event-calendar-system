@@ -2697,3 +2697,25 @@ html:not(.js-lazy) .lazy-bg { background-image: var(--bg); }
     contain-intrinsic-size: auto 420px;
   }
 }
+
+/* ============================================================
+   Dark & Dim: main buttons in burnt orange
+   The main colour (--p-main, navy) is almost the same as the dark and dim
+   cards and page, so navy buttons ("Register Now!", Save, Add, Filter, the
+   active tab) all but vanished. In these two themes they're burnt orange
+   (--p-accent) with white text (5.1:1), like the category pills and the
+   Back button; hover goes a shade darker (6.6:1). .btn-accent, which turned
+   light peach (white text 1.8:1), joins them. The light theme is unchanged.
+   Last in the file so these win.
+   ============================================================ */
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  body .btn-primary, .btn-accent, .neu .btn-primary, .neu .btn-login, .neu .btn-accent,
+  .neu .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate):not(:disabled), body .admin-tab.active
+) {
+  background: var(--p-accent); border-color: var(--p-accent); color: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+:root:is([data-theme="dark"], [data-theme="dim"]) :is(
+  body .btn-primary, .btn-accent, .neu .btn-primary, .neu .btn-login, .neu .btn-accent,
+  .neu .ed-btn:not(.ed-btn-outline):not(.ed-btn-evaluate):not(:disabled)
+):hover { background: var(--p-accent-deep); border-color: var(--p-accent-deep); color: #fff; }

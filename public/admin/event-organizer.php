@@ -198,8 +198,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if ($fields['start_date'] !== '' && $fields['end_date'] !== '' && $fields['end_date'] < $fields['start_date']) {
         $fail('end_date', "End date can't be before the start date.");
     }
-    if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && $fields['end_time'] <= $fields['start_time']) {
-        $fail('end_time', 'End time must be after the start time.');
+    // Times are optional; when given they must fall within EVENT_HOURS (4:00 AM – 10:00 PM),
+    // and an event can't end at the very moment it starts (or before).
+    foreach (['start_time' => 'Start', 'end_time' => 'End'] as $key => $label) {
+        if ($fields[$key] && !event_time_allowed($fields[$key])) {
+            $fail($key, $label . ' time must be between ' . EVENT_HOURS_LABEL . '.');
+        }
+    }
+    if ($fields['start_date'] === $fields['end_date'] && $fields['start_time'] && $fields['end_time'] && substr($fields['end_time'], 0, 5) <= substr($fields['start_time'], 0, 5)) {
+        $fail('end_time', substr($fields['end_time'], 0, 5) === substr($fields['start_time'], 0, 5)
+            ? 'The event can\'t start and end at the same date and time. Pick a later end time.'
+            : 'End time must be after the start time.');
     }
     // Venue: one from the list (or the event's own, if it has since left the list);
     // typed only for off-campus places, or when that list is still empty.
@@ -389,7 +398,7 @@ $time = fn(string $key) => htmlspecialchars(substr((string) ($f[$key] ?? ''), 0,
 $checked = fn(string $key) => !empty($f[$key]) ? 'checked' : '';
 // Fields the last save rejected: red border + the reason under the field.
 // Errors without a field of their own (e.g. the database said no) show as banners.
-$fieldKeys = ['title', 'category_id', 'category_other', 'description', 'start_date', 'end_date', 'end_time', 'venue', 'venue_other', 'online_event_link',
+$fieldKeys = ['title', 'category_id', 'category_other', 'description', 'start_date', 'start_time', 'end_date', 'end_time', 'venue', 'venue_other', 'online_event_link',
     'poster_file', 'registration_limit', 'registration_deadline', 'contact_email', 'audiences', 'organizations', 'programs'];
 $bad = fn(string $key) => isset($errors[$key]) ? ' is-invalid" aria-invalid="true" aria-describedby="' . $key . '-error' : '';
 $why = fn(string $key) => isset($errors[$key]) ? '<p class="field-error" id="' . $key . '-error">' . htmlspecialchars($errors[$key]) . '</p>' : '';
@@ -606,7 +615,7 @@ $breadcrumbs[] = [$pageTitle, null];
           <p class="admin-hint">Required attendees are always notified when the event is published — in the site and by email — and see it marked <strong>Required</strong>. "Eligible attendees" means the people the event is open to (the audience and year levels above); only they can be required.</p>
         </details>
 
-        <details class="form-section form-fold"<?= $openIf('start_date', 'end_date', 'end_time') ?>>
+        <details class="form-section form-fold"<?= $openIf('start_date', 'start_time', 'end_date', 'end_time') ?>>
           <summary><h2 class="form-section-head" id="sec-when"><span class="form-section-num">4</span><span>Date &amp; Time<small>When it starts and ends</small></span><?= $fold ?></h2></summary>
           <div class="admin-four-col">
             <div>
@@ -615,7 +624,7 @@ $breadcrumbs[] = [$pageTitle, null];
             </div>
             <div>
               <label class="admin-label" for="start_time">Start Time</label>
-              <input type="time" id="start_time" name="start_time" class="admin-input" value="<?= $time('start_time') ?>">
+              <input type="time" id="start_time" name="start_time" class="admin-input<?= $bad('start_time') ?>" value="<?= $time('start_time') ?>" min="<?= EVENT_HOURS[0] ?>" max="<?= EVENT_HOURS[1] ?>" data-event-hours><?= $why('start_time') ?>
             </div>
             <div>
               <label class="admin-label" for="end_date">End Date <span class="req">*</span></label>
@@ -623,9 +632,10 @@ $breadcrumbs[] = [$pageTitle, null];
             </div>
             <div>
               <label class="admin-label" for="end_time">End Time</label>
-              <input type="time" id="end_time" name="end_time" class="admin-input<?= $bad('end_time') ?>" value="<?= $time('end_time') ?>"><?= $why('end_time') ?>
+              <input type="time" id="end_time" name="end_time" class="admin-input<?= $bad('end_time') ?>" value="<?= $time('end_time') ?>" min="<?= EVENT_HOURS[0] ?>" max="<?= EVENT_HOURS[1] ?>" data-event-hours><?= $why('end_time') ?>
             </div>
           </div>
+          <p class="admin-hint">Times are optional. Events can run between <?= EVENT_HOURS_LABEL ?>, and must end after they start.</p>
           <!-- Other events on these dates, and clashes (filled by the script below) -->
           <div class="schedule-hint" data-schedule-hint hidden></div>
         </details>
@@ -1212,9 +1222,7 @@ $breadcrumbs[] = [$pageTitle, null];
     if (empty('start_date')) add('start_date', 'Choose the start date.');
     if (empty('end_date')) add('end_date', 'Choose the end date.');
     else if (v('start_date') && v('end_date') < v('start_date')) add('end_date', "End date can't be before the start date.");
-    if (v('start_date') && v('start_date') === v('end_date') && v('start_time') && v('end_time') && v('end_time') <= v('start_time')) {
-      add('end_time', 'End time must be after the start time.');
-    }
+    whenProblems(add, v);
     var place = venueChoice();
     if (!place.type) add('venue', 'Choose where the event will be held.');
     else if (place.type === 'online') {
@@ -1231,6 +1239,20 @@ $breadcrumbs[] = [$pageTitle, null];
       if (boxes[0].value.trim() === '' && (boxes[1].value.trim() || boxes[2].value.trim())) add(boxes[0].id, 'Give this part a name (what happens), or remove it.');
     });
     return problems;
+  }
+  // Date & Time (the server checks the same): times within EVENT_HOURS, and an
+  // event that ends after it starts — never at the very same date and time.
+  var HOURS = <?= json_encode(EVENT_HOURS) ?>, HOURS_LABEL = <?= json_encode(EVENT_HOURS_LABEL) ?>;
+  function whenProblems(add, v) {
+    ['start_time', 'end_time'].forEach(function (id) {
+      var t = v(id).slice(0, 5);
+      if (t && (t < HOURS[0] || t > HOURS[1])) add(id, (id === 'start_time' ? 'Start' : 'End') + ' time must be between ' + HOURS_LABEL + '.');
+    });
+    if (v('start_date') && v('start_date') === v('end_date') && v('start_time') && v('end_time')) {
+      var s = v('start_time').slice(0, 5), f = v('end_time').slice(0, 5);
+      if (f === s) add('end_time', "The event can't start and end at the same date and time. Pick a later end time.");
+      else if (f < s) add('end_time', 'End time must be after the start time.');
+    }
   }
   function focusFirstInvalid() {
     var first = form.querySelector('.is-invalid');
@@ -1259,6 +1281,27 @@ $breadcrumbs[] = [$pageTitle, null];
       if (e.target.classList && e.target.classList.contains('is-invalid')) clearInvalid(e.target);
     });
   });
+  // …and Date & Time is checked as it's picked (after the line above, so a time
+  // that's still wrong keeps its red border): out-of-hours times, and an end that
+  // isn't after the start, show their reason right away. A one-day event's end
+  // time picker also starts at the start time.
+  var whenIds = ['start_date', 'start_time', 'end_date', 'end_time'];
+  var startTime = byId('start_time'), endTime = byId('end_time');
+  function checkWhen() {
+    endTime.min = startDate.value && startDate.value === endDate.value && startTime.value ? startTime.value : HOURS[0];
+    var found = {};
+    whenProblems(function (id, message) { if (!found[id]) found[id] = message; },
+      function (id) { return (byId(id) && byId(id).value.trim()) || ''; });
+    [startTime, endTime].forEach(function (el) {
+      if (found[el.id]) markInvalid(el, found[el.id]);
+      else if (el.classList.contains('is-invalid')) clearInvalid(el);
+    });
+  }
+  ['input', 'change'].forEach(function (type) {
+    form.addEventListener(type, function (e) { if (whenIds.indexOf(e.target.id) !== -1) checkWhen(); });
+  });
+  if (startTime.value || endTime.value) endTime.min = startDate.value && startDate.value === endDate.value && startTime.value ? startTime.value : HOURS[0];
+
   // Back from the server with errors: go straight to the first highlighted field.
   if (form.querySelector('.is-invalid')) focusFirstInvalid();
 

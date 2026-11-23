@@ -804,6 +804,20 @@ const EVENT_LEVEL_HINTS = [
     'organizational' => 'Held by an organization for its members and guests',
 ];
 
+/**
+ * The hours an event may start and end in (Create / Edit Event): 4:00 AM to
+ * 10:00 PM. Times stay optional; these limits apply to the ones given.
+ */
+const EVENT_HOURS = ['04:00', '22:00'];
+const EVENT_HOURS_LABEL = '4:00 AM and 10:00 PM';
+
+/** Whether a time ("13:30" or "13:30:00") is within EVENT_HOURS. */
+function event_time_allowed(string $time): bool
+{
+    $hm = substr($time, 0, 5);
+    return (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hm) && $hm >= EVENT_HOURS[0] && $hm <= EVENT_HOURS[1];
+}
+
 /** An event's level; events saved before levels existed count as organizational. */
 function event_level(array $ev): string
 {
@@ -4153,8 +4167,24 @@ function delete_term_admin(string $termId): array
  * $filters: school_year, semester, department, organization, audience,
  *           venue_type, from / to (start-date range, 'Y-m-d')
  */
+/**
+ * Whose events the Admin Dashboard and Reports cover: null for a Super Admin
+ * (every organization), else the Admin's own organization — the events it
+ * runs (events.organization_id), the same ones Manage Events lists for them.
+ * An Admin without an organization gets a scope nothing matches.
+ */
+function report_scope_organization(): ?string
+{
+    $user = current_user();
+    if (($user['role'] ?? '') === 'admin') return null;
+    $org = (string) ($user['organization_id'] ?? '');
+    return is_uuid($org) ? $org : '00000000-0000-0000-0000-000000000000';
+}
+
 function get_event_report(array $filters = []): array
 {
+    // Admins only ever get their own organization's events, whatever the page asks for.
+    if (($scope = report_scope_organization()) !== null) $filters['organization'] = $scope;
     $parts = ['select=*', 'order=start_date.asc,start_time.asc.nullslast,title.asc', 'limit=1000'];
     if (preg_match('/^\d{4}-\d{4}$/', $filters['school_year'] ?? '')) $parts[] = 'school_year=eq.' . $filters['school_year'];
     if (isset(SEMESTERS[$filters['semester'] ?? ''])) $parts[] = 'semester=eq.' . $filters['semester'];
@@ -4171,7 +4201,8 @@ function get_event_report(array $filters = []): array
 function get_report_school_years(): array
 {
     $years = array_merge(
-        array_column(supabase_user_request('event_report', 'select=school_year'), 'school_year'),
+        array_column(supabase_user_request('event_report', 'select=school_year'
+            . (($scope = report_scope_organization()) !== null ? '&organization_id=eq.' . $scope : '')), 'school_year'),
         array_column(get_academic_terms(), 'school_year'),
         [school_period_of()['school_year']]
     );

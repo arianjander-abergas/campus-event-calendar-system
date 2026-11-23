@@ -112,7 +112,14 @@ $usersOpen = in_array($activeNav, ['admin-users', 'admin-roles'], true); // "Use
   <?php if ($navRole === 'moderator'): ?>
     <nav class="side-nav side-admin" aria-label="Admin">
       <div class="side-group-label">Admin</div>
+      <?php /* Admin Dashboard and Reports: their own organization's events only (get_event_report()). */ ?>
+      <?php if (!empty($navUser['organization_id'])): ?>
+        <?= $navLink('/admin/dashboard.php', 'admin-dashboard', 'chart', 'Admin Dashboard') ?>
+      <?php endif; ?>
       <?= $manageMenu() ?>
+      <?php if (!empty($navUser['organization_id'])): ?>
+        <?= $navLink('/admin/reports.php', 'admin-reports', 'reports', 'Reports') ?>
+      <?php endif; ?>
       <?= $navLink('/admin/import.php', 'import', 'import', 'Import &amp; Verify') ?>
       <?php if (!empty($navUser['organization_id'])): ?>
         <?= $navLink('/admin/organization-officers.php?org=' . urlencode($navUser['organization_id']), 'my-officers', 'people', 'Our Officers') ?>

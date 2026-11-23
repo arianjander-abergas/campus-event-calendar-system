@@ -284,6 +284,8 @@ body .admin-input.is-invalid:focus {
 .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
 .kpi-grid-wide { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .kpi { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; min-width: 0; }
+/* A number inside a panel (Admin Dashboard › Participation): a flat, slightly darker box that follows the theme. */
+.kpi.kpi-flat { box-shadow: none; background: var(--surface-2, #f8f9fb); }
 .kpi-label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
 .kpi-value { display: block; font-size: 2rem; font-weight: 800; color: var(--navy); line-height: 1.1; margin: 6px 0 2px; }
 .kpi-grid-wide .kpi-value { font-size: 1.6rem; }
@@ -459,7 +461,7 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
   .admin-table tfoot { display: table-row-group; } /* totals once, not on every page */
   .admin-table-sub { font-size: 8.5px; }
   .admin-org-logo { width: 16px; height: 16px; }
-  /* Reports print the numbers only: no graphs, no bars inside table cells. */
+  /* No bars inside table cells on paper (the Reports page's "Events per month" graph does print). */
   .cell-bar { min-width: 0; display: block; }
   .cell-bar-track { display: none !important; }
   .rating-bar { min-width: 110px; }
@@ -468,20 +470,20 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
   .admin-grid-halves { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .admin-panel-flush { overflow: visible; }
   .admin-table th { text-transform: none; }
-  /* Reports: the four totals on one row, and every breakdown one after the
-     other (no tabs on paper), each under its own heading. */
+  /* Reports on paper: the four totals on one row, the "Events per month"
+     graph (the summary), and of the breakdowns only "Per department" —
+     the other tabs (month, week, semester, organization, event list) stay
+     on screen and in the Excel download. Admins have no department table,
+     so their breakdown box isn't printed at all. */
   .report-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-  .js-lazy .report-panel:not(.is-active) { display: block !important; }
+  .report-panel:not(#by-department) { display: none !important; }
+  .report-panel#by-department { display: block !important; }
+  .report-breakdown:not(:has(#by-department)) { display: none !important; }
   .report-panel-title { margin: 12px 12px 6px; font-size: 0.9rem; }
   .report-panel .admin-table-note { padding: 4px 12px 8px; }
-  /* Reports event list: fixed column widths so the columns fit an A4 page. */
-  .report-events { table-layout: fixed; }
-  .report-events th:nth-child(1) { width: 13%; }
-  .report-events th:nth-child(2) { width: 43%; }
-  .report-events th:nth-child(n+3):nth-child(-n+5) { width: 11%; }
-  .report-events th:nth-child(6) { width: 11%; }
-  .report-events td { overflow-wrap: anywhere; }
-  .report-events .admin-status { padding: 2px 6px; font-size: 8px; }
+  /* The graph: full width, and its legend / labels in print-friendly sizes. */
+  .chart-panel .chart-svg { width: 100%; height: auto; max-height: 260px; }
+  .chart-panel .chart-legend { margin-bottom: 4px; }
 }
 
 /* ---- Evaluation form (includes/evaluation-fields.php) ----

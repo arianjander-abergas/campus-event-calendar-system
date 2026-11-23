@@ -8,7 +8,9 @@
  *   (tabs: month / week / semester / department / organization / events).
  * Print-ready ("Print report" prints the totals and every breakdown, no
  * graphs) and downloadable as an Excel workbook with every column.
- * Numbers come from the event_report view.
+ * Numbers come from the event_report view. Super Admins see every
+ * organization; Admins see only their own organization's events (no
+ * department / organization filters or breakdowns — get_event_report() limits them).
  *
  *   ?school_year=2026-2027|all &semester=1st|2nd|summer &month=2026-10 &department=<id>
  *   &organization=<id> &audience=students|faculty|all
@@ -18,7 +20,8 @@ require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../includes/charts.php';
 require_once __DIR__ . '/../../includes/spreadsheet.php';
 
-$user = require_admin();
+$user = require_staff(); // Super Admins, and Admins with an organization
+$isSuper = is_super_admin_user($user);
 
 $current = school_period_of();
 $departments = get_departments();
@@ -31,8 +34,8 @@ $filters = [
     'school_year' => $param('school_year') === 'all' ? 'all'
         : (preg_match('/^\d{4}-\d{4}$/', $param('school_year')) ? $param('school_year') : $current['school_year']),
     'semester' => isset(SEMESTERS[$param('semester')]) ? $param('semester') : '',
-    'department' => in_array($param('department'), array_column($departments, 'id'), true) ? $param('department') : '',
-    'organization' => in_array($param('organization'), array_column($organizations, 'id'), true) ? $param('organization') : '',
+    'department' => $isSuper && in_array($param('department'), array_column($departments, 'id'), true) ? $param('department') : '',
+    'organization' => $isSuper && in_array($param('organization'), array_column($organizations, 'id'), true) ? $param('organization') : '',
     'audience' => isset(EVENT_AUDIENCES[$param('audience')]) ? $param('audience') : '',
     'venue_type' => isset(VENUE_TYPES[$param('venue_type')]) ? $param('venue_type') : '',
     'from' => $isDate($param('from')) ? $param('from') : '',
@@ -62,7 +65,9 @@ $held = array_values(array_filter($rows, fn($r) => $r['status'] !== 'cancelled')
 // ---- Describe the filters (page subtitle, printout, Excel file name) ----
 $deptName = array_column($departments, null, 'id')[$filters['department']] ?? null;
 $orgName = array_column($organizations, 'name', 'id')[$filters['organization']] ?? '';
+$myOrg = $isSuper ? null : (array_column($organizations, null, 'id')[$user['organization_id']] ?? ['name' => 'Your organization']);
 $scope = array_filter([
+    $myOrg ? organization_label($myOrg) : '', // an Admin's reports: always their organization
     $filters['school_year'] === 'all' ? 'All school years' : 'SY ' . $filters['school_year'],
     $filters['semester'] !== '' ? SEMESTERS[$filters['semester']] : '',
     $filters['month'] !== '' ? month_label($filters['month']) : '',
@@ -225,6 +230,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
       <details class="report-more"<?= $moreFilters ? ' open' : '' ?>>
         <summary>More filters<?= $moreFilters ? ' (' . $moreFilters . ' on)' : '' ?></summary>
         <div class="report-more-fields">
+          <?php if ($isSuper): /* Admins: always their own organization */ ?>
           <label>Department
             <select name="department">
               <option value="">All departments</option>
@@ -241,6 +247,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
               <?php endforeach; ?>
             </select>
           </label>
+          <?php endif; ?>
           <label>Audience
             <select name="audience">
               <option value="">All audiences</option>
@@ -277,8 +284,8 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
       <section class="admin-panel"><p class="chart-empty">No events match these filters.<?= $isFiltered ? ' <a href="reports.php">Reset the filters</a>.' : '' ?></p></section>
     <?php else: ?>
 
-    <!-- Per month -->
-    <section class="admin-panel chart-panel no-print">
+    <!-- Per month (printed too: the summary graph) -->
+    <section class="admin-panel chart-panel">
       <div class="admin-panel-head">
         <div>
           <h2>Events per month</h2>
@@ -301,14 +308,17 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
           'by-organization' => ['By organization', 'Per organization'],
           'by-event' => ['All events (' . count($rows) . ')', 'Event list'],
       ];
+      // Admins: one organization, so no department / organization breakdowns.
+      if (!$isSuper) unset($tabs['by-department'], $tabs['by-organization']);
       $panelAttrs = fn(string $id): string => 'class="report-panel' . ($id === array_key_first($tabs) ? ' is-active' : '')
           . '" id="' . $id . '" role="tabpanel" aria-labelledby="tab-' . $id . '"';
       $panelTitle = fn(string $id): string => '<h3 class="report-panel-title print-only">' . htmlspecialchars($tabs[$id][1]) . '</h3>'; // headings on paper
       $flatWrap = '<div class="admin-table-wrap" style="box-shadow:none;border-radius:0">';
     ?>
+    <?php /* On paper only the "Per department" table of this section is printed (admin.css @media print). */ ?>
     <section class="admin-panel admin-panel-flush report-breakdown">
-      <div class="admin-panel-head">
-        <div><h2>Breakdown</h2><p>Group the events by month, week, semester, department or organization. Cancelled events are left out of every number.</p></div>
+      <div class="admin-panel-head no-print">
+        <div><h2>Breakdown</h2><p>Group the events by month, week, semester<?= $isSuper ? ', department or organization' : '' ?>. Cancelled events are left out of every number.</p></div>
       </div>
       <div class="admin-tabs admin-subtabs report-tabs no-print" role="tablist" aria-label="Group the events" data-tabs>
         <?php foreach ($tabs as $id => [$label]): $first = $id === array_key_first($tabs); ?>
@@ -384,7 +394,7 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Reports', null]];
         <p class="admin-hint admin-table-note">Terms follow the <a href="school-calendar.php">school calendar</a>.</p>
       </div>
 
-      <?php foreach (['by-department' => ['Department', $byDepartment], 'by-organization' => ['Organization', $byOrganization]] as $id => [$heading, $groups]): ?>
+      <?php foreach (array_intersect_key(['by-department' => ['Department', $byDepartment], 'by-organization' => ['Organization', $byOrganization]], $tabs) as $id => [$heading, $groups]): ?>
         <div <?= $panelAttrs($id) ?>><?= $panelTitle($id) ?>
           <?= $flatWrap ?>
             <table class="admin-table admin-table-compact">

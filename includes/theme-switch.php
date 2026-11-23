@@ -45,6 +45,18 @@ $themeSvg = fn(string $t, int $size) => '<svg width="' . $size . '" height="' . 
       menu.open = false;
     });
   });
+  // Printing is always in the light theme (dark ink on white paper, whatever
+  // the screen shows): Dim / Dark are switched off just before printing —
+  // the Print buttons and Ctrl+P alike — and back on right after.
+  var printTheme = null;
+  window.addEventListener('beforeprint', function () {
+    printTheme = document.documentElement.getAttribute('data-theme');
+    if (printTheme) document.documentElement.removeAttribute('data-theme');
+  });
+  window.addEventListener('afterprint', function () {
+    if (printTheme) document.documentElement.setAttribute('data-theme', printTheme);
+    printTheme = null;
+  });
   // A click outside or Escape closes it.
   document.addEventListener('click', function (e) { if (menu.open && !menu.contains(e.target)) menu.open = false; });
   document.addEventListener('keydown', function (e) {
