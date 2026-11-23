@@ -4,7 +4,7 @@
  * Pages always come from the network — nothing personal is cached. Only
  * when the phone is offline does a page show offline.html instead.
  */
-const CACHE = 'ceh-app-v2'; // change it when offline.html or the icon changes
+const CACHE = 'ceh-app-v3'; // change it when offline.html or the icon changes (v3: new logo)
 const OFFLINE_PAGE = 'offline.html';
 
 self.addEventListener('install', (event) => {

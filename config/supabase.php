@@ -95,10 +95,13 @@ function shared_redis(): ?Redis
 // ---- School identity --------------------------------------------------------
 // Shown in the header, sidebar, footer, login pages and on every printout.
 const SCHOOL_NAME = 'La Consolacion University Philippines';
-// IMAGE SLOT: site logo (Campus Event Hub hand + magnifier) | file: public/assets/images/school-logo.png | square, 512×512
+// IMAGE SLOT: site logo (Campus Event Hub hand + magnifier with the calendar "H") | file: public/assets/images/school-logo.png | square, 512×512
 // Replace the file with a new logo (keep the file name). Transparent PNG works best.
+// Both files hold the orange logo; the app icons and link preview (public/assets/images/app/)
+// are the same logo on navy #0e2a5e.
+/** Printouts (reports, attendance sheets, evaluation results) and the search-engine logo. */
 const SCHOOL_LOGO = 'assets/images/school-logo.png';
-/** Light (Orange) version for dark backgrounds: sidebar, phone top bar, footer, login cards. */
+/** Dark backgrounds: sidebar, phone top bar, footer, login cards. */
 const SCHOOL_LOGO_LIGHT = 'assets/images/school-logo-light.png';
 
 // ---- Site base URL ----------------------------------------------------------
@@ -1571,10 +1574,12 @@ function current_theme(): string
 function app_head_tags(): string
 {
     $b = htmlspecialchars(BASE_URL);
+    // ?v=<file time>: a new icon file is fetched at once instead of the browser's cached copy.
+    $v = fn(string $file): string => '?v=' . (@filemtime(__DIR__ . '/../public/' . $file) ?: '1');
     return '<link rel="manifest" href="' . $b . '/manifest.json">' . "\n"
         . '<meta name="theme-color" content="#213e60">' . "\n"
-        . '<link rel="icon" type="image/png" sizes="192x192" href="' . $b . '/assets/images/app/icon-192.png">' . "\n"
-        . '<link rel="apple-touch-icon" href="' . $b . '/assets/images/app/apple-touch-icon.png">' . "\n"
+        . '<link rel="icon" type="image/png" sizes="192x192" href="' . $b . '/assets/images/app/icon-192.png' . $v('assets/images/app/icon-192.png') . '">' . "\n"
+        . '<link rel="apple-touch-icon" href="' . $b . '/assets/images/app/apple-touch-icon.png' . $v('assets/images/app/apple-touch-icon.png') . '">' . "\n"
         . '<meta name="mobile-web-app-capable" content="yes">' . "\n"
         . '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n"
         . '<meta name="apple-mobile-web-app-title" content="Event Hub">' . "\n"
@@ -1598,7 +1603,7 @@ function seo_head_tags(string $title, string $description, string $path, bool $h
     $e = fn(string $s) => htmlspecialchars($s, ENT_QUOTES);
     $url = app_url($path);
     // The logo on the site's navy, 1200×630 (the shape link previews use, so nothing is cropped).
-    $image = app_url('assets/images/app/share-preview.png');
+    $image = app_url('assets/images/app/share-preview.png') . '?v=' . (@filemtime(__DIR__ . '/../public/assets/images/app/share-preview.png') ?: '1');
     $tags = [
         '<meta name="description" content="' . $e($description) . '">',
         '<meta name="robots" content="index, follow">',
