@@ -1509,10 +1509,13 @@ function auth_requires_email_confirmation(): ?bool
  * Google domain, which may be a different one, and would then hide the
  * students' accounts.) auth/callback.php and the database refuse any address
  * that isn't @email.lcup.edu.ph.
+ * prompt=select_account: Google always shows its account chooser first, even
+ * when the browser is signed in to just one account, so people can pick (or
+ * add) the right school account instead of being signed in automatically.
  */
 function google_signin_url(): string
 {
-    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&hd=*'
+    return rtrim(SUPABASE_URL, '/') . '/auth/v1/authorize?provider=google&hd=*&prompt=select_account'
         . '&redirect_to=' . rawurlencode(auth_callback_url());
 }
 
