@@ -1,8 +1,26 @@
-# The Event Hub Assistant's Anthropic API key (see config/assistant.local.example.php)
-config/assistant.local.php
+# ---- Passwords, keys and other secrets: never committed ----
+# Set them on the server instead (Render → Environment) or in these local files.
 
-# Email (SMTP) password for notifications (see config/mail.local.example.php)
-config/mail.local.php
+# Local settings with passwords / API keys (copies of config/*.example.php):
+#   config/mail.local.php       email (SMTP) App Password for notifications
+#   config/assistant.local.php  the Event Hub Assistant's Anthropic API key
+config/*.local.php
 
-# Load balancer settings (see deploy/load-balancer/.env.example)
-deploy/load-balancer/.env
+# Environment files, in any folder (deploy/load-balancer/.env, a root .env…).
+# The *.example files hold no secrets and stay in the repo as templates.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Google / service-account credential files
+credentials*.json
+service-account*.json
