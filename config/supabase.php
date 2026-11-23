@@ -2927,7 +2927,13 @@ function announce_published_event(array $ev, bool $toEveryoneOpen): int
 // that fails is tried again 10 minutes, 2 hours and a day later, from the
 // pages Admins open (the outbox also runs every 10 minutes for them).
 
-/** SMTP settings from config/mail.local.php (a copy of mail.local.example.php), or environment variables. */
+/**
+ * Email settings from config/mail.local.php (a copy of mail.local.example.php),
+ * or environment variables. Two ways to send:
+ *   - Brevo's email API (BREVO_API_KEY) — over HTTPS, so it works on hosts that
+ *     block the email ports (Render's free plan blocks 25 / 465 / 587);
+ *   - SMTP (e.g. Gmail with an App Password) — used when there's no Brevo key.
+ */
 function mail_config(): array
 {
     static $config = null;
@@ -2936,6 +2942,7 @@ function mail_config(): array
         $local = is_file($file) ? (array) (include $file) : [];
         $get = fn(string $key, string $env, $default = '') => getenv($env) !== false && getenv($env) !== '' ? getenv($env) : ($local[$key] ?? $default);
         $config = [
+            'brevo_api_key' => trim((string) $get('brevo_api_key', 'BREVO_API_KEY')),
             'host' => trim((string) $get('host', 'SMTP_HOST', 'smtp.gmail.com')),
             'port' => (int) $get('port', 'SMTP_PORT', 465),
             'username' => trim((string) $get('username', 'SMTP_USERNAME')),
@@ -2944,16 +2951,73 @@ function mail_config(): array
             'from_name' => trim((string) $get('from_name', 'SMTP_FROM_NAME', 'Campus Event Hub')),
         ];
         if ($config['from_email'] === '') $config['from_email'] = $config['username'];
+        if (stripos($config['brevo_api_key'], 'paste') !== false) $config['brevo_api_key'] = ''; // the example's placeholder
     }
     return $config;
 }
 
-/** True once real SMTP settings are filled in (the example file's placeholders don't count). */
-function mail_enabled(): bool
+/** Which way email goes out: 'brevo', 'smtp', or '' (not set up). */
+function mail_method(): string
 {
     $c = mail_config();
-    return $c['host'] !== '' && $c['username'] !== '' && $c['password'] !== ''
-        && stripos($c['password'], 'paste') === false && filter_var($c['from_email'], FILTER_VALIDATE_EMAIL) !== false;
+    if (filter_var($c['from_email'], FILTER_VALIDATE_EMAIL) === false) return '';
+    if ($c['brevo_api_key'] !== '') return 'brevo';
+    if ($c['host'] !== '' && $c['username'] !== '' && $c['password'] !== '' && stripos($c['password'], 'paste') === false) return 'smtp';
+    return '';
+}
+
+/** True once real email settings are filled in (the example file's placeholders don't count). */
+function mail_enabled(): bool
+{
+    return mail_method() !== '';
+}
+
+/**
+ * Send one email through Brevo's API (https://api.brevo.com/v3/smtp/email).
+ * Several recipients: one request with a "version" per person, so each gets
+ * their own copy addressed only to them (like Bcc: nobody sees the others).
+ * The sender address must be verified in Brevo (Senders).
+ * @param string[] $recipients valid, unique addresses
+ * @return array{ok:bool, error?:string}
+ */
+function brevo_send(array $recipients, string $subject, string $text, string $html): array
+{
+    $c = mail_config();
+    foreach (array_chunk($recipients, 500) as $chunk) {
+        $payload = [
+            'sender' => ['name' => $c['from_name'], 'email' => $c['from_email']],
+            'subject' => $subject,
+            'htmlContent' => $html,
+            'textContent' => $text,
+            'headers' => ['Auto-Submitted' => 'auto-generated', 'X-Auto-Response-Suppress' => 'All'],
+        ];
+        if (count($chunk) === 1) {
+            $payload['to'] = [['email' => $chunk[0]]];
+        } else {
+            $payload['messageVersions'] = array_map(fn($e) => ['to' => [['email' => $e]]], $chunk);
+        }
+        $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['api-key: ' . $c['brevo_api_key'], 'Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        if (defined('CURLSSLOPT_NATIVE_CA')) curl_setopt($ch, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA); // as in supabase_http()
+        $response = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        if ($response === false || $status < 200 || $status >= 300) {
+            $answer = json_decode((string) $response, true);
+            $error = $curlError !== '' ? $curlError : 'Brevo: ' . ($answer['message'] ?? ('HTTP ' . $status));
+            if ($status === 401) $error .= ' — check BREVO_API_KEY, and turn off Security › Authorised IPs in Brevo.';
+            error_log('[brevo_send] ' . $error);
+            return ['ok' => false, 'error' => $error];
+        }
+    }
+    return ['ok' => true];
 }
 
 /** A header value with non-ASCII text encoded (subjects, names). */
@@ -2963,8 +3027,9 @@ function mail_header_text(string $text): string
 }
 
 /**
- * Send one email (plain text + HTML) to $recipients over SMTP. One
- * recipient goes in To:; several go in Bcc (To: shows the site's address).
+ * Send one email (plain text + HTML) to $recipients — through Brevo when a
+ * Brevo key is set (brevo_send()), else over SMTP: one recipient goes in To:;
+ * several go in Bcc (To: shows the site's address).
  * @param string[] $recipients
  * @return array{ok:bool, error?:string}
  */
@@ -2974,6 +3039,7 @@ function smtp_send(array $recipients, string $subject, string $text, string $htm
     $c = mail_config();
     $recipients = array_values(array_unique(array_filter(array_map('trim', $recipients), fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL) !== false)));
     if (!$recipients) return ['ok' => false, 'error' => 'No valid recipients.'];
+    if (mail_method() === 'brevo') return brevo_send($recipients, $subject, $text, $html);
 
     $from = mail_header_text($c['from_name']) . ' <' . $c['from_email'] . '>';
     $boundary = 'ceh_' . bin2hex(random_bytes(8));

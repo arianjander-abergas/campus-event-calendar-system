@@ -62,7 +62,7 @@ $setup = [
             : 'Off. In Google Cloud Console → APIs & Services → Credentials, create an OAuth client ID (Web application) with the Authorized redirect URI ' . $googleCallback . ', and publish the app (OAuth consent screen → Audience → Publish app) so every school account can use it. Then paste its Client ID and Client secret in Authentication → Sign In / Providers → Google and turn it on. Only @' . SCHOOL_EMAIL_DOMAIN . ' accounts will be let in.',
         $googleOn ? [] : ['Open Google Cloud credentials' => 'https://console.cloud.google.com/apis/credentials', 'Open the Google provider' => $projectUrl . '/auth/providers']],
     ['Email notifications', mail_enabled(),
-        mail_enabled() ? 'On: sent from ' . mail_config()['from_email'] . '.' : 'Off: copy config/mail.local.example.php to config/mail.local.php and fill in a Gmail address and App Password.',
+        mail_enabled() ? 'On: sent from ' . mail_config()['from_email'] . (mail_method() === 'brevo' ? ' through Brevo.' : ' over SMTP (' . mail_config()['host'] . ').') : 'Off: set BREVO_API_KEY (Brevo) or a Gmail address and App Password: see config/mail.local.example.php.',
         []],
     ['Install on phones', $secure,
         $secure ? 'Ready: phones can install the site ("Install app" / "Add to Home screen").' : 'Phones can add a home-screen shortcut; the full "Install app" needs the site on HTTPS.',
