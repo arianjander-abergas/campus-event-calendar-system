@@ -49,8 +49,13 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
   <?php foreach ($byDepartment as $deptName => $orgs): ?>
   <h2 class="org-dept-heading"><?= htmlspecialchars($deptName) ?> <span><?= count($orgs) ?> organization<?= count($orgs) === 1 ? '' : 's' ?></span></h2>
   <?php foreach ($orgs as $org): ?>
-    <section class="org-card" id="org-<?= htmlspecialchars($org['id']) ?>">
-      <header class="org-card-head">
+    <?php
+    // A dropdown: the name shows; the officers and upcoming events open on click.
+    $officerCount = count($org['officers'] ?? []);
+    $upcomingCount = count($org['upcoming_events'] ?? []);
+    ?>
+    <details class="org-card org-fold" id="org-<?= htmlspecialchars($org['id']) ?>">
+      <summary class="org-card-head">
         <?php if (!empty($org['logo_url'])): ?>
           <img loading="lazy" decoding="async" src="<?= htmlspecialchars(asset_url($org['logo_url'])) ?>" alt="" class="org-logo">
         <?php else: ?>
@@ -64,9 +69,13 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
           <?php if (!empty($org['description'])): ?>
             <p><?= nl2br(htmlspecialchars($org['description'])) ?></p>
           <?php endif; ?>
+          <div class="org-fold-meta">
+            <?= $officerCount ?> officer<?= $officerCount === 1 ? '' : 's' ?> · <?= $upcomingCount ? $upcomingCount . ' upcoming event' . ($upcomingCount === 1 ? '' : 's') : 'no upcoming events' ?>
+          </div>
         </div>
         <a href="events.php?organization=<?= urlencode($org['id']) ?>" class="btn btn-outline org-events-link">All events</a>
-      </header>
+        <span class="org-fold-toggle" aria-hidden="true"></span>
+      </summary>
 
       <div class="org-card-body">
         <div>
@@ -107,12 +116,27 @@ $breadcrumbs = [['Home', BASE_URL . '/index.php'], ['Organizations', null]];
           <?php endif; ?>
         </div>
       </div>
-    </section>
+    </details>
   <?php endforeach; ?>
   <?php endforeach; ?>
 
 </main>
 </div>
+
+<script>
+// A link to one organization (organizations.php#org-…, from an event page or the assistant) opens its card.
+(function () {
+  function openLinked() {
+    var card = location.hash && document.getElementById(location.hash.slice(1));
+    if (card && card.tagName === 'DETAILS') {
+      card.open = true;
+      card.scrollIntoView({ block: 'start' });
+    }
+  }
+  window.addEventListener('hashchange', openLinked);
+  openLinked();
+})();
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>
 

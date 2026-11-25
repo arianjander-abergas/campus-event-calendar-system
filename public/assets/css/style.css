@@ -745,6 +745,26 @@ a.upcoming-item:hover .u-title { color: var(--blue-accent); }
 .org-card-body { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; margin-top: 22px; }
 .org-card-body h3 { margin: 0 0 12px; font-size: 0.95rem; }
 .org-empty { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+/* Each organization is a dropdown: click its header to show the officers and upcoming events. */
+.org-fold > summary { list-style: none; cursor: pointer; align-items: center; }
+.org-fold > summary::-webkit-details-marker { display: none; }
+.org-fold > summary:focus-visible { outline: 3px solid var(--blue-accent); outline-offset: 6px; border-radius: 12px; }
+.org-fold-meta { margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.org-fold-toggle {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--navy); background: rgba(var(--p-accent-rgb), 0.08);
+  transition: background 0.15s ease;
+}
+.org-fold-toggle::before {
+  content: ""; width: 9px; height: 9px; margin-top: -4px;
+  border-right: 2.5px solid currentColor; border-bottom: 2.5px solid currentColor;
+  transform: rotate(45deg); transition: transform 0.2s ease, margin 0.2s ease;
+}
+.org-fold[open] .org-fold-toggle::before { transform: rotate(-135deg); margin-top: 4px; }
+.org-fold > summary:hover .org-fold-toggle { background: rgba(var(--p-accent-rgb), 0.16); }
+.org-fold:not([open]) { contain-intrinsic-size: auto 130px; }
+:root:is([data-theme="dark"], [data-theme="dim"]) .org-fold-toggle { color: var(--text-main); background: rgba(255, 255, 255, 0.08); }
 .officer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
 .officer-card {
   display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
