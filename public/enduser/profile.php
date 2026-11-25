@@ -55,14 +55,20 @@ if ($request && $request['status'] !== 'pending'
 
 $isStudent = ($user['account_type'] ?? '') === 'student';
 $value = fn(string $key): string => profile_value_label($key, $user[$key] ?? null, $departments, $organizations);
-$details = [
-    'Full name' => $user['full_name'],
+// The name in three parts once the database has them (else the one full name).
+$nameRows = name_parts_ready() && (($user['last_name'] ?? '') !== '' || ($user['first_name'] ?? '') !== '')
+    ? ['Last name' => $value('last_name'), 'First name' => $value('first_name'), 'Middle name' => $value('middle_name')]
+    : ['Full name' => $user['full_name']];
+$details = $nameRows + [
     'Email' => $user['email'] ?? '—',
     'Account' => role_display($user['role'], $user['account_type'] ?? null)
         . (is_super_admin_user($user) ? ' · Super admin' : (($user['role'] ?? '') !== 'user' && !empty($user['account_type']) ? ' · ' . label_of(ACCOUNT_TYPES, $user['account_type']) : '')),
     'Department' => $value('department_id'),
     'Organization' => $value('organization_id'),
 ];
+if (other_orgs_ready()) {
+    $details['Other organizations'] = $value('other_organization_ids');
+}
 if ($isStudent) {
     $details += [
         'School ID' => $value('school_id'),

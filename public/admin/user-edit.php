@@ -29,8 +29,15 @@ $selfUrl = 'user-edit.php?' . http_build_query(['id' => $account['id'], 'back' =
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_account') {
     $errors = [];
-    $fullName = post_param('full_name');
-    if ($fullName === '') $errors[] = 'Please enter their name.';
+    // The name: Last / First / Middle once the database has them (full name made from them), else one Full Name.
+    if (name_parts_ready()) {
+        $name = name_parts_from_post();
+        $errors = str_replace(['your last name', 'your first name'], ['their last name', 'their first name'], name_parts_errors($name));
+    } else {
+        $name = ['full_name' => post_param('full_name')];
+        if ($name['full_name'] === '') $errors[] = 'Please enter their name.';
+    }
+    $fullName = $name['full_name'];
     $role = $roleLocked ? $account['role'] : post_param('role');
     if (!isset(ROLES[$role])) $errors[] = 'Please choose a role.';
 
@@ -43,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_acco
         'year_level' => post_param('year_level'),
         'student_type' => post_param('student_type'),
         'irregular_year_levels' => $_POST['irregular_year_levels'] ?? [],
+        'other_organization_ids' => $_POST['other_organization_ids'] ?? [],
     ], $departments, $organizations, $account['school_id'] ?? null);
     $accountErrors = $result['errors'];
     // Super Admins don't have to belong to a department / organization.
@@ -55,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_acco
     $errors = array_merge($errors, $accountErrors);
 
     if (!$errors) {
-        $saved = update_profile_admin($account, ['full_name' => $fullName] + $result['fields'], $result['school_id'], isset($_POST['verified']));
+        $saved = update_profile_admin($account, $name + $result['fields'], $result['school_id'], isset($_POST['verified']));
         if ($saved['ok'] && $role !== $account['role']) {
             $changed = set_user_role_admin($account['id'], $role);
             $saved = $changed['ok'] ? ['ok' => true, 'message' => $saved['message'] . ' ' . $changed['message']] : ['ok' => false, 'message' => 'The details were saved, but not the role: ' . $changed['message']];
@@ -67,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_acco
         }
         $errors[] = $saved['message'];
     }
-    remember_form('user-edit', ['full_name' => $fullName, 'role' => $role, 'verified' => isset($_POST['verified'])] + $result['fields'] + ['school_id' => $result['school_id'] ?? post_param('school_id')], $errors);
+    remember_form('user-edit', $name + ['role' => $role, 'verified' => isset($_POST['verified'])] + $result['fields'] + ['school_id' => $result['school_id'] ?? post_param('school_id')], $errors);
     header('Location: ' . $selfUrl);
     exit;
 }
@@ -126,10 +134,29 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], [$fromRoles ? 'Roles' : 'U
         <p class="admin-hint">Changes made here are saved straight away — they don't need approval.</p>
 
         <div class="acct-grid">
+          <?php if (name_parts_ready()): /* Last | First, then Middle | Role */ ?>
+            <?php $nv = fn(string $key) => htmlspecialchars((string) ($acct[$key] ?? '')); ?>
+            <div>
+              <label class="admin-label" for="last_name">Last Name <span class="req">*</span></label>
+              <input type="text" id="last_name" name="last_name" class="admin-input" required maxlength="60" value="<?= $nv('last_name') ?>">
+            </div>
+            <div>
+              <label class="admin-label" for="first_name">First Name <span class="req">*</span></label>
+              <input type="text" id="first_name" name="first_name" class="admin-input" required maxlength="60" value="<?= $nv('first_name') ?>">
+            </div>
+            <div>
+              <label class="admin-label" for="middle_name">Middle Name <span class="admin-muted">(optional)</span></label>
+              <input type="text" id="middle_name" name="middle_name" class="admin-input" maxlength="60" value="<?= $nv('middle_name') ?>">
+              <?php if (($acct['last_name'] ?? '') === '' && ($acct['first_name'] ?? '') === ''): ?>
+                <p class="admin-hint">Saved as one name so far: <strong><?= $nv('full_name') ?></strong> — fill in the parts.</p>
+              <?php endif; ?>
+            </div>
+          <?php else: ?>
           <div>
             <label class="admin-label" for="full_name">Full Name <span class="req">*</span></label>
             <input type="text" id="full_name" name="full_name" class="admin-input" required value="<?= htmlspecialchars((string) ($acct['full_name'] ?? '')) ?>">
           </div>
+          <?php endif; ?>
           <div>
             <label class="admin-label" for="role">Role <span class="req">*</span></label>
             <select id="role" name="role" class="admin-input"<?= $roleLocked ? ' disabled' : '' ?>>

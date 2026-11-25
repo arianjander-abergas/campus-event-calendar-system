@@ -244,8 +244,7 @@ body .admin-input.is-invalid:focus {
 
 /* ---- My Profile ---- */
 .profile-layout { display: grid; grid-template-columns: minmax(0, 920px); gap: 20px; align-items: start; }
-.profile-head { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
-.profile-head-actions { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.profile-head { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }.profile-head-actions { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
 .profile-head-actions .btn { padding: 9px 18px; font-size: 0.85rem; }
 .profile-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin: 4px 0 12px; }
 .profile-details > div { padding-bottom: 10px; border-bottom: 1px dashed var(--border); min-width: 0; }
@@ -662,6 +661,9 @@ a.kpi:hover { box-shadow: var(--shadow-hover); }
   background: #fff; border-radius: 10px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
 }
+/* Open, with scripts on: placed against the screen (event-organizer.php sets top / left),
+   so it floats over the table instead of stretching the row or scrolling the table. */
+.row-more-menu.is-floating { position: fixed; right: auto; z-index: 60; max-height: calc(100vh - 16px); overflow-y: auto; }
 .row-more-menu form { display: flex; margin: 0; }
 .row-more-menu .btn-sm { width: 100%; text-align: left; justify-content: flex-start; }
 /* Edit ▾ menu: Delete sits apart from the safe choices, under a thin line. */
@@ -787,6 +789,18 @@ td.admin-row-actions > form { gap: 6px; }
 .pf-fields .field-error { order: 9; grid-column: 1 / -1; margin: 0; } /* under the row, not between its boxes */
 .pf-tools { display: flex; gap: 4px; flex-shrink: 0; }
 .pf-add { margin-top: 4px; }
+/* + Add a part, Upload program flow, Download a template */
+.pf-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 4px; }
+.pf-actions .pf-add { margin-top: 0; }
+.pf-upload { position: relative; cursor: pointer; }
+.pf-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; } /* the label opens it */
+.pf-upload:focus-within { outline: 3px solid var(--blue-accent); outline-offset: 2px; }
+.pf-template { font-size: 0.85rem; font-weight: 600; color: var(--blue-accent); text-decoration: underline; }
+.pf-upload-hint { margin-top: 8px; }
+.pf-upload-msg { margin: 6px 0 0; font-size: 0.85rem; font-weight: 600; color: var(--green, #15803d); }
+.pf-upload-msg.is-error { color: var(--red); }
+:root:is([data-theme="dark"], [data-theme="dim"]) .pf-upload-msg:not(.is-error) { color: #86efac; }
+:root:is([data-theme="dark"], [data-theme="dim"]) .pf-upload-msg.is-error { color: #fca5a5; }
 @media (max-width: 760px) {
   .pf-row { align-items: flex-start; flex-wrap: wrap; }
   .pf-fields { grid-template-columns: 1fr; flex-basis: calc(100% - 40px); }

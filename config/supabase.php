@@ -670,7 +670,8 @@ const DB_UPDATES = [
     '20261112120000_security_hardening.sql' => ['Security: registrations start as "registered" (only event admins mark attendance), and image uploads are limited to 5 MB', 'rpc', 'registrations_are_guarded', []],
     '20261120120000_venues.sql' => ['The venues list (On-campus places and Online platforms) for the event form\'s Venue dropdown', 'venues', 'select=id&limit=1'],
     '20261122120000_approval_notices.sql' => ['"Your event was approved / not approved" notices to the event\'s author, in the bell and by email', 'rpc', 'approval_notices_ready', []],
-];
+    '20261125130000_name_parts.sql' => ['Names in three parts (Last name, First name, Middle name) on sign-up and profiles', 'rpc', 'profile_names_ready', []],
+    '20261125140000_more_organizations.sql' => ['More than one organization per account (Other organizations on sign-up, profiles and Users)', 'rpc', 'profile_other_organizations_ready', []],];
 
 /**
  * The database updates that haven't been run yet (file => what it switches on).
@@ -1364,9 +1365,14 @@ function supabase_auth_signup(string $email, string $password, string $fullName,
         'password' => $password,
         'data' => array_filter([
             'full_name' => $fullName,
+            // The name in parts (the database's handle_new_user() saves them once the name_parts update is run).
+            'last_name' => $profile['last_name'] ?? null,
+            'first_name' => $profile['first_name'] ?? null,
+            'middle_name' => $profile['middle_name'] ?? null,
             'account_type' => $profile['account_type'] ?? null,
             'department_id' => $profile['department_id'] ?? null,
             'organization_id' => $profile['organization_id'] ?? null,
+            'other_organization_ids' => $profile['other_organization_ids'] ?? null,
             'school_id' => $profile['school_id'] ?? null,
             'year_level' => $profile['year_level'] ?? null,
             'course' => $profile['course'] ?? null,
@@ -1554,12 +1560,83 @@ function start_user_session(array $authUser, string $accessToken, ?string $refre
 /** Profile columns kept in the session (see current_user()). */
 const SESSION_PROFILE_SELECT = 'full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)';
 
+/**
+ * Whether profiles have the name parts (last / first / middle name) — the
+ * 20261125130000_name_parts.sql update. Until it's run, the site keeps using
+ * the single Full name field everywhere.
+ */
+function name_parts_ready(): bool
+{
+    static $ready = null;
+    return $ready ??= !isset(pending_db_updates()['20261125130000_name_parts.sql']);
+}
+
+/** The profile columns for the name: full_name, plus the parts once they exist. */
+function profile_name_columns(): string
+{
+    return 'full_name' . (name_parts_ready() ? ',last_name,first_name,middle_name' : '');
+}
+
+/**
+ * Whether profiles have "Other organizations" (other_organization_ids — the
+ * 20261125140000_more_organizations.sql update). Until it's run, accounts
+ * have their one organization only.
+ */
+function other_orgs_ready(): bool
+{
+    static $ready = null;
+    return $ready ??= !isset(pending_db_updates()['20261125140000_more_organizations.sql']);
+}
+
+/** The profile columns for organizations: organization_id, plus the other ones once they exist. */
+function profile_org_columns(): string
+{
+    return 'organization_id' . (other_orgs_ready() ? ',other_organization_ids' : '');
+}
+
+/** The account's other organizations' names (from profiles.other_organization_ids), in the list's order. */
+function other_organization_names(array $profile, array $organizations): array
+{
+    $names = array_column($organizations, 'name', 'id');
+    $ids = is_array($profile['other_organization_ids'] ?? null) ? $profile['other_organization_ids'] : [];
+    $out = array_values(array_filter(array_map(fn($id) => $names[$id] ?? null, $ids)));
+    sort($out, SORT_NATURAL | SORT_FLAG_CASE);
+    return $out;
+}
+
+/** "First Middle Last" from the parts (what full_name holds and the site shows). */
+function compose_full_name(string $first, string $middle, string $last): string
+{
+    return trim(preg_replace('/\s+/', ' ', $first . ' ' . $middle . ' ' . $last));
+}
+
+/** The three name fields from a form (trimmed, spaces tidied), and the full name they make. */
+function name_parts_from_post(): array
+{
+    $part = fn(string $key): string => trim(preg_replace('/\s+/', ' ', post_param($key)));
+    $parts = ['last_name' => $part('last_name'), 'first_name' => $part('first_name'), 'middle_name' => $part('middle_name')];
+    return $parts + ['full_name' => compose_full_name($parts['first_name'], $parts['middle_name'], $parts['last_name'])];
+}
+
+/** Problems with the three name fields (Last and First are required; 60 characters each). */
+function name_parts_errors(array $parts): array
+{
+    $errors = [];
+    if ($parts['last_name'] === '') $errors[] = 'Please enter your last name.';
+    if ($parts['first_name'] === '') $errors[] = 'Please enter your first name.';
+    foreach (['last_name' => 'Last name', 'first_name' => 'First name', 'middle_name' => 'Middle name'] as $key => $label) {
+        if (mb_strlen($parts[$key]) > 60) $errors[] = $label . ' must be 60 characters or fewer.';
+    }
+    return $errors;
+}
+
 /** Re-read name / role / account details from `profiles` into the session. */
 function reload_session_profile(): void
 {
     if (empty($_SESSION['user']['id'])) return;
     $id = '&id=eq.' . urlencode($_SESSION['user']['id']);
-    $rows = supabase_request('profiles', 'select=' . SESSION_PROFILE_SELECT . $id, 'GET', null, $_SESSION['access_token'] ?? null);
+    $select = str_replace(['full_name,', 'organization_id,'], [profile_name_columns() . ',', profile_org_columns() . ','], SESSION_PROFILE_SELECT);
+    $rows = supabase_request('profiles', 'select=' . $select . $id, 'GET', null, $_SESSION['access_token'] ?? null);
     $schemaReady = true;
     if (empty($rows) && supabase_last_error() !== '' && !supabase_session_expired()) {
         // The database doesn't have the new account columns yet (migration
@@ -1921,6 +1998,12 @@ function validate_account_fields(array $in, array $departments, array $organizat
         'student_type' => null,
         'irregular_year_levels' => null,
     ];
+    // Other organizations (optional, any department): known ones only, never the main one, each once.
+    if (array_key_exists('other_organization_ids', $in) && other_orgs_ready()) {
+        $others = array_map('strval', is_array($in['other_organization_ids']) ? $in['other_organization_ids'] : []);
+        $fields['other_organization_ids'] = array_values(array_unique(array_filter($others, fn($id) => isset($orgsById[$id]) && $id !== $organizationId)));
+        if (count($fields['other_organization_ids']) > 20) $errors[] = 'Choose up to 20 other organizations.';
+    }
     $schoolId = null;
 
     if ($type === 'student') {
@@ -1987,12 +2070,13 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
     }
 
     $allowed = array_intersect_key($fields, array_flip($schemaReady
-        ? ['full_name', 'account_type', 'department_id', 'organization_id', 'year_level', 'course', 'student_type', 'irregular_year_levels']
+        ? ['full_name', 'last_name', 'first_name', 'middle_name', 'account_type', 'department_id', 'organization_id', 'other_organization_ids', 'year_level', 'course', 'student_type', 'irregular_year_levels']
         : ['full_name', 'organization_id', 'year_level', 'course'])); // database not updated yet: the older columns only
     // Moderators' organization is their scope: only an admin changes it (the database refuses too).
     if (($user['role'] ?? '') === 'moderator') {
         unset($allowed['organization_id']);
     }
+    if (array_key_exists('other_organization_ids', $allowed)) $allowed['other_organization_ids'] ??= []; // none = an empty list
     if ($allowed) {
         $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', $allowed);
         if (empty($rows)) {
@@ -2009,10 +2093,14 @@ function update_my_profile(array $fields, ?string $schoolId = null): array
 
 /** The details on the profile form, as shown to the reviewer. */
 const PROFILE_DETAIL_LABELS = [
+    'last_name' => 'Last name',
+    'first_name' => 'First name',
+    'middle_name' => 'Middle name',
     'full_name' => 'Full name',
     'account_type' => 'Student or faculty',
     'department_id' => 'Department',
     'organization_id' => 'Organization',
+    'other_organization_ids' => 'Other organizations',
     'school_id' => 'School ID',
     'course' => 'Course',
     'year_level' => 'Highest year level',
@@ -2024,6 +2112,11 @@ const PROFILE_DETAIL_LABELS = [
 function profile_value_norm(string $key, $value)
 {
     if ($key === 'irregular_year_levels') return parse_year_levels($value ?? []) ?: null;
+    if ($key === 'other_organization_ids') {
+        $ids = array_values(array_unique(array_filter(array_map('strval', is_array($value) ? $value : []), 'is_uuid')));
+        sort($ids);
+        return $ids ?: null;
+    }
     if ($key === 'year_level') return $value === null || $value === '' ? null : (int) $value;
     if ($key === 'school_id') return ($id = normalize_school_id(is_string($value) ? $value : null)) === '' ? null : $id;
     $value = is_string($value) ? trim($value) : $value;
@@ -2059,6 +2152,7 @@ function profile_value_label(string $key, $value, array $departments, array $org
         'account_type' => label_of(ACCOUNT_TYPES, $value),
         'department_id' => department_label(array_column($departments, null, 'id')[$value] ?? null) ?: 'Unknown department',
         'organization_id' => array_column($organizations, 'name', 'id')[$value] ?? 'Unknown organization',
+        'other_organization_ids' => implode(', ', other_organization_names(['other_organization_ids' => $value], $organizations)) ?: '—',
         'year_level' => year_label($value),
         'student_type' => label_of(STUDENT_TYPES, $value),
         'irregular_year_levels' => year_levels_label($value) ?: 'Every year level',
@@ -2172,7 +2266,7 @@ function withdraw_profile_request(string $requestId): array
 function get_profile_requests_admin(string $status = 'pending'): array
 {
     return supabase_user_request('profile_change_requests',
-        'select=*,profiles(id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at))'
+        'select=*,profiles(id,' . profile_name_columns() . ',role,account_type,department_id,' . profile_org_columns() . ',year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at))'
         . '&status=eq.' . urlencode($status) . '&order=' . ($status === 'pending' ? 'created_at.asc' : 'reviewed_at.desc') . '&limit=300');
 }
 
@@ -2263,7 +2357,7 @@ function approvals_waiting_counts(bool $fresh = false): array
 function get_all_profiles_admin(): array
 {
     return supabase_user_request_compat('profiles',
-        'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,created_at,organization_id,department_id,'
+        'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,created_at,' . profile_org_columns() . ',department_id,'
         . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)&order=role.asc,full_name.asc',
         'select=id,full_name,role,year_level,course,created_at,organization_id,organizations!profiles_organization_id_fkey(name)&order=role.asc,full_name.asc');
 }
@@ -2298,7 +2392,7 @@ function set_user_role_admin(string $userId, string $role): array
 function get_profile_admin(string $userId): ?array
 {
     if (!is_uuid($userId)) return null;
-    $rows = supabase_user_request('profiles', 'select=id,full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
+    $rows = supabase_user_request('profiles', 'select=id,' . profile_name_columns() . ',role,account_type,department_id,' . profile_org_columns() . ',year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
     if (empty($rows[0])) return null;
     $row = $rows[0];
     $row['school_id'] = $row['school_ids']['school_id'] ?? null;
@@ -2343,16 +2437,68 @@ function delete_account_admin(string $userId): array
 }
 
 /**
- * Student accounts with their school IDs (Import & Verify compares the
- * registrar's list against these).
+ * Accounts with their school IDs that Import & Verify compares the
+ * registrar's list against: students of every role — Students, Admins (role
+ * 'moderator') and Super Admins (role 'admin') — plus accounts whose type
+ * isn't set yet. Faculty are left out (they aren't on a student list).
  */
 function get_student_accounts_admin(): array
 {
     return supabase_user_request_compat('profiles',
-        'select=id,full_name,account_type,year_level,course,student_type,irregular_year_levels,'
+        'select=id,full_name,role,account_type,year_level,course,student_type,irregular_year_levels,'
         . 'organizations!profiles_organization_id_fkey(name),departments(name,code),school_ids(school_id,verified_at)'
-        . '&role=eq.user&or=(account_type.eq.student,account_type.is.null)&order=full_name.asc&limit=5000',
-        'select=id,full_name,year_level,course,organizations!profiles_organization_id_fkey(name)&role=eq.user&order=full_name.asc&limit=5000');
+        . '&role=in.(user,moderator,admin)&or=(account_type.eq.student,account_type.is.null)&order=full_name.asc&limit=5000',
+        'select=id,full_name,role,year_level,course,organizations!profiles_organization_id_fkey(name)&role=in.(user,moderator,admin)&order=full_name.asc&limit=5000');
+}
+
+/**
+ * Set accounts' year levels to the registrar's list (Import & Verify): $changes
+ * is [user id => year level 1–5]. Year level is the student's highest one, so
+ * an irregular student's subject year levels above it are dropped. Super
+ * Admins only (the database's "Admins can update any profile" rule).
+ * Everyone whose year level changed — students and Admins — is told, in the
+ * bell and by email (the usual email queue), with how to ask if it's wrong.
+ * @param array<string,int> $changes
+ * @param array<string,array> $accounts the compared accounts by id (for their irregular year levels)
+ */
+function set_year_levels_admin(array $changes, array $accounts): array
+{
+    $updated = []; // user id => new year level
+    $failed = [];
+    foreach ($changes as $userId => $year) {
+        if (!is_uuid((string) $userId) || !isset(YEAR_LEVELS[$year])) continue;
+        $fields = ['year_level' => $year];
+        $levels = parse_year_levels($accounts[$userId]['irregular_year_levels'] ?? []);
+        if ($levels) $fields['irregular_year_levels'] = array_values(array_filter($levels, fn($l) => $l <= $year)) ?: [$year];
+        $rows = supabase_user_request('profiles', 'id=eq.' . urlencode((string) $userId), 'PATCH', $fields);
+        if ($rows && supabase_last_error() === '') $updated[$userId] = $year;
+        else $failed[] = $accounts[$userId]['full_name'] ?? $userId;
+    }
+    $done = count($updated);
+    if (!$done && !$failed) return ['ok' => false, 'message' => 'Nothing to update.'];
+
+    // Tell each person (bell + email).
+    $notified = 0;
+    if ($updated) {
+        $now = gmdate('c');
+        $rows = supabase_user_request('notifications', '', 'POST', array_map(fn($uid, $year) => [
+            'user_id' => $uid,
+            'title' => 'Your year level was updated',
+            'message' => 'A Super Admin updated your year level to ' . YEAR_LEVELS[$year] . ' to match the registrar\'s student list. '
+                . 'Events open to your year level now follow it. If this isn\'t right, open My Profile › Edit my profile to send a correction, or contact a Super Admin.',
+            'status' => 'sent',
+            'sent_at' => $now,
+        ], array_keys($updated), array_values($updated)));
+        $notified = count($rows);
+        if ($notified) queue_notification_emails(); // emailed from the next page (assets/js/email-outbox.js)
+    }
+    $told = $notified ? ' ' . ($notified === 1 ? 'They were' : 'They were all') . ' notified in the site' . (mail_enabled() ? ' and by email' : '') . '.' : '';
+
+    if ($failed) {
+        return ['ok' => $done > 0, 'message' => ($done ? $done . ' year level' . ($done === 1 ? '' : 's') . ' updated;' . $told . ' ' : '')
+            . 'Couldn\'t update ' . implode(', ', $failed) . '. ' . friendly_error('Please try again.')];
+    }
+    return ['ok' => true, 'message' => $done . ' year level' . ($done === 1 ? ' was' : 's were') . ' updated to match the list.' . $told];
 }
 
 /** Mark accounts' school IDs as verified (matched with the registrar's list). */

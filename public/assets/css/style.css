@@ -1388,6 +1388,47 @@ a.announcement-item:hover .ann-title { color: var(--blue-accent); }
 }
 .acct-link { background: none; border: none; padding: 0; color: var(--blue-accent); font-weight: 700; font-size: 0.82rem; text-decoration: underline; }
 
+/* "Other organizations": a field-looking summary that opens a checklist grouped by department (account.js). */
+.acct-orgs { margin-bottom: 14px; }
+.acct-orgs-summary {
+  position: relative; display: flex; align-items: center;
+  padding-right: 38px !important;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  list-style: none; cursor: pointer; user-select: none;
+}
+.acct-orgs-summary::-webkit-details-marker { display: none; }
+.acct-orgs-summary::after {
+  content: ""; position: absolute; right: 16px; top: 50%;
+  width: 7px; height: 7px; margin-top: -6px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); opacity: 0.6; transition: transform 0.15s ease;
+}
+.acct-orgs-picker[open] .acct-orgs-summary::after { transform: rotate(-135deg); margin-top: -2px; }
+.acct-orgs-picker .acct-orgs-summary { margin-bottom: 0; }
+.acct-orgs-list {
+  margin-top: 6px; padding: 10px 14px;
+  max-height: 280px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card-bg);
+}
+.acct-orgs-list fieldset {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: 14px;
+  margin: 0 0 8px; padding: 0; border: none; min-width: 0;
+}
+.acct-orgs-list fieldset:last-child { margin-bottom: 0; }
+.acct-orgs-list legend {
+  padding: 4px 0 2px; font-size: 0.7rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);
+}
+.acct-orgs-list label {
+  display: flex !important; align-items: flex-start; gap: 8px; margin: 0 !important;
+  padding: 6px 0; font-size: 0.86rem !important; font-weight: 400; line-height: 1.35;
+  color: var(--text-main) !important; cursor: pointer;
+}
+.acct-orgs-list label[hidden] { display: none !important; }
+.acct-orgs-list input { margin-top: 2px; accent-color: var(--p-main); flex-shrink: 0; }
+.user-other-orgs { font-style: italic; }
+
 /* The "Irregular student registration" pop-up */
 .acct-modal {
   width: min(520px, calc(100vw - 32px));
@@ -2643,7 +2684,7 @@ body .dash-topbar .topbar-brand .brand-text .campus, .site-footer-brand strong {
 .install-help h2 { margin: 0 0 12px; font-size: 1.1rem; color: var(--navy); }
 .install-help ol { margin: 0 0 12px; padding-left: 20px; line-height: 1.6; font-size: 0.9rem; }
 .install-help p { margin: 0 0 14px; font-size: 0.82rem; color: var(--text-muted); }
-.install-help-actions { display: flex; justify-content: flex-end; }
+.install-help-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 :root:is([data-theme="dark"], [data-theme="dim"]) .install-help h2 { color: var(--text-main); }
 
 /* Appearance menu: a soft dark drop shadow instead of the neumorphic white glow

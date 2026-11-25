@@ -4,6 +4,7 @@
  *  - Student / Faculty: the student-only fields show (and are required) for students.
  *  - School ID: typed as 23-3170-870 — only digits are kept and the dashes are added.
  *  - Department: the Organization list shows only that department's organizations.
+ *  - Other organizations: a drop-down of checkboxes (any department), its summary the chosen names.
  *  - Irregular: opens the pop-up to pick the year levels of the student's
  *    subjects (the highest year level is always picked; higher ones can't be).
  * The server checks everything again (validate_account_fields()).
@@ -107,6 +108,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if (dept && d && dept.value !== d) { dept.value = d; syncOrgs(); }
   });
   syncOrgs();
+
+  /* ---- Other organizations (optional, any department) ----
+     The summary lists the ticked ones; the main organization isn't offered
+     again (it's unticked and hidden while it's the main one). */
+  const others = root.querySelector("[data-other-orgs]");
+  if (others) {
+    const summaryEl = others.querySelector("[data-other-orgs-summary]");
+    const boxes = [...others.querySelectorAll('input[type="checkbox"][name="other_organization_ids[]"]')];
+    const syncOthers = () => {
+      const main = org ? org.value : "";
+      boxes.forEach((b) => {
+        const isMain = b.value === main;
+        if (isMain) b.checked = false;
+        b.disabled = isMain;
+        b.closest("label").hidden = isMain;
+      });
+      const names = boxes.filter((b) => b.checked).map((b) => b.dataset.name).sort((a, b) => a.localeCompare(b));
+      summaryEl.textContent = names.length ? names.join(", ") : summaryEl.dataset.empty;
+    };
+    boxes.forEach((b) => b.addEventListener("change", syncOthers));
+    org?.addEventListener("change", syncOthers);
+    dept?.addEventListener("change", syncOthers);
+    // Closes when clicking elsewhere.
+    const picker = others.querySelector("details");
+    document.addEventListener("click", (e) => { if (picker.open && !picker.contains(e.target)) picker.open = false; });
+    syncOthers();
+  }
 
   /* ---- Irregular students: the pop-up ---- */
   const modal = document.getElementById("irregularModal");

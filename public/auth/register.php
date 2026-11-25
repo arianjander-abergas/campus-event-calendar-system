@@ -29,12 +29,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'resend') 
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fullName = post_param('full_name');
+    $name = name_parts_from_post(); // last / first / middle name, and the full name they make
+    $fullName = $name['full_name'];
     $email = strtolower(post_param('email'));
     $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
     $confirm = is_string($_POST['confirm_password'] ?? null) ? $_POST['confirm_password'] : '';
 
-    if ($fullName === '') $errors[] = 'Please enter your full name.';
+    $errors = array_merge($errors, name_parts_errors($name));
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Please enter your LCUP school email (ending in @' . SCHOOL_EMAIL_DOMAIN . ').';
     } elseif (!email_allowed($email)) {
@@ -55,13 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'year_level' => post_param('year_level'),
         'student_type' => post_param('student_type'),
         'irregular_year_levels' => $_POST['irregular_year_levels'] ?? [],
+        'other_organization_ids' => $_POST['other_organization_ids'] ?? [],
     ], $departments, $organizations);
     $errors = array_merge($errors, $account['errors']);
 
     if (!$errors) {
-        $result = supabase_auth_signup($email, $password, $fullName, $account['fields'] + ['school_id' => $account['school_id']]);
+        $result = supabase_auth_signup($email, $password, $fullName, $account['fields'] + ['school_id' => $account['school_id']]
+            + array_intersect_key($name, array_flip(['last_name', 'first_name', 'middle_name'])));
         if ($result['ok'] && empty($result['needsEmailConfirmation'])) {
-            flash('success', 'Welcome to Campus Event Hub, ' . explode(' ', $fullName)[0] . '!');
+            flash('success', 'Welcome to Campus Event Hub, ' . $name['first_name'] . '!');
             header('Location: ' . BASE_URL . '/enduser/dashboard.php');
             exit;
         }
@@ -76,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($errors) {
         // Back to a clean URL: the typed values show once (passwords never).
-        remember_form('register', ['full_name' => $fullName, 'email' => $email] + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
+        remember_form('register', ['last_name' => $name['last_name'], 'first_name' => $name['first_name'], 'middle_name' => $name['middle_name'], 'email' => $email] + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
         header('Location: register.php');
         exit;
     }
@@ -165,10 +168,20 @@ $old = fn(string $key): string => htmlspecialchars((string) ($acct[$key] ?? ''))
   <?php if ($sentTo === ''): ?>
   <form method="POST" action="register.php" class="login-form register-form" data-autoreset>
     <div class="register-grid">
+      <div>
+        <label for="last_name">Last Name</label>
+        <input type="text" id="last_name" name="last_name" class="login-input" required maxlength="60" autocomplete="family-name"
+               placeholder="Dela Cruz" value="<?= $old('last_name') ?>">
+      </div>
+      <div>
+        <label for="first_name">First Name</label>
+        <input type="text" id="first_name" name="first_name" class="login-input" required maxlength="60" autocomplete="given-name"
+               placeholder="Juan" value="<?= $old('first_name') ?>">
+      </div>
       <div class="register-full">
-        <label for="full_name">Full Name</label>
-        <input type="text" id="full_name" name="full_name" class="login-input" required autocomplete="name"
-               placeholder="Juan Dela Cruz" value="<?= $old('full_name') ?>">
+        <label for="middle_name">Middle Name <span class="login-optional">(optional)</span></label>
+        <input type="text" id="middle_name" name="middle_name" class="login-input" maxlength="60" autocomplete="additional-name"
+               placeholder="Santos" value="<?= $old('middle_name') ?>">
       </div>
 
       <div class="register-full">

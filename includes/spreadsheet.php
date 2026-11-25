@@ -590,3 +590,203 @@ function compare_attendance(array $records, array $registrations, bool $hasIdCol
     return $out;
 }
 
+// ---- Program Flow upload (Create Event › 6. Program Flow) ------------------
+
+const PROGRAM_FLOW_MAX_PARTS = 100;
+
+/** Header names for the Program Flow columns (compared lowercase, letters only). */
+const PROGRAM_FLOW_COLUMNS = [
+    'title' => ['part', 'parts', 'program', 'programme', 'programflow', 'activity', 'activities', 'title', 'item', 'items', 'segment', 'agenda', 'event', 'what', 'portion', 'particulars', 'programpart'],
+    'speaker' => ['speaker', 'speakers', 'speakerincharge', 'speakerpersonincharge', 'incharge', 'personincharge', 'presenter', 'facilitator', 'host', 'by', 'performer', 'performers', 'person', 'resourcespeaker', 'emcee', 'who', 'responsible', 'assignedto', 'name'],
+    'time' => ['time', 'times', 'schedule', 'start', 'starttime', 'when', 'duration', 'timeslot'],
+    'notes' => ['notes', 'note', 'description', 'remarks', 'details', 'venue', 'room', 'others'],
+];
+
+/**
+ * The parts of a program flow from an uploaded file — Excel (.xlsx), CSV,
+ * Word (.docx) or plain text — as [title, speaker, description] rows for the
+ * Program Flow section to fill in (nothing is saved here).
+ * Columns are found by their header (Part / Speaker / Time / Notes…); without
+ * one: Part, Speaker, Notes — or Time, Part, Speaker when the first column
+ * holds times. A time goes at the start of the notes.
+ * @return array{ok:bool, rows?:array<int, array{title:string, speaker:string, description:string}>, message?:string}
+ */
+function read_program_flow_file(string $path, string $originalName): array
+{
+    $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $read = match ($ext) {
+        'xlsx' => read_xlsx_file($path),
+        'csv' => read_csv_file($path),
+        'docx' => read_docx_rows($path),
+        'txt' => ['ok' => true, 'rows' => array_map(fn($l) => program_flow_split_line($l), preg_split('/\R/u', program_flow_text((string) file_get_contents($path))))],
+        'xls', 'doc' => ['ok' => false, 'message' => 'Older Office files (.' . $ext . ') can\'t be read. Save it as ' . ($ext === 'doc' ? 'a Word document (.docx)' : 'an Excel workbook (.xlsx)') . ' and upload that.'],
+        'pdf', 'jpg', 'jpeg', 'png', 'webp' => ['ok' => false, 'message' => 'Pictures and PDFs can\'t be read as a list. Upload the Word or Excel file the program was typed in, or add the parts by hand.'],
+        default => ['ok' => false, 'message' => 'Please upload an Excel (.xlsx), CSV, Word (.docx) or text (.txt) file.'],
+    };
+    if (!$read['ok']) return $read;
+
+    // Tidy cells; drop empty rows.
+    $rows = [];
+    foreach ($read['rows'] as $row) {
+        $row = array_map(fn($c) => trim(preg_replace('/\s+/u', ' ', (string) $c)), array_slice(array_values((array) $row), 0, 12));
+        while ($row && end($row) === '') array_pop($row);
+        if ($row && implode('', $row) !== '') $rows[] = $row;
+        if (count($rows) > 400) break;
+    }
+
+    // A header row (within the first 3 rows): its words say which column is which.
+    $columns = null;
+    foreach (array_slice($rows, 0, 3) as $i => $row) {
+        $found = [];
+        foreach ($row as $c => $cell) {
+            $key = preg_replace('/[^a-z]/', '', strtolower($cell));
+            foreach (PROGRAM_FLOW_COLUMNS as $field => $names) {
+                if (!isset($found[$field]) && !in_array($c, $found, true) && in_array($key, $names, true)) { $found[$field] = $c; break; }
+            }
+        }
+        // One cell alone ("PROGRAM") is a heading, not a header row.
+        if (count($row) > 1 && (isset($found['title']) || count($found) >= 2)) {
+            $columns = $found;
+            $rows = array_slice($rows, $i + 1);
+            break;
+        }
+    }
+
+    $parts = [];
+    foreach ($rows as $row) {
+        if ($columns !== null) {
+            $get = fn(string $f) => isset($columns[$f]) ? ($row[$columns[$f]] ?? '') : '';
+            $title = $get('title');
+            $speaker = $get('speaker');
+            $time = $get('time');
+            $notes = [$get('notes')];
+            // Columns nobody named go into the notes; without a Part column, the first one is the part.
+            foreach ($row as $c => $cell) {
+                if (in_array($c, $columns, true) || $cell === '') continue;
+                if ($title === '') $title = $cell; else $notes[] = $cell;
+            }
+        } else {
+            $cells = $row;
+            $time = count($cells) > 1 && program_flow_is_time($cells[0]) ? array_shift($cells) : '';
+            $title = array_shift($cells) ?? '';
+            $speaker = array_shift($cells) ?? '';
+            $notes = $cells;
+        }
+        $time = program_flow_time_text($time);
+        $title = trim(preg_replace('/^\(?([0-9]{1,3}|[IVXivx]{1,6}|[A-Za-z])[.)]\s+/u', '', $title)); // "1. ", "IV) ", "a. "
+        if ($title === '' && $speaker === '') continue;
+        // Leftover headings ("PROGRAM", "Program Flow") aren't parts.
+        if ($speaker === '' && preg_match('/^(the\s+)?(program(me)?(\s+flow)?|order\s+of\s+(the\s+)?program|agenda)\s*:?$/iu', $title)) continue;
+        if ($title === '') { $title = $speaker; $speaker = ''; }
+        $notes = implode(' · ', array_filter(array_merge([$time], $notes), fn($n) => $n !== ''));
+        $parts[] = [
+            'title' => mb_substr($title, 0, 200),
+            'speaker' => mb_substr($speaker, 0, 120),
+            'description' => mb_substr($notes, 0, 500),
+        ];
+        if (count($parts) >= PROGRAM_FLOW_MAX_PARTS) break;
+    }
+    if (!$parts) {
+        return ['ok' => false, 'message' => 'No parts were found in that file. Put one part per row (or line): the part, then the speaker / person in charge, then any notes.'];
+    }
+    return ['ok' => true, 'rows' => $parts];
+}
+
+/** Text from a .txt upload as UTF-8. */
+function program_flow_text(string $text): string
+{
+    $text = preg_replace('/^\xEF\xBB\xBF/', '', $text);
+    return mb_check_encoding($text, 'UTF-8') ? $text : mb_convert_encoding($text, 'UTF-8', 'Windows-1252');
+}
+
+/**
+ * One typed line as cells: split on tabs, dot leaders ("Prayer ...... Ms. Cruz"),
+ * " | ", or a dash between words ("Prayer – Ms. Cruz"); a time at the start
+ * ("8:00 AM Opening Prayer") becomes its own cell.
+ */
+function program_flow_split_line(string $line): array
+{
+    $line = trim($line);
+    if ($line === '') return [];
+    if (str_contains($line, "\t")) $cells = preg_split('/\t+/', $line);
+    elseif (preg_match('/\.{3,}|…/u', $line)) $cells = preg_split('/\s*(?:\.{3,}|…+)\s*/u', $line);
+    elseif (str_contains($line, ' | ')) $cells = explode(' | ', $line);
+    else $cells = preg_split('/\s+[–—-]\s+/u', $line, 5);
+    $cells = array_values(array_filter(array_map('trim', $cells), fn($c) => $c !== ''));
+    // "8:00 AM Opening Prayer" / "8:00-8:15 Opening Prayer": the time apart.
+    if ($cells && !program_flow_is_time($cells[0])
+        && preg_match('/^(\d{1,2}(?::\d{2})?\s*(?:[AaPp]\.?[Mm]\.?)?(?:\s*[–—-]\s*\d{1,2}(?::\d{2})?\s*(?:[AaPp]\.?[Mm]\.?)?)?)\s+(\D.*)$/u', $cells[0], $m)
+        && program_flow_is_time($m[1])) {
+        array_splice($cells, 0, 1, [trim($m[1]), trim($m[2])]);
+    }
+    // A time split off by a dash ("8:00 – 8:15 – Opening Prayer") comes back together.
+    if (count($cells) >= 3 && program_flow_is_time($cells[0]) && program_flow_is_time($cells[1])) {
+        array_splice($cells, 0, 2, [$cells[0] . ' – ' . $cells[1]]);
+    }
+    return $cells;
+}
+
+/** "8:00 AM", "08:00", "8:00-8:30 AM", "9 AM", or an Excel time (0.3333…). */
+function program_flow_is_time(string $cell): bool
+{
+    $cell = trim($cell);
+    if (preg_match('/^0?\.\d+$/', $cell)) return true; // Excel stores times as part of a day
+    return (bool) preg_match('/^\d{1,2}(:\d{2})?\s*([AaPp]\.?[Mm]\.?)?(\s*[–—-]\s*\d{1,2}(:\d{2})?\s*([AaPp]\.?[Mm]\.?)?)?$/u', $cell)
+        && (str_contains($cell, ':') || preg_match('/[AaPp]\.?[Mm]/', $cell));
+}
+
+/** An Excel time (fraction of a day) as "8:30 AM"; any other text as it is. */
+function program_flow_time_text(string $cell): string
+{
+    $cell = trim($cell);
+    if (preg_match('/^0?\.\d+$/', $cell)) {
+        $minutes = (int) round((float) $cell * 1440) % 1440;
+        return date('g:i A', mktime(intdiv($minutes, 60), $minutes % 60, 0, 1, 1, 2000));
+    }
+    return $cell;
+}
+
+/**
+ * A Word document's program as rows: each table row's cells (the usual
+ * program-flow layout), or else each paragraph split like a typed line.
+ * @return array{ok:bool, rows?:array, message?:string}
+ */
+function read_docx_rows(string $path): array
+{
+    $zip = (string) file_get_contents($path);
+    $entries = zip_list_entries($zip);
+    $doc = ($entries !== null && isset($entries['word/document.xml'])) ? xml_document(zip_read_entry($zip, $entries['word/document.xml'])) : null;
+    if (!$doc) {
+        return ['ok' => false, 'message' => 'That file isn\'t a readable Word document. Try saving it again as .docx.'];
+    }
+    $xpath = new DOMXPath($doc);
+    $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+    // A paragraph's text, with tabs and line breaks kept.
+    $text = function (DOMNode $p) use ($xpath): string {
+        $out = '';
+        foreach ($xpath->query('.//w:t | .//w:tab | .//w:br', $p) as $node) {
+            $out .= match ($node->localName) { 't' => $node->textContent, 'tab' => "\t", default => "\n" };
+        }
+        return $out;
+    };
+
+    $rows = [];
+    foreach ($xpath->query('//w:tbl//w:tr') as $tr) {
+        $cells = [];
+        foreach ($xpath->query('./w:tc', $tr) as $tc) {
+            $lines = [];
+            foreach ($xpath->query('.//w:p', $tc) as $p) $lines[] = trim($text($p));
+            $cells[] = implode(' ', array_filter($lines, fn($l) => $l !== ''));
+        }
+        $rows[] = $cells;
+    }
+    if (count(array_filter($rows, fn($r) => implode('', $r) !== '')) >= 2) {
+        return ['ok' => true, 'rows' => $rows];
+    }
+    // No table: the paragraphs, one part per line.
+    $rows = [];
+    foreach ($xpath->query('//w:body//w:p[not(ancestor::w:tbl)]') as $p) {
+        foreach (explode("\n", $text($p)) as $line) $rows[] = program_flow_split_line($line);
+    }
+    return ['ok' => true, 'rows' => $rows];
+}

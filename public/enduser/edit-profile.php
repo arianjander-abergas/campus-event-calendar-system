@@ -20,8 +20,15 @@ $selfUrl = 'edit-profile.php' . ($completing ? '?complete=1' : '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_profile') {
     $errors = [];
-    $fullName = post_param('full_name');
-    if ($fullName === '') $errors[] = 'Please enter your name.';
+    // The name: Last / First / Middle once the database has them (full name made from them), else one Full Name.
+    if (name_parts_ready()) {
+        $name = name_parts_from_post();
+        $errors = name_parts_errors($name);
+    } else {
+        $name = ['full_name' => post_param('full_name')];
+        if ($name['full_name'] === '') $errors[] = 'Please enter your name.';
+    }
+    $fullName = $name['full_name'];
 
     $account = validate_account_fields([
         // The student / faculty choice is fixed once made (only an admin changes it).
@@ -33,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_prof
         'year_level' => post_param('year_level'),
         'student_type' => post_param('student_type'),
         'irregular_year_levels' => $_POST['irregular_year_levels'] ?? [],
+        'other_organization_ids' => $_POST['other_organization_ids'] ?? [],
     ], $departments, $organizations, $user['school_id'] ?? null);
     // Admins don't have to belong to a department / organization.
     if ($isAdmin) {
@@ -41,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_prof
     $errors = array_merge($errors, $account['errors']);
 
     if (!$errors) {
-        $result = save_profile_details(['full_name' => $fullName] + $account['fields'] + ['school_id' => $account['school_id']], $completing);
+        $result = save_profile_details($name + $account['fields'] + ['school_id' => $account['school_id']], $completing);
         if ($result['ok']) {
             if ($completing) {
                 $stillMissing = profile_missing_fields(current_user());
@@ -55,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_prof
         }
         $errors[] = $result['message'];
     }
-    remember_form('profile', ['full_name' => $fullName] + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
+    remember_form('profile', $name + $account['fields'] + ['school_id' => $account['school_id'] ?? post_param('school_id')], $errors);
     header('Location: ' . $selfUrl);
     exit;
 }
@@ -131,8 +139,12 @@ $breadcrumbs = $completing
           </div>
         </div>
 
-        <label class="admin-label" for="full_name">Full Name <span class="req">*</span></label>
-        <input type="text" id="full_name" name="full_name" class="admin-input" required value="<?= htmlspecialchars((string) ($acct['full_name'] ?? $user['full_name'])) ?>">
+        <?php if (name_parts_ready()): ?>
+          <?php $nameValues = $acct + $user; include __DIR__ . '/../../includes/name-fields.php'; ?>
+        <?php else: ?>
+          <label class="admin-label" for="full_name">Full Name <span class="req">*</span></label>
+          <input type="text" id="full_name" name="full_name" class="admin-input" required value="<?= htmlspecialchars((string) ($acct['full_name'] ?? $user['full_name'])) ?>">
+        <?php endif; ?>
 
         <?php include __DIR__ . '/../../includes/account-fields.php'; ?>
 

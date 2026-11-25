@@ -55,6 +55,21 @@ $compare = function () use (&$import, $type, $event): array {
         ? compare_roster($import['records'], get_student_accounts_admin(), $hasId)
         : compare_attendance($import['records'], get_event_registrations_admin($event['id']), $hasId);
 };
+/**
+ * Student list: accounts whose year level differs from the list's —
+ * [user id => the list's year level]. Worked out again on every request, so
+ * the Update buttons can only ever set the value in the uploaded file.
+ */
+$yearFixes = function (array $result): array {
+    $fixes = [];
+    foreach ($result['mismatch'] ?? [] as $m) {
+        $year = $m['record']['year_level'] ?? null;
+        if ($year && isset(YEAR_LEVELS[$year]) && (int) ($m['account']['year_level'] ?? 0) !== $year) {
+            $fixes[$m['account']['id']] = $year;
+        }
+    }
+    return $fixes;
+};
 
 // ---- Actions ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -100,6 +115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ids = array_map(fn($m) => $m['account']['id'], array_filter($result['matched'], fn($m) => empty($m['account']['school_ids']['verified_at']) && !empty($m['account']['school_ids']['school_id'])));
         $done = mark_school_ids_verified($ids);
         flash($done['ok'] ? 'success' : 'error', $done['message']);
+    } elseif ($import && $type === 'roster' && in_array($action, ['update_year', 'update_years'], true)) {
+        // Year level to the list's: one account (its row's Update button) or all of them.
+        $result = $compare();
+        $fixes = $yearFixes($result);
+        if ($action === 'update_year') $fixes = array_intersect_key($fixes, [post_param('id') => true]);
+        $accounts = array_column(array_map(fn($m) => $m['account'], $result['mismatch']), null, 'id');
+        $done = $fixes ? set_year_levels_admin($fixes, $accounts) : ['ok' => false, 'message' => 'That year level already matches the list.'];
+        flash($done['ok'] ? 'success' : 'error', $done['message']);
     } elseif ($import && $event && in_array($action, ['mark_attended', 'mark_no_show'], true)) {
         $result = $compare();
         if ($action === 'mark_attended') {
@@ -142,15 +165,19 @@ $columnNames = ['school_id' => 'School ID', 'full_name' => 'Name', 'last_name' =
 $activeNav = 'import';
 $breadcrumbs = [$isAdmin ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], ['Import & Verify', null]];
 
-/** One table of comparison results. */
-function render_matches(array $items, string $mode): void
+/**
+ * One table of comparison results. $yearFixes ([user id => year], "Details
+ * differ" only) adds an Update button to the rows whose year level differs.
+ */
+function render_matches(array $items, string $mode, array $yearFixes = [], string $action = ''): void
 {
     if (!$items) {
         echo '<p class="admin-muted import-none">None.</p>';
         return;
     }
     echo '<div class="admin-table-wrap"><table class="admin-table admin-table-compact"><thead><tr>'
-        . '<th class="num">Row</th><th>In the file</th><th>In the system</th><th>Notes</th></tr></thead><tbody>';
+        . '<th class="num">Row</th><th>In the file</th><th>In the system</th><th>Notes</th>'
+        . ($yearFixes ? '<th><span class="visually-hidden">Actions</span></th>' : '') . '</tr></thead><tbody>';
     foreach ($items as $m) {
         $r = $m['record'];
         $person = $mode === 'roster' ? $m['account'] : ($m['registration']['profiles'] ?? null);
@@ -161,9 +188,21 @@ function render_matches(array $items, string $mode): void
             $sys = trim(($sid !== '' ? $sid . ' · ' : '') . $person['full_name'] . (!empty($person['course']) ? ' · ' . $person['course'] : '') . (!empty($person['year_level']) ? ' · ' . ordinal((int) $person['year_level']) . ' yr' : ''));
             if ($mode === 'attendance' && !empty($m['registration']['status'])) $sys .= ' · ' . ucfirst(str_replace('_', '-', $m['registration']['status']));
         }
+        $cell = '';
+        if ($yearFixes) {
+            $id = (string) ($person['id'] ?? '');
+            if (isset($yearFixes[$id])) {
+                $to = ordinal($yearFixes[$id]) . ' yr';
+                $cell = '<form method="POST" action="' . htmlspecialchars($action) . '" data-confirm="Change ' . htmlspecialchars($person['full_name']) . '\'s year level to ' . $to . ', as on the list? They\'ll be notified in the site and by email." data-confirm-title="Update year level" data-confirm-ok="Update">'
+                    . '<input type="hidden" name="action" value="update_year"><input type="hidden" name="id" value="' . htmlspecialchars($id) . '">'
+                    . '<button type="submit" class="btn-sm btn-sm-accent">Update to ' . $to . '</button></form>';
+            }
+            $cell = '<td class="admin-row-actions">' . $cell . '</td>';
+        }
         echo '<tr><td class="num">' . ($r['row'] ?? '—') . '</td><td>' . htmlspecialchars($file) . '</td><td>' . htmlspecialchars($sys)
+            . (in_array($person['role'] ?? '', ['moderator', 'admin'], true) ? ' <span class="admin-table-sub">(' . ($person['role'] === 'admin' ? 'Super Admin' : 'Admin') . ')</span>' : '')
             . (!empty($person['school_ids']['verified_at']) ? ' <span class="verify-badge is-verified">Verified</span>' : '')
-            . '</td><td>' . htmlspecialchars(implode(' ', $m['notes'])) . '</td></tr>';
+            . '</td><td>' . htmlspecialchars(implode(' ', $m['notes'])) . '</td>' . $cell . '</tr>';
     }
     echo '</tbody></table></div>';
 }
@@ -209,7 +248,7 @@ function render_matches(array $items, string $mode): void
           <div>
             <h2><?= $type === 'roster' ? 'Check the registrar\'s student list' : 'Check an attendance sheet' ?></h2>
             <p><?= $type === 'roster'
-              ? 'Compares each student on the list with the accounts: same School ID, name, course and year level. Matching accounts can then be marked verified.'
+              ? 'Compares each student on the list with the accounts — Students, Admins and Super Admins: same School ID, name, course and year level. Matching accounts can then be marked verified.'
               : 'Compares the people on the sheet with the event\'s registrations, so you can mark them Attended in one click.' ?></p>
           </div>
         </div>
@@ -287,10 +326,18 @@ function render_matches(array $items, string $mode): void
               <span class="admin-hint">Only accounts whose School ID, name, course and year level all match.</span>
             </form>
           <?php endif; ?>
-          <?php foreach (['mismatch' => 'Details differ', 'no_account' => 'On the list but no account', 'not_in_file' => 'Student accounts not on the list', 'duplicate' => 'Duplicates in the file', 'matched' => 'Matched'] as $key => $label): ?>
+          <?php $fixes = $yearFixes($result); ?>
+          <?php if ($fixes): ?>
+            <form method="POST" action="<?= htmlspecialchars($self) ?>" class="import-action" data-confirm="Change the year level of <?= count($fixes) ?> account(s) to the one on the list? Each person will be notified in the site and by email." data-confirm-title="Update year levels" data-confirm-ok="Update">
+              <input type="hidden" name="action" value="update_years">
+              <button type="submit" class="btn btn-outline">Update <?= count($fixes) ?> year level<?= count($fixes) === 1 ? '' : 's' ?> to match the list</button>
+              <span class="admin-hint">Students, Admins and Super Admins whose year level differs from the file (Details differ). Each is notified in the site and by email. Or update them one by one below.</span>
+            </form>
+          <?php endif; ?>
+          <?php foreach (['mismatch' => 'Details differ', 'no_account' => 'On the list but no account', 'not_in_file' => 'Accounts not on the list (students, Admins and Super Admins)', 'duplicate' => 'Duplicates in the file', 'matched' => 'Matched'] as $key => $label): ?>
             <details class="import-group"<?= $result[$key] && $key !== 'matched' ? ' open' : '' ?>>
               <summary><?= $label ?> <span class="import-count"><?= count($result[$key]) ?></span></summary>
-              <?php render_matches($result[$key], 'roster'); ?>
+              <?php render_matches($result[$key], 'roster', $key === 'mismatch' ? $fixes : [], $self); ?>
             </details>
           <?php endforeach; ?>
         <?php else: ?>

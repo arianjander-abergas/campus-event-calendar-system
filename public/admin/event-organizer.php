@@ -726,7 +726,17 @@ $breadcrumbs[] = [$pageTitle, null];
           </ol>
           <p class="admin-hint" data-pf-empty<?= $programRows ? ' hidden' : '' ?>>No program flow yet. Add the parts of the event in the order they happen.</p>
           <?= $why('programs') ?>
-          <button type="button" class="btn btn-outline pf-add" data-pf-add>+ Add a part</button>
+          <div class="pf-actions">
+            <button type="button" class="btn btn-outline pf-add" data-pf-add>+ Add a part</button>
+            <?php /* No name: the file isn't sent with the event — the script reads it (program-flow-upload.php) and fills in the parts. */ ?>
+            <label class="btn btn-outline pf-upload">
+              <input type="file" accept=".xlsx,.csv,.docx,.txt" data-pf-file>
+              Upload program flow
+            </label>
+            <a href="program-flow-upload.php?template=1" class="pf-template">Download a template</a>
+          </div>
+          <p class="admin-hint pf-upload-hint">Upload an Excel, CSV, Word or text file with one part per row or line: the part, the speaker / person in charge, then any notes (times go into the notes). The parts fill in above so you can check them — they're saved with the event.</p>
+          <p class="pf-upload-msg" data-pf-upload-msg role="status" hidden></p>
           <template data-pf-template><?= $programRow([]) ?></template>
         </details>
 
@@ -1180,6 +1190,58 @@ $breadcrumbs[] = [$pageTitle, null];
   });
   pfSync();
 
+  // Upload program flow: the file is read on the server (program-flow-upload.php)
+  // and its parts are filled in here — replacing the list, or after it.
+  var pfFile = form.querySelector('[data-pf-file]');
+  var pfMsg = form.querySelector('[data-pf-upload-msg]');
+  function pfSay(text, isError) {
+    pfMsg.textContent = text;
+    pfMsg.classList.toggle('is-error', !!isError);
+    pfMsg.hidden = !text;
+  }
+  function pfFilled() {
+    return Array.prototype.filter.call(pfList.querySelectorAll('[data-pf-row]'), function (row) {
+      return Array.prototype.some.call(row.querySelectorAll('input[type="text"]'), function (i) { return i.value.trim() !== ''; });
+    });
+  }
+  function pfAddRows(parts, replace) {
+    if (replace) pfList.innerHTML = '';
+    else pfList.querySelectorAll('[data-pf-row]').forEach(function (row) { if (pfFilled().indexOf(row) < 0) row.remove(); }); // drop empty rows
+    parts.forEach(function (p) {
+      var row = pfTemplate.content.firstElementChild.cloneNode(true);
+      row.querySelector('input[name="programs[title][]"]').value = p.title || '';
+      row.querySelector('input[name="programs[speaker][]"]').value = p.speaker || '';
+      row.querySelector('input[name="programs[description][]"]').value = p.description || '';
+      pfList.appendChild(row);
+    });
+    pfSync();
+  }
+  pfFile.addEventListener('change', function () {
+    var file = pfFile.files[0];
+    if (!file) return;
+    var name = file.name;
+    var data = new FormData();
+    data.append('file', file);
+    pfFile.value = ''; // the same file can be chosen again
+    pfSay('Reading ' + name + '…');
+    fetch('program-flow-upload.php', { method: 'POST', body: data, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok) { pfSay(res.message || 'That file could not be read.', true); return; }
+        var parts = res.rows || [];
+        var filled = pfFilled().length;
+        var done = function (replace) {
+          pfAddRows(parts, replace);
+          pfSay((replace || !filled ? 'Filled in ' : 'Added ') + parts.length + (parts.length === 1 ? ' part' : ' parts') + ' from ' + name + '. Check them, then save the event.');
+        };
+        if (!filled) { done(true); return; }
+        var question = 'The list already has ' + filled + (filled === 1 ? ' part' : ' parts') + '. Replace ' + (filled === 1 ? 'it' : 'them') + ' with the ' + parts.length + ' from ' + name + ', or add the new ones after ' + (filled === 1 ? 'it' : 'them') + '?';
+        if (window.cehConfirm) window.cehConfirm(question, { title: 'Upload program flow', ok: 'Replace', cancel: 'Add after' }).then(done);
+        else done(window.confirm(question + '\n\nOK = Replace, Cancel = Add after'));
+      })
+      .catch(function () { pfSay('The file could not be uploaded. Check your connection and try again.', true); });
+  });
+
   // ---- Fields that still need information ----
   // Checked before the form is sent (the same rules the server applies):
   // every field with a problem gets a red border and the reason under it,
@@ -1384,13 +1446,38 @@ $breadcrumbs[] = [$pageTitle, null];
 </script>
 <script>
 // Events table "Edit ▾" / "Manage ▾" menus: one open at a time; a click outside or Escape closes it.
+// Each menu pops up over the page (placed against the screen, not inside the table), so
+// opening one never stretches the row or scrolls the table: below its button, or above
+// it when there isn't room below. Scrolling or resizing closes it.
 (function () {
   var menus = document.querySelectorAll('details.row-more');
+  function place(menu) {
+    var list = menu.querySelector('.row-more-menu');
+    var button = menu.querySelector('summary').getBoundingClientRect();
+    list.classList.add('is-floating');
+    var w = list.offsetWidth, h = list.offsetHeight, gap = 6, edge = 8;
+    var top = button.bottom + gap;
+    if (top + h > window.innerHeight - edge && button.top - gap - h >= edge) top = button.top - gap - h; // no room below: above
+    var left = Math.min(Math.max(edge, button.right - w), window.innerWidth - w - edge); // right edges lined up, kept on screen
+    list.style.top = Math.round(top) + 'px';
+    list.style.left = Math.round(left) + 'px';
+  }
   menus.forEach(function (menu) {
+    // Floating from the start, so even the first frame after a click is outside the table.
+    menu.querySelector('.row-more-menu').classList.add('is-floating');
     menu.addEventListener('toggle', function () {
-      if (menu.open) menus.forEach(function (m) { if (m !== menu) m.open = false; });
+      if (menu.open) {
+        menus.forEach(function (m) { if (m !== menu) m.open = false; });
+        place(menu);
+      }
     });
   });
+  function closeAll() { menus.forEach(function (m) { if (m.open) m.open = false; }); }
+  window.addEventListener('resize', closeAll);
+  document.addEventListener('scroll', function (e) {
+    if (e.target.closest && e.target.closest('.row-more-menu')) return; // scrolling inside a menu
+    closeAll();
+  }, true); // capture: also the table's own scrolling
   document.addEventListener('click', function (e) {
     menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
   });

@@ -113,13 +113,20 @@ if ($tab === 'approvals') {
     ksort($courses, SORT_NATURAL);
     $matchesId = fn(string $filter, $id): bool => $filter === '' || ($filter === 'none' ? empty($id) : (string) $id === $filter);
 
-    $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter, $deptFilter, $orgFilter, $yearFilter, $courseFilter, $courseKey, $matchesId) {
+    // Each account's other organizations (names), shown under the main one and searched / filtered too.
+    $otherOrgs = [];
+    foreach ($all as $p) $otherOrgs[$p['id']] = other_organization_names($p, $organizations);
+    // The Organization filter finds members of it — their main organization or one of their others.
+    $inOrg = fn(array $p): bool => $orgFilter === '' || $matchesId($orgFilter, $p['organization_id'] ?? null)
+        || ($orgFilter !== 'none' && in_array($orgFilter, (array) ($p['other_organization_ids'] ?? []), true));
+
+    $profiles = array_values(array_filter($all, function ($p) use ($q, $roleFilter, $typeFilter, $deptFilter, $yearFilter, $courseFilter, $courseKey, $matchesId, $inOrg, $otherOrgs) {
         if ($roleFilter !== '' && $p['role'] !== $roleFilter) return false;
         if ($typeFilter !== '' && ($p['account_type'] ?? '') !== $typeFilter) return false;
-        if (!$matchesId($deptFilter, $p['department_id'] ?? null) || !$matchesId($orgFilter, $p['organization_id'] ?? null)) return false;
+        if (!$matchesId($deptFilter, $p['department_id'] ?? null) || !$inOrg($p)) return false;
         if ($yearFilter !== '' && (string) ($p['year_level'] ?? '') !== $yearFilter) return false;
         if ($courseFilter !== '' && $courseKey($p['course'] ?? '') !== $courseKey($courseFilter)) return false;
-        return matches_search($q, [$p['full_name'] ?? '', $p['course'] ?? '', $p['organizations']['name'] ?? '', $p['departments']['name'] ?? '', $p['school_ids']['school_id'] ?? '']);
+        return matches_search($q, array_merge([$p['full_name'] ?? '', $p['course'] ?? '', $p['organizations']['name'] ?? '', $p['departments']['name'] ?? '', $p['school_ids']['school_id'] ?? ''], $otherOrgs[$p['id']]));
     }));
     $listPager = paginate($profiles, 20, $page);
     $listPageUrl = fn(int $p): string => $listUrl(['page' => $p > 1 ? $p : '']);
@@ -294,6 +301,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
               <td>
                 <?= htmlspecialchars($p['departments']['name'] ?? '—') ?>
                 <div class="admin-table-sub"><?= htmlspecialchars($p['organizations']['name'] ?? 'No organization') ?></div>
+                <?php if (!empty($otherOrgs[$p['id']])): ?><div class="admin-table-sub user-other-orgs" title="Other organizations">Also: <?= htmlspecialchars(implode(', ', $otherOrgs[$p['id']])) ?></div><?php endif; ?>
               </td>
               <td>
                 <span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span>
@@ -370,6 +378,7 @@ $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', 
               <td>
                 <?= htmlspecialchars($p['departments']['name'] ?? '—') ?>
                 <div class="admin-table-sub"><?= htmlspecialchars($p['organizations']['name'] ?? 'No organization') ?></div>
+                <?php if (!empty($otherOrgs[$p['id']])): ?><div class="admin-table-sub user-other-orgs" title="Other organizations">Also: <?= htmlspecialchars(implode(', ', $otherOrgs[$p['id']])) ?></div><?php endif; ?>
               </td>
               <?php /* Read-only here: roles are changed on the Roles page. */ ?>
               <td><span class="admin-status role-<?= htmlspecialchars($p['role']) ?>"><?= htmlspecialchars(role_display($p['role'], $p['account_type'] ?? null)) ?></span></td>

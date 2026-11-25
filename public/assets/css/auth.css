@@ -659,6 +659,13 @@ button.login-field-icon { cursor: pointer; }
   color: var(--glass-muted);
 }
 .login-glass .acct-status label { font-weight: 400; color: var(--glass-text); }
+/* Other organizations (sign-up): the checklist on the dark glass. */
+.login-glass .acct-orgs { margin-bottom: 16px; }
+.login-glass .acct-orgs-summary { color: var(--glass-text); }
+.login-glass .acct-orgs-list { background: rgba(var(--p-dark-mid-rgb), 0.92); border-color: var(--glass-field-border); }
+.login-glass .acct-orgs-list legend { color: var(--glass-muted); }
+.login-glass .register-form .acct-orgs-list label { color: var(--glass-text) !important; font-size: 0.86rem !important; margin: 0 !important; }
+.login-glass .acct-orgs-list input { accent-color: var(--glass-gold); }
 .login-glass .acct-status input { accent-color: var(--glass-gold); }
 .login-glass .acct-irregular-summary {
   background: rgba(var(--p-hi-rgb), 0.1);

@@ -83,6 +83,33 @@ uksort($orgGroups, fn($a, $b) => strcmp($deptNames[$a] ?? 'zzz', $deptNames[$b] 
     </div>
   </div>
 
+  <?php if (other_orgs_ready()): /* More organizations (any department), besides the main one above. */ ?>
+    <?php
+    $acctOthers = array_map('strval', is_array($acct['other_organization_ids'] ?? null) ? $acct['other_organization_ids'] : []);
+    $acctOtherNames = other_organization_names(['other_organization_ids' => $acctOthers], $organizations);
+    ?>
+    <div class="acct-orgs" data-other-orgs>
+      <span class="<?= $labelClass ?> acct-label">Other Organizations <span class="<?= $isAuth ? 'login-optional' : 'admin-muted' ?>">(optional — if you're a member of more than one)</span></span>
+      <details class="acct-orgs-picker">
+        <summary class="<?= $inputClass ?> acct-orgs-summary" data-other-orgs-summary data-empty="None — tap to add"><?= $acctOtherNames ? htmlspecialchars(implode(', ', $acctOtherNames)) : 'None — tap to add' ?></summary>
+        <div class="acct-orgs-list">
+          <?php foreach ($orgGroups as $deptId => $orgs): ?>
+            <fieldset>
+              <legend><?= htmlspecialchars($deptNames[$deptId] ?? 'Other organizations') ?></legend>
+              <?php foreach ($orgs as $o): ?>
+                <label>
+                  <input type="checkbox" name="other_organization_ids[]" value="<?= htmlspecialchars($o['id']) ?>" data-name="<?= htmlspecialchars($o['name']) ?>" <?= in_array($o['id'], $acctOthers, true) ? 'checked' : '' ?>>
+                  <span><?= htmlspecialchars(organization_label($o)) ?></span>
+                </label>
+              <?php endforeach; ?>
+            </fieldset>
+          <?php endforeach; ?>
+        </div>
+      </details>
+      <input type="hidden" name="other_organization_ids[]" value="">
+    </div>
+  <?php endif; ?>
+
   <!-- Students only -->
   <div class="acct-student" data-student-only<?= $acctType === 'student' ? '' : ' hidden' ?>>
     <div class="acct-grid">
