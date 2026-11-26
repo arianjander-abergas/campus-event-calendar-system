@@ -54,7 +54,8 @@ $myRegistration = $event ? get_my_registration($eventId) : null;
 $reg = $event ? registration_state($event, $myRegistration, $going) : null;
 
 // Attendees evaluate the event once (one standard form for every event).
-$attended = ($myRegistration['status'] ?? '') === 'attended';
+// (Not when the organizers switched the evaluation off for this event.)
+$attended = ($myRegistration['status'] ?? '') === 'attended' && event_has_evaluation($event);
 $evaluated = $attended && has_evaluated($eventId);
 
 // Program Flow: this event's parts from event_programs, in running order (sort_order).

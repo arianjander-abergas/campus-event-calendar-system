@@ -789,6 +789,8 @@ td.admin-row-actions > form { gap: 6px; }
 .pf-fields .field-error { order: 9; grid-column: 1 / -1; margin: 0; } /* under the row, not between its boxes */
 .pf-tools { display: flex; gap: 4px; flex-shrink: 0; }
 .pf-add { margin-top: 4px; }
+.page-title-count { font-size: 0.7em; font-weight: 600; color: var(--text-muted); }
+
 /* + Add a part, Upload program flow, Download a template */
 .pf-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 4px; }
 .pf-actions .pf-add { margin-top: 0; }

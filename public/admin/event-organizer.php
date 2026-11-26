@@ -143,6 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
         'contact_number' => post_param('contact_number') ?: null,
         'enable_registration' => isset($_POST['enable_registration']),
         'send_notification' => $sendNotification,
+        'has_evaluation' => isset($_POST['has_evaluation']),
         'is_published' => $intent === 'publish',
         'status' => $intent === 'publish' ? 'published' : 'draft',
     ];
@@ -169,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save') {
     if (!$fields['category_other'] && empty($previous['category_other'])) unset($fields['category_other']);
     if (!$fields['required_for'] && empty($previous['required_for'])) unset($fields['required_for']);
     if ($eventLevel === 'organizational' && empty($previous['event_level'])) unset($fields['event_level']);
+    if (!evaluation_toggle_ready()) unset($fields['has_evaluation']); // the database doesn't have the switch yet
 
     // Errors are keyed by the field they belong to, so the form can highlight
     // that field and show the reason under it (the first problem per field wins).
@@ -745,6 +747,9 @@ $breadcrumbs[] = [$pageTitle, null];
           <div class="admin-checkbox-row">
             <label class="admin-checkbox"><input type="checkbox" name="enable_registration" <?= $checked('enable_registration') ?>> Enable Registration</label>
             <label class="admin-checkbox"><input type="checkbox" name="send_notification" <?= $checked('send_notification') ?>> Send Notification to Users</label>
+            <?php if (evaluation_toggle_ready()): /* on for new events; an event saved without it stays off */ ?>
+              <label class="admin-checkbox"><input type="checkbox" name="has_evaluation" <?= !array_key_exists('has_evaluation', $f) || !empty($f['has_evaluation']) ? 'checked' : '' ?>> Evaluation after the event</label>
+            <?php endif; ?>
           </div>
           <p class="admin-hint">With "Send Notification" on: publishing a new event notifies everyone it's open to (the audience and year levels above); saving changes to a published event notifies the people registered for it and the required attendees. Notifications show in the site and are emailed too<?= mail_enabled() ? '' : ' (once email is set up — a Super Admin can check Database update › Site setup)' ?>.</p>
         </details>

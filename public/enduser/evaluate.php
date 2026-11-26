@@ -15,6 +15,11 @@ if (!$event) {
     header('Location: dashboard.php');
     exit;
 }
+if (!event_has_evaluation($event)) {
+    flash('info', 'This event doesn\'t have an evaluation.');
+    header('Location: ../event-details.php?id=' . urlencode($eventId));
+    exit;
+}
 
 $myRegistration = get_my_registration($eventId);
 $attended = ($myRegistration['status'] ?? '') === 'attended';

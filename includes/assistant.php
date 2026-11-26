@@ -687,7 +687,7 @@ function assistant_tool_event_details(array $in, ?array $user): array
         if ($contact !== '') $row['contact'] = $contact;
         $status = $mine['status'] ?? '';
         $row['my_registration'] = $status !== '' && $status !== 'cancelled' ? $status : 'not registered';
-        if ($status === 'attended') {
+        if ($status === 'attended' && event_has_evaluation($ev)) {
             $row['my_evaluation'] = has_evaluated($id) ? 'done' : 'not yet — they can evaluate it now (open_page evaluate_event)';
         }
     } else {
@@ -822,6 +822,9 @@ function assistant_tool_open_page(array $in, ?array $user, ?array &$nav): array
             return ['error' => "This user can only manage their own organization's events."];
         }
         if ($key === 'evaluate_event') {
+            if (!event_has_evaluation($ev)) {
+                return ['error' => 'This event has no evaluation (the organizers switched it off).'];
+            }
             if ((get_my_registration($eventId)['status'] ?? '') !== 'attended') {
                 return ['error' => 'Only people marked Attended can evaluate this event, and this user is not.'];
             }

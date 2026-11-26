@@ -33,15 +33,6 @@ $decisions = ['pending' => 'Waiting', 'approved' => 'Approved', 'rejected' => 'R
     <?php endif; ?>
   </p>
 
-  <div class="admin-tabs admin-subtabs" role="tablist" aria-label="Approvals">
-    <a href="<?= htmlspecialchars($approvalsUrl('events')) ?>" class="admin-tab<?= $kind === 'events' ? ' active' : '' ?>" role="tab" aria-selected="<?= $kind === 'events' ? 'true' : 'false' ?>">
-      Event approvals<?php if ($waitingEvents): ?> <span class="tab-badge"><?= count($waitingEvents) ?></span><?php endif; ?>
-    </a>
-    <a href="<?= htmlspecialchars($approvalsUrl('profiles')) ?>" class="admin-tab<?= $kind === 'profiles' ? ' active' : '' ?>" role="tab" aria-selected="<?= $kind === 'profiles' ? 'true' : 'false' ?>">
-      Profile edits<?php if ($waitingProfiles): ?> <span class="tab-badge"><?= count($waitingProfiles) ?></span><?php endif; ?>
-    </a>
-  </div>
-
   <nav class="approval-filter" aria-label="Show">
     <?php foreach ($decisions as $key => $label): ?>
       <a href="<?= htmlspecialchars($approvalsUrl($kind, $key)) ?>" class="btn-sm<?= $decision === $key ? ' btn-sm-accent' : '' ?>"<?= $decision === $key ? ' aria-current="true"' : '' ?>><?= $label ?></a>

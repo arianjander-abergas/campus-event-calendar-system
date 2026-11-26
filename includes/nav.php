@@ -88,7 +88,6 @@ $usersOpen = in_array($activeNav, ['admin-users', 'admin-roles'], true); // "Use
         <div class="event-submenu" id="eventSubmenu"<?= $eventsOpen ? '' : ' hidden' ?>>
           <?= $navLink('/events.php', 'events', 'calendar', 'Event Calendar', 16) ?>
           <?= $navLink('/events.php?mine=1', 'my-events', 'check', 'My Events', 16) ?>
-          <?= $navLink('/event-details.php', 'event', 'list', 'Next Event', 16) ?>
         </div>
       </div>
     <?php else: ?>

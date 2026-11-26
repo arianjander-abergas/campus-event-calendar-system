@@ -672,7 +672,8 @@ const DB_UPDATES = [
     '20261122120000_approval_notices.sql' => ['"Your event was approved / not approved" notices to the event\'s author, in the bell and by email', 'rpc', 'approval_notices_ready', []],
     '20261125130000_name_parts.sql' => ['Names in three parts (Last name, First name, Middle name) on sign-up and profiles', 'rpc', 'profile_names_ready', []],
     '20261125140000_more_organizations.sql' => ['More than one organization per account (Other organizations on sign-up, profiles and Users)', 'rpc', 'profile_other_organizations_ready', []],
-    '20261126090000_profile_photos.sql' => ['Profile pictures (My Profile › Change photo)', 'rpc', 'profile_photos_ready', []],];
+    '20261126090000_profile_photos.sql' => ['Profile pictures (My Profile › Change photo)', 'rpc', 'profile_photos_ready', []],
+    '20261126100000_event_evaluation_toggle.sql' => ['"Evaluation after the event" on or off per event (Create Event › Publishing Options)', 'rpc', 'event_evaluation_toggle_ready', []],];
 
 /**
  * The database updates that haven't been run yet (file => what it switches on).
@@ -3953,6 +3954,7 @@ function set_registration_status_admin(array $event, array $registrationIds, str
  */
 function request_evaluations(array $event, array $userIds): int
 {
+    if (!event_has_evaluation($event)) return 0; // evaluation switched off for this event
     $userIds = array_values(array_unique(array_filter($userIds, 'is_uuid')));
     if (!$userIds) return 0;
     $done = array_column(supabase_user_request('event_evaluations', 'select=user_id&event_id=eq.' . urlencode($event['id'])), 'user_id');
@@ -4744,6 +4746,19 @@ function submit_evaluation(string $eventId, array $answers): array
     return ['ok' => true, 'message' => 'Thank you! Your evaluation was submitted.'];
 }
 
+/** Whether the "Evaluation after the event" switch is there (the event_evaluation_toggle update was run). */
+function evaluation_toggle_ready(): bool
+{
+    static $ready = null;
+    return $ready ??= !isset(pending_db_updates()['20261126100000_event_evaluation_toggle.sql']);
+}
+
+/** Whether an event has an evaluation after it (events.has_evaluation; on unless switched off). */
+function event_has_evaluation(?array $event): bool
+{
+    return ($event['has_evaluation'] ?? true) !== false;
+}
+
 /** Ids of the events the logged-in user has evaluated. */
 function get_my_evaluated_event_ids(): array
 {
@@ -4768,10 +4783,10 @@ function get_my_pending_evaluations(): array
     $user = current_user();
     if (!$user) return [];
     $rows = supabase_user_request('event_registrations',
-        'select=attended_at,events(id,title,start_date,end_date,poster_url)&user_id=eq.' . urlencode($user['id'])
+        'select=attended_at,events(id,title,start_date,end_date,poster_url' . (evaluation_toggle_ready() ? ',has_evaluation' : '') . ')&user_id=eq.' . urlencode($user['id'])
         . '&status=eq.attended&order=attended_at.desc.nullslast');
     $done = get_my_evaluated_event_ids();
-    return array_values(array_filter(array_column($rows, 'events'), fn($ev) => $ev && !in_array($ev['id'], $done, true)));
+    return array_values(array_filter(array_column($rows, 'events'), fn($ev) => $ev && event_has_evaluation($ev) && !in_array($ev['id'], $done, true)));
 }
 
 /** Every evaluation of an event with its answers (admins). Names aren't included: results are anonymous. */

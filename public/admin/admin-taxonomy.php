@@ -273,17 +273,11 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], ['Categories', null], [$ta
   <?php include __DIR__ . '/../../includes/topbar.php'; ?>
 
   <main class="dash-main">
-    <h1 class="page-title">Categories</h1>
+    <?php /* No tab buttons: the sidebar's Categories ▾ opens each list; the title names the one shown. */ ?>
+    <h1 class="page-title"><?= $tabTitle ?> <span class="page-title-count">(<?= count(['categories' => $categories, 'departments' => $allDepartments, 'organizations' => $organizations, 'venues' => $venues][$tab]) ?>)</span></h1>
 
     <?= render_flashes() ?>
     <?php foreach ($errors as $err): ?><div class="flash flash-error" role="alert"><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
-
-    <div class="admin-tabs" role="tablist">
-      <a href="admin-taxonomy.php?tab=categories" class="admin-tab<?= $tab === 'categories' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'categories' ? 'true' : 'false' ?>">Event Categories (<?= count($categories) ?>)</a>
-      <a href="admin-taxonomy.php?tab=departments" class="admin-tab<?= $tab === 'departments' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'departments' ? 'true' : 'false' ?>">Departments (<?= count($allDepartments) ?>)</a>
-      <a href="admin-taxonomy.php?tab=organizations" class="admin-tab<?= $tab === 'organizations' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'organizations' ? 'true' : 'false' ?>">Organizations (<?= count($organizations) ?>)</a>
-      <a href="admin-taxonomy.php?tab=venues" class="admin-tab<?= $tab === 'venues' ? ' active' : '' ?>" role="tab" aria-selected="<?= $tab === 'venues' ? 'true' : 'false' ?>">Venues (<?= count($venues) ?>)</a>
-    </div>
 
     <?php if ($tab === 'categories'): ?>
       <div class="taxonomy-list">

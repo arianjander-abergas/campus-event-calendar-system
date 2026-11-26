@@ -143,7 +143,8 @@ $roleSummaries = [
 ];
 
 $activeNav = ['approvals' => 'admin-approvals-' . $kind, 'roles' => 'admin-roles', 'accounts' => 'admin-users'][$tab];
-$pageTitle = ['approvals' => 'Approvals', 'roles' => 'Roles', 'accounts' => 'Users'][$tab];
+// Approvals has no tab buttons: the sidebar's Approvals ▾ opens Event approvals or Profile edits, named in the title.
+$pageTitle = ['approvals' => ($kind ?? 'events') === 'profiles' ? 'Profile edits' : 'Event approvals', 'roles' => 'Roles', 'accounts' => 'Users'][$tab];
 $breadcrumbs = [$isSuper ? ['Admin Dashboard', 'dashboard.php'] : ['Dashboard', '../enduser/dashboard.php'], [$pageTitle, null]];
 ?>
 <!DOCTYPE html>

@@ -103,7 +103,7 @@ $topbarSearch = true;
           $unavailable = in_array($ev['status'], ['cancelled', 'completed'], true)
               || ($ev['end_date'] ?? $ev['start_date']) < date('Y-m-d');
           // Attended but not evaluated yet: the row opens the evaluation form.
-          $toEvaluate = $reg['status'] === 'attended' && !has_evaluated($ev['id']);
+          $toEvaluate = $reg['status'] === 'attended' && event_has_evaluation($ev) && !has_evaluated($ev['id']);
           $rowHref = $toEvaluate ? 'evaluate.php?event=' . urlencode($ev['id']) : '../event-details.php?id=' . urlencode($ev['id']);
         ?>
           <a class="mini-row" href="<?= htmlspecialchars($rowHref) ?>"<?= $toEvaluate ? '' : ' data-event-modal' ?>>
