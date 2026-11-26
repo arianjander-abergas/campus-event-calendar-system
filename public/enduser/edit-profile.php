@@ -132,7 +132,7 @@ $breadcrumbs = $completing
         <h2 class="admin-card-title">Your details</h2>
 
         <div class="profile-head">
-          <span class="avatar avatar-lg"><?= htmlspecialchars(initials($user['full_name'])) ?></span>
+          <?= avatar_html($user, 'avatar avatar-lg') ?>
           <div>
             <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
             <div class="user-role"><?= htmlspecialchars($user['email'] ?? '') ?> · <?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></div>

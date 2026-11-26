@@ -671,7 +671,8 @@ const DB_UPDATES = [
     '20261120120000_venues.sql' => ['The venues list (On-campus places and Online platforms) for the event form\'s Venue dropdown', 'venues', 'select=id&limit=1'],
     '20261122120000_approval_notices.sql' => ['"Your event was approved / not approved" notices to the event\'s author, in the bell and by email', 'rpc', 'approval_notices_ready', []],
     '20261125130000_name_parts.sql' => ['Names in three parts (Last name, First name, Middle name) on sign-up and profiles', 'rpc', 'profile_names_ready', []],
-    '20261125140000_more_organizations.sql' => ['More than one organization per account (Other organizations on sign-up, profiles and Users)', 'rpc', 'profile_other_organizations_ready', []],];
+    '20261125140000_more_organizations.sql' => ['More than one organization per account (Other organizations on sign-up, profiles and Users)', 'rpc', 'profile_other_organizations_ready', []],
+    '20261126090000_profile_photos.sql' => ['Profile pictures (My Profile › Change photo)', 'rpc', 'profile_photos_ready', []],];
 
 /**
  * The database updates that haven't been run yet (file => what it switches on).
@@ -1558,7 +1559,89 @@ function start_user_session(array $authUser, string $accessToken, ?string $refre
 }
 
 /** Profile columns kept in the session (see current_user()). */
-const SESSION_PROFILE_SELECT = 'full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)';
+const SESSION_PROFILE_SELECT = 'full_name,role,account_type,department_id,organization_id,year_level,course,student_type,irregular_year_levels,avatar_url,school_ids(school_id,verified_at)';
+
+// ---- Profile pictures (migration 20261126090000_profile_photos.sql) ----------
+
+const PROFILE_PHOTO_BUCKET = 'profile-photos';
+
+/** Whether profile pictures are switched on (the profile_photos update was run). */
+function profile_photos_ready(): bool
+{
+    static $ready = null;
+    return $ready ??= !isset(pending_db_updates()['20261126090000_profile_photos.sql']);
+}
+
+/** The account's picture URL when it's one of its own uploads (else null: initials are shown). */
+function profile_photo_url(array $profile): ?string
+{
+    $url = (string) ($profile['avatar_url'] ?? '');
+    $prefix = rtrim(SUPABASE_URL, '/') . '/storage/v1/object/public/' . PROFILE_PHOTO_BUCKET . '/' . ($profile['id'] ?? '') . '/';
+    return $url !== '' && !empty($profile['id']) && str_starts_with($url, $prefix) && !str_contains($url, '..') ? $url : null;
+}
+
+/** The round avatar: the profile picture, or the initials. $class e.g. 'avatar avatar-lg'. */
+function avatar_html(array $profile, string $class = 'avatar'): string
+{
+    $url = profile_photo_url($profile);
+    if ($url !== null) {
+        return '<span class="' . htmlspecialchars($class) . ' has-photo"><img src="' . htmlspecialchars($url) . '" alt="" loading="lazy" decoding="async"></span>';
+    }
+    return '<span class="' . htmlspecialchars($class) . '">' . htmlspecialchars(initials((string) ($profile['full_name'] ?? ''))) . '</span>';
+}
+
+/** Storage path of a picture URL in the bucket ('<account id>/<file>'), or null. */
+function profile_photo_path(?string $url): ?string
+{
+    $prefix = rtrim(SUPABASE_URL, '/') . '/storage/v1/object/public/' . PROFILE_PHOTO_BUCKET . '/';
+    return $url && str_starts_with($url, $prefix) ? substr($url, strlen($prefix)) : null;
+}
+
+/**
+ * Set the logged-in user's picture from a form upload (<input type="file">),
+ * saved in their own folder; the previous one is deleted. No approval needed.
+ */
+function set_my_profile_photo(array $file): array
+{
+    $user = current_user();
+    if (!$user) return ['ok' => false, 'message' => 'Please log in again.'];
+    if (!profile_photos_ready()) return ['ok' => false, 'message' => 'Profile pictures need the latest database update first. Please ask a Super Admin to run it.'];
+    $upload = upload_public_image(PROFILE_PHOTO_BUCKET, $file, $user['id']);
+    if (!$upload['ok']) return ['ok' => false, 'message' => $upload['message'] ?? 'Choose a picture first.'];
+
+    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($user['id']), 'PATCH', ['avatar_url' => $upload['url']]);
+    if (empty($rows)) {
+        delete_profile_photo_file(profile_photo_path($upload['url']));
+        return ['ok' => false, 'message' => friendly_error('Could not save your picture. Please try again.')];
+    }
+    delete_profile_photo_file(profile_photo_path($user['avatar_url'] ?? null)); // the old one
+    reload_session_profile();
+    return ['ok' => true, 'message' => 'Your profile picture was updated.'];
+}
+
+/** Remove a profile picture: the logged-in user's own, or (Super Admin) anyone's. */
+function remove_profile_photo(?array $account = null): array
+{
+    $me = current_user();
+    if (!$me) return ['ok' => false, 'message' => 'Please log in again.'];
+    $account ??= $me;
+    $isMine = ($account['id'] ?? '') === $me['id'];
+    if (!$isMine && !is_super_admin_user()) return ['ok' => false, 'message' => 'Only a Super Admin can remove someone else\'s picture.'];
+
+    $rows = supabase_user_request('profiles', 'id=eq.' . urlencode($account['id']), 'PATCH', ['avatar_url' => null]);
+    if (empty($rows)) return ['ok' => false, 'message' => friendly_error('Could not remove the picture. Please try again.')];
+    delete_profile_photo_file(profile_photo_path($account['avatar_url'] ?? null));
+    if ($isMine) reload_session_profile();
+    return ['ok' => true, 'message' => $isMine ? 'Your profile picture was removed.' : 'Their profile picture was removed.'];
+}
+
+/** Delete one file from the bucket (best effort: a leftover file does no harm). */
+function delete_profile_photo_file(?string $path): void
+{
+    if (!$path || str_contains($path, '..')) return;
+    supabase_call('DELETE', '/storage/v1/object/' . PROFILE_PHOTO_BUCKET . '/' . $path, null, session_access_token());
+    $GLOBALS['supabase_last_error'] = '';
+}
 
 /**
  * Whether profiles have the name parts (last / first / middle name) — the
@@ -2392,7 +2475,7 @@ function set_user_role_admin(string $userId, string $role): array
 function get_profile_admin(string $userId): ?array
 {
     if (!is_uuid($userId)) return null;
-    $rows = supabase_user_request('profiles', 'select=id,' . profile_name_columns() . ',role,account_type,department_id,' . profile_org_columns() . ',year_level,course,student_type,irregular_year_levels,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
+    $rows = supabase_user_request('profiles', 'select=id,' . profile_name_columns() . ',role,account_type,department_id,' . profile_org_columns() . ',year_level,course,student_type,irregular_year_levels,avatar_url,school_ids(school_id,verified_at)&id=eq.' . urlencode($userId));
     if (empty($rows[0])) return null;
     $row = $rows[0];
     $row['school_id'] = $row['school_ids']['school_id'] ?? null;

@@ -27,6 +27,14 @@ $isProtected = in_array($account['id'], protected_account_ids(), true);
 $roleLocked = $isMe || $isProtected;
 $selfUrl = 'user-edit.php?' . http_build_query(['id' => $account['id'], 'back' => $back]);
 
+// Remove their profile picture (e.g. an inappropriate one).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'remove_photo') {
+    $result = remove_profile_photo($account);
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    header('Location: ' . $selfUrl);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && post_param('action') === 'save_account') {
     $errors = [];
     // The name: Last / First / Middle once the database has them (full name made from them), else one Full Name.
@@ -125,10 +133,13 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], [$fromRoles ? 'Roles' : 'U
         <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
 
         <div class="profile-head">
-          <span class="avatar avatar-lg"><?= htmlspecialchars(initials($account['full_name'])) ?></span>
+          <?= avatar_html($account, 'avatar avatar-lg') ?>
           <div>
             <div class="user-name"><?= htmlspecialchars($account['full_name']) ?><?= $isMe ? ' <span class="admin-table-sub">(you)</span>' : '' ?></div>
             <div class="user-role"><?= htmlspecialchars(role_display($account['role'], $account['account_type'] ?? null)) ?><?= $isProtected ? ' · Protected account' : '' ?></div>
+            <?php if (profile_photo_url($account)): /* the button belongs to the small form below the page (forms can't nest) */ ?>
+              <button type="submit" form="remove-photo-form" class="acct-link">Remove picture</button>
+            <?php endif; ?>
           </div>
         </div>
         <p class="admin-hint">Changes made here are saved straight away — they don't need approval.</p>
@@ -178,6 +189,12 @@ $breadcrumbs = [['Admin Dashboard', 'dashboard.php'], [$fromRoles ? 'Roles' : 'U
           <a href="<?= htmlspecialchars($back) ?>" class="btn btn-outline">Cancel</a>
           <button type="submit" class="btn btn-primary">Save changes</button>
         </div>
+      </form>
+      <form method="POST" action="<?= htmlspecialchars($selfUrl) ?>" id="remove-photo-form" hidden
+            data-confirm="Remove <?= htmlspecialchars($account['full_name']) ?>'s profile picture? Their initials show instead; they can add a new one."
+            data-confirm-title="Remove picture" data-confirm-ok="Remove" data-confirm-tone="danger">
+        <input type="hidden" name="action" value="remove_photo">
+        <input type="hidden" name="back" value="<?= htmlspecialchars($back) ?>">
       </form>
     </div>
   </main>

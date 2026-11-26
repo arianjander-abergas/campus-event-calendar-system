@@ -18,7 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = post_param('action');
     $errors = [];
 
-    if ($action === 'withdraw_request') {
+    if ($action === 'upload_photo') {
+        $result = set_my_profile_photo($_FILES['photo'] ?? []);
+        flash($result['ok'] ? 'success' : 'error', $result['message']);
+    } elseif ($action === 'remove_photo') {
+        $result = remove_profile_photo();
+        flash($result['ok'] ? 'success' : 'error', $result['message']);
+    } elseif ($action === 'withdraw_request') {
         $result = withdraw_profile_request(post_param('id'));
         flash($result['ok'] ? 'success' : 'error', $result['message']);
     } elseif ($action === 'change_password') {
@@ -147,7 +153,27 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
         <h2 class="admin-card-title" id="details-title">Your details</h2>
 
         <div class="profile-head">
-          <span class="avatar avatar-lg"><?= htmlspecialchars(initials($user['full_name'])) ?></span>
+          <?php if (profile_photos_ready()): $hasPhoto = profile_photo_url($user) !== null; ?>
+            <?php /* Profile picture: choosing a file sends it straight away (no approval needed). */ ?>
+            <form method="POST" action="profile.php" enctype="multipart/form-data" class="profile-photo" data-photo-form>
+              <input type="hidden" name="action" value="upload_photo">
+              <label class="profile-photo-pick" title="<?= $hasPhoto ? 'Change' : 'Add a' ?> profile picture">
+                <?= avatar_html($user, 'avatar avatar-xl') ?>
+                <span class="profile-photo-badge" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>
+                </span>
+                <input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif" class="profile-photo-input" data-photo-input aria-label="<?= $hasPhoto ? 'Change' : 'Add a' ?> profile picture">
+              </label>
+              <span class="profile-photo-links">
+                <span class="profile-photo-status" data-photo-status aria-live="polite"><?= $hasPhoto ? 'Change photo' : 'Add photo' ?></span>
+                <?php if ($hasPhoto): ?>
+                  <button type="submit" form="remove-photo-form" class="acct-link">Remove</button>
+                <?php endif; ?>
+              </span>
+            </form>
+          <?php else: ?>
+            <?= avatar_html($user, 'avatar avatar-lg') ?>
+          <?php endif; ?>
           <div>
             <div class="user-name"><?= htmlspecialchars($user['full_name']) ?></div>
             <div class="user-role"><?= htmlspecialchars($user['email'] ?? '') ?> · <?= htmlspecialchars(role_display($user['role'], $user['account_type'] ?? null)) ?></div>
@@ -172,6 +198,13 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
         <?php endif; ?>
       </section>
     </div>
+
+    <?php if (profile_photos_ready() && profile_photo_url($user)): ?>
+      <form method="POST" action="profile.php" id="remove-photo-form" hidden
+            data-confirm="Remove your profile picture? Your initials show instead." data-confirm-title="Remove picture" data-confirm-ok="Remove" data-confirm-tone="danger">
+        <input type="hidden" name="action" value="remove_photo">
+      </form>
+    <?php endif; ?>
 
     <!-- Change password: pop-up opened by the button in "Your details" -->
     <dialog class="acct-modal admin-modal" id="password-modal" aria-labelledby="password-modal-title"<?= $passwordErrors ? ' data-open' : '' ?>>
@@ -203,6 +236,37 @@ $breadcrumbs = [['Dashboard', BASE_URL . '/enduser/dashboard.php'], ['My Profile
 <?php include __DIR__ . '/../../includes/footer.php'; ?>
 
 <script>
+// Profile picture: checked here (type, 5 MB), shown right away, then sent.
+(function () {
+  var form = document.querySelector('[data-photo-form]');
+  if (!form) return;
+  var input = form.querySelector('[data-photo-input]');
+  var status = form.querySelector('[data-photo-status]');
+  var types = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  input.addEventListener('change', function () {
+    var file = input.files[0];
+    if (!file) return;
+    var problem = types.indexOf(file.type) < 0 ? 'Please choose a JPG, PNG, WEBP or GIF picture.'
+      : file.size > 5 * 1024 * 1024 ? 'That picture is bigger than 5 MB. Choose a smaller one.' : '';
+    if (problem) {
+      input.value = '';
+      if (window.cehAlert) window.cehAlert(problem, { title: 'Profile picture' }); else alert(problem);
+      return;
+    }
+    // Preview in the circle while it uploads.
+    var avatar = form.querySelector('.avatar');
+    avatar.classList.add('has-photo');
+    avatar.innerHTML = '';
+    var img = document.createElement('img');
+    img.alt = '';
+    img.src = URL.createObjectURL(file);
+    avatar.appendChild(img);
+    form.classList.add('is-uploading');
+    status.textContent = 'Uploading…';
+    form.submit();
+  });
+})();
+
 // Change password pop-up. The passwords are checked here (a message in the
 // pop-up instead of the browser's bubbles) and again by the server.
 (function () {

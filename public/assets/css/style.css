@@ -975,6 +975,27 @@ a.notif-item:hover { background: #f8fafc; }
   flex-shrink: 0;
 }
 .avatar-lg { width: 56px; height: 56px; font-size: 1.1rem; }
+.avatar-xl { width: 76px; height: 76px; font-size: 1.4rem; }
+/* A profile picture instead of the initials (avatar_html()). */
+.avatar.has-photo { background: var(--border); overflow: hidden; padding: 0; }
+.avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* My Profile: the picture, clicked to add / change it (a camera badge on its corner). */
+.profile-photo { display: flex; flex-direction: column; align-items: center; gap: 5px; margin: 0; }
+.profile-photo-pick { position: relative; display: block; cursor: pointer; border-radius: 50%; }
+.profile-photo-pick:focus-within { outline: 3px solid var(--blue-accent); outline-offset: 3px; }
+.profile-photo-pick:hover .avatar { filter: brightness(0.92); }
+.profile-photo-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.profile-photo-badge {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--p-main); color: var(--p-on-main, #fff);
+  border: 2px solid var(--card-bg); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+.profile-photo-links { display: flex; gap: 8px; align-items: baseline; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+.profile-photo-links .acct-link { font-size: 0.75rem; }
+.profile-photo.is-uploading .avatar { opacity: 0.6; }
 .user-name { font-weight: 700; font-size: 0.88rem; line-height: 1.1; }
 .user-role { font-size: 0.75rem; color: var(--text-muted); }
 

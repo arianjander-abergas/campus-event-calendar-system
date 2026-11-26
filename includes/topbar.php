@@ -49,7 +49,7 @@ $unreadCount = unread_count($notifications);
 
     <details class="user-menu">
       <summary class="user-chip">
-        <span class="avatar"><?= htmlspecialchars(initials($topUser['full_name'] ?? '')) ?></span>
+        <?= avatar_html($topUser) ?>
         <span class="user-text">
           <span class="user-name"><?= htmlspecialchars($topUser['full_name'] ?? '') ?></span>
           <span class="user-role"><?= htmlspecialchars(role_display($topUser['role'] ?? 'user', $topUser['account_type'] ?? null)) ?></span>
